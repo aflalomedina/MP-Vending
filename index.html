@@ -30,4 +30,297 @@
   .hero h1 em { font-style: normal; color: var(--accent); }
   .hero p { font-size: 1.1rem; color: var(--gray-3); max-width: 480px; margin-bottom: 2.5rem; font-weight: 300; line-height: 1.75; }
   .hero-btns { display: flex; gap: 1rem; flex-wrap: wrap; }
-  .btn-primary { background: var(--accent); color: var(--white); padding: 0.9rem 2rem; border-radius: 8px; text-decoration: none; font-weight: 500; font-size: 0.95re
+  .btn-primary { background: var(--accent); color: var(--white); padding: 0.9rem 2rem; border-radius: 8px; text-decoration: none; font-weight: 500; font-size: 0.95rem; transition: background 0.2s, transform 0.15s; display: inline-block; }
+  .btn-primary:hover { background: var(--accent-dark); transform: translateY(-1px); }
+  .btn-secondary { background: transparent; color: var(--black); padding: 0.9rem 2rem; border-radius: 8px; border: 1.5px solid var(--gray-light); text-decoration: none; font-weight: 500; font-size: 0.95rem; transition: border-color 0.2s, transform 0.15s; display: inline-block; }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+  .hero-visual { position: relative; z-index: 1; display: flex; justify-content: center; align-items: center; }
+  .machine-mockup { width: 260px; height: 460px; background: var(--gray-1); border-radius: 20px; position: relative; box-shadow: 30px 30px 60px rgba(0,0,0,0.15); overflow: hidden; }
+  .machine-screen { position: absolute; top: 12%; left: 50%; transform: translateX(-50%); width: 78%; height: 38%; background: #0a1628; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px solid #1e3a5f; }
+  .machine-screen-logo { font-family: var(--font-display); font-size: 1rem; font-weight: 800; color: var(--accent); letter-spacing: -0.5px; margin-bottom: 4px; }
+  .machine-screen p { font-size: 0.5rem; color: #5a8fc4; letter-spacing: 0.1em; text-transform: uppercase; }
+  .machine-grid { position: absolute; bottom: 30%; left: 8%; right: 8%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+  .machine-slot { height: 38px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; font-weight: 600; }
+  .slot-red { background: #8b1a1a; color: #ffaaaa; } .slot-blue { background: #1a3d8b; color: #aac4ff; }
+  .slot-green { background: #1a6b2e; color: #aaffbb; } .slot-yellow { background: #7a6a00; color: #ffe566; }
+  .slot-orange { background: #8b3a00; color: #ffbb88; } .slot-gray { background: #3a3a3a; color: #aaa; }
+  .machine-bottom { position: absolute; bottom: 0; left: 0; right: 0; height: 30%; background: var(--gray-2); border-top: 3px solid #3a3a3a; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 0 10px; }
+  .keypad { display: grid; grid-template-columns: repeat(3, 18px); gap: 4px; }
+  .key { width: 18px; height: 18px; background: #444; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 0.5rem; color: #999; font-family: var(--font-display); }
+  .delivery-tray { width: 70px; height: 28px; background: #222; border-radius: 6px; border: 1px solid #444; }
+  .hero-stats { display: flex; gap: 2rem; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--gray-light); }
+  .stat-num { font-family: var(--font-display); font-size: 1.8rem; font-weight: 800; color: var(--black); letter-spacing: -1px; line-height: 1; }
+  .stat-num span { color: var(--accent); }
+  .stat-label { font-size: 0.8rem; color: var(--gray-3); font-weight: 400; margin-top: 3px; }
+  section { padding: 6rem 5vw; }
+  .section-tag { font-size: 0.75rem; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.75rem; }
+  .section-title { font-family: var(--font-display); font-size: clamp(2rem, 3.5vw, 3rem); font-weight: 800; letter-spacing: -1.5px; line-height: 1.1; color: var(--black); margin-bottom: 1.2rem; }
+  .section-sub { font-size: 1.05rem; color: var(--gray-3); max-width: 520px; font-weight: 300; line-height: 1.75; }
+  .como { background: var(--black); color: var(--white); }
+  .como .section-title { color: var(--white); }
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0; margin-top: 4rem; position: relative; }
+  .steps::before { content: ''; position: absolute; top: 32px; left: 5%; right: 5%; height: 1px; background: #333; }
+  .step { padding: 0 2rem 2rem; }
+  .step-num { width: 64px; height: 64px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--white); margin-bottom: 1.5rem; position: relative; z-index: 1; }
+  .step h3 { font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; color: var(--white); margin-bottom: 0.6rem; }
+  .step p { font-size: 0.9rem; color: #888; line-height: 1.65; font-weight: 300; }
+  .services-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 4rem; }
+  .service-card { background: var(--white); border: 1px solid var(--gray-light); border-radius: 16px; padding: 2rem; transition: box-shadow 0.25s, transform 0.2s, border-color 0.25s; }
+  .service-card:hover { box-shadow: 0 12px 40px rgba(0,0,0,0.08); transform: translateY(-3px); border-color: var(--accent); }
+  .service-icon { width: 48px; height: 48px; background: var(--accent-light); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 1.2rem; font-size: 1.4rem; }
+  .service-card h3 { font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; margin-bottom: 0.6rem; }
+  .service-card p { font-size: 0.9rem; color: var(--gray-3); line-height: 1.65; font-weight: 300; }
+  .produtos { background: var(--accent-light); }
+  .produtos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.2rem; margin-top: 3rem; }
+  .produto-card { background: var(--white); border-radius: 14px; padding: 1.5rem 1.2rem; text-align: center; border: 1px solid rgba(212,80,26,0.1); transition: transform 0.2s; }
+  .produto-card:hover { transform: translateY(-3px); }
+  .produto-emoji { font-size: 2.5rem; margin-bottom: 0.8rem; display: block; }
+  .produto-card h4 { font-family: var(--font-display); font-size: 0.95rem; font-weight: 700; margin-bottom: 0.3rem; }
+  .produto-card p { font-size: 0.8rem; color: var(--gray-3); }
+  .setores-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 3.5rem; }
+  .setor-item { padding: 1.5rem; border: 1px solid var(--gray-light); border-radius: 12px; text-align: center; transition: border-color 0.2s, background 0.2s; }
+  .setor-item:hover { border-color: var(--accent); background: var(--accent-light); }
+  .setor-item span { font-size: 2rem; display: block; margin-bottom: 0.6rem; }
+  .setor-item p { font-size: 0.85rem; font-weight: 500; color: var(--black); }
+  .porque { background: var(--black); color: var(--white); }
+  .porque .section-title { color: var(--white); }
+  .vantagens { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; margin-top: 4rem; align-items: center; }
+  .vantagem-list { display: flex; flex-direction: column; gap: 1.5rem; }
+  .vantagem { display: flex; gap: 1.2rem; align-items: flex-start; }
+  .v-icon { width: 44px; height: 44px; min-width: 44px; background: rgba(212,80,26,0.15); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: var(--accent); }
+  .v-text h4 { font-family: var(--font-display); font-size: 1rem; font-weight: 700; color: var(--white); margin-bottom: 0.3rem; }
+  .v-text p { font-size: 0.875rem; color: #777; line-height: 1.6; }
+  .porque-visual { background: var(--gray-1); border-radius: 20px; padding: 2.5rem; border: 1px solid #2a2a2a; }
+  .porque-visual h3 { font-family: var(--font-display); font-size: 1.2rem; font-weight: 700; color: var(--white); margin-bottom: 1.5rem; }
+  .metric-row { display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; border-bottom: 1px solid #2a2a2a; }
+  .metric-row:last-child { border-bottom: none; }
+  .metric-label { font-size: 0.85rem; color: #888; }
+  .metric-val { font-family: var(--font-display); font-size: 1.3rem; font-weight: 800; color: var(--accent); letter-spacing: -0.5px; }
+  .testi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 3.5rem; }
+  .testi-card { background: var(--white); border: 1px solid var(--gray-light); border-radius: 16px; padding: 2rem; }
+  .testi-stars { color: var(--accent); font-size: 0.9rem; margin-bottom: 1rem; letter-spacing: 2px; }
+  .testi-card blockquote { font-size: 0.95rem; color: var(--black); line-height: 1.7; margin-bottom: 1.2rem; font-weight: 300; font-style: italic; }
+  .testi-author { display: flex; align-items: center; gap: 0.8rem; }
+  .author-avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 0.85rem; font-weight: 700; color: var(--white); background: var(--accent); }
+  .author-info p:first-child { font-size: 0.9rem; font-weight: 500; }
+  .author-info p:last-child { font-size: 0.8rem; color: var(--gray-3); }
+  .contacto { background: var(--accent); color: var(--white); }
+  .contacto-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 5rem; align-items: center; }
+  .contacto .section-title { color: var(--white); font-size: 2.5rem; }
+  .contacto p { color: rgba(255,255,255,0.8); font-size: 1rem; line-height: 1.7; margin-bottom: 2rem; }
+  .contact-details { display: flex; flex-direction: column; gap: 1rem; margin-top: 1.5rem; }
+  .contact-item { display: flex; gap: 0.75rem; align-items: center; }
+  .contact-item a { color: var(--white); text-decoration: none; font-size: 0.95rem; opacity: 0.9; }
+  .contact-form { background: rgba(255,255,255,0.12); border-radius: 16px; padding: 2.5rem; }
+  .form-group { margin-bottom: 1.2rem; }
+  .form-group label { display: block; font-size: 0.85rem; margin-bottom: 0.4rem; opacity: 0.85; }
+  .form-group input, .form-group select, .form-group textarea { width: 100%; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); border-radius: 8px; padding: 0.75rem 1rem; color: var(--white); font-family: var(--font-body); font-size: 0.9rem; outline: none; }
+  .form-group input::placeholder, .form-group textarea::placeholder { color: rgba(255,255,255,0.5); }
+  .form-group select option { background: var(--accent-dark); }
+  .form-group textarea { height: 90px; resize: none; }
+  .btn-form { width: 100%; background: var(--white); color: var(--accent); border: none; padding: 0.9rem; border-radius: 8px; font-family: var(--font-body); font-size: 0.95rem; font-weight: 600; cursor: pointer; margin-top: 0.5rem; }
+  footer { background: var(--black); color: #888; padding: 3rem 5vw; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+  .footer-logo { font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--white); text-decoration: none; }
+  .footer-logo span { color: var(--accent); }
+  footer p { font-size: 0.85rem; }
+  .footer-links { display: flex; gap: 2rem; }
+  .footer-links a { color: #666; text-decoration: none; font-size: 0.85rem; }
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: 1fr; text-align: center; padding-top: 6rem; }
+    .hero::before { display: none; }
+    .hero p { margin-inline: auto; }
+    .hero-btns { justify-content: center; }
+    .hero-stats { justify-content: center; }
+    .hero-visual { display: none; }
+    .vantagens { grid-template-columns: 1fr; }
+    .contacto-inner { grid-template-columns: 1fr; gap: 3rem; }
+    .steps::before { display: none; }
+    nav ul { display: none; }
+  }
+</style>
+</head>
+<body>
+<nav>
+  <a href="#" class="logo">MP<span>.</span>Vending</a>
+  <ul>
+    <li><a href="#servicos">Serviços</a></li>
+    <li><a href="#produtos">Produtos</a></li>
+    <li><a href="#setores">Setores</a></li>
+    <li><a href="#sobre">Sobre</a></li>
+    <li><a href="#contacto" class="btn-nav">Pedir proposta</a></li>
+  </ul>
+</nav>
+
+<section class="hero">
+  <div class="hero-content">
+    <span class="hero-tag">✦ Vending para empresas</span>
+    <h1>A pausa<br>que a sua<br>equipa <em>merece.</em></h1>
+    <p>Instalamos, abastecemos e mantemos máquinas de vending de café, bebidas e snacks — sem custos, sem preocupações, com total dedicação.</p>
+    <div class="hero-btns">
+      <a href="#contacto" class="btn-primary">Pedir proposta gratuita</a>
+      <a href="#servicos" class="btn-secondary">Como funciona</a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat-item">
+        <div class="stat-num">500<span>+</span></div>
+        <div class="stat-label">Máquinas instaladas</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">98<span>%</span></div>
+        <div class="stat-label">Satisfação de clientes</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">24<span>h</span></div>
+        <div class="stat-label">Suporte técnico</div>
+      </div>
+    </div>
+  </div>
+  <div class="hero-visual">
+    <div class="machine-mockup">
+      <div class="machine-screen">
+        <div class="machine-screen-logo">MP Vending</div>
+        <p>Bem-vindo</p>
+      </div>
+      <div class="machine-grid">
+        <div class="machine-slot slot-red">Cola</div>
+        <div class="machine-slot slot-blue">Água</div>
+        <div class="machine-slot slot-yellow">Sumo</div>
+        <div class="machine-slot slot-orange">Snack</div>
+        <div class="machine-slot slot-green">Saud.</div>
+        <div class="machine-slot slot-gray">Café</div>
+      </div>
+      <div class="machine-bottom">
+        <div>
+          <div class="keypad">
+            <div class="key">A1</div><div class="key">A2</div><div class="key">A3</div>
+            <div class="key">B1</div><div class="key">B2</div><div class="key">B3</div>
+          </div>
+        </div>
+        <div class="delivery-tray"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="como" id="servicos">
+  <div class="section-tag" style="color:var(--accent);">Processo</div>
+  <div class="section-title">Simples do início ao fim</div>
+  <div class="section-sub" style="color:#888;">Tratamos de tudo — do pedido à manutenção. A sua empresa não precisa de se preocupar com nada.</div>
+  <div class="steps">
+    <div class="step"><div class="step-num">01</div><h3>Contacte-nos</h3><p>Avaliamos o seu espaço e percebemos as necessidades da sua equipa.</p></div>
+    <div class="step"><div class="step-num">02</div><h3>Proposta personalizada</h3><p>Enviamos uma solução à medida — o número certo de máquinas e produtos.</p></div>
+    <div class="step"><div class="step-num">03</div><h3>Instalação gratuita</h3><p>A nossa equipa instala as máquinas sem custo. Sem obras, sem complicações.</p></div>
+    <div class="step"><div class="step-num">04</div><h3>Gestão total</h3><p>Reabastecimento regular, manutenção preventiva e suporte técnico incluídos.</p></div>
+  </div>
+</section>
+
+<section id="sobre">
+  <div class="section-tag">O que oferecemos</div>
+  <div class="section-title">Soluções completas de vending</div>
+  <div class="section-sub">Desde o café da manhã até ao lanche da tarde — temos tudo o que a sua equipa precisa.</div>
+  <div class="services-grid">
+    <div class="service-card"><div class="service-icon">☕</div><h3>Máquinas de Café</h3><p>Café de qualidade, expresso, cappuccino e bebidas quentes. Marcas premium selecionadas.</p></div>
+    <div class="service-card"><div class="service-icon">🥤</div><h3>Bebidas Frias</h3><p>Refrigerantes, sumos, água e bebidas energéticas. Sempre frescas, 24 horas por dia.</p></div>
+    <div class="service-card"><div class="service-icon">🍪</div><h3>Snacks & Refeições</h3><p>Snacks, bolachas, fruta e opções saudáveis para qualquer momento do dia.</p></div>
+    <div class="service-card"><div class="service-icon">🔧</div><h3>Manutenção Incluída</h3><p>Assistência técnica rápida. Tempo médio de resposta inferior a 4 horas.</p></div>
+    <div class="service-card"><div class="service-icon">📱</div><h3>Pagamento Digital</h3><p>MB Way, cartão de crédito, multibanco e moedas. Tecnologia moderna e segura.</p></div>
+    <div class="service-card"><div class="service-icon">📊</div><h3>Gestão Remota</h3><p>Monitorização em tempo real do estado das máquinas e níveis de stock.</p></div>
+  </div>
+</section>
+
+<section class="produtos" id="produtos">
+  <div class="section-tag">Catálogo</div>
+  <div class="section-title">Variedade para todos os gostos</div>
+  <div class="section-sub">Selecionamos os melhores produtos para garantir que a sua equipa tem sempre o que precisa.</div>
+  <div class="produtos-grid">
+    <div class="produto-card"><span class="produto-emoji">☕</span><h4>Café & Infusões</h4><p>Expresso, cappuccino, chá, chocolate</p></div>
+    <div class="produto-card"><span class="produto-emoji">🥤</span><h4>Refrigerantes</h4><p>Coca-Cola, Fanta, Pepsi, Sprite</p></div>
+    <div class="produto-card"><span class="produto-emoji">💧</span><h4>Água & Sumos</h4><p>Água com e sem gás, sumos naturais</p></div>
+    <div class="produto-card"><span class="produto-emoji">🍫</span><h4>Chocolates</h4><p>Barras, snacks, amendoins</p></div>
+    <div class="produto-card"><span class="produto-emoji">🥗</span><h4>Opções Saudáveis</h4><p>Fruta, barras de cereais, frutos secos</p></div>
+    <div class="produto-card"><span class="produto-emoji">🥪</span><h4>Refeições Rápidas</h4><p>Sandes, wraps, saladas embaladas</p></div>
+  </div>
+</section>
+
+<section id="setores">
+  <div class="section-tag">Onde atuamos</div>
+  <div class="section-title">Adaptamos ao seu setor</div>
+  <div class="section-sub">Cada espaço tem as suas necessidades. Personalizamos as soluções para cada cliente.</div>
+  <div class="setores-grid">
+    <div class="setor-item"><span>🏢</span><p>Escritórios</p></div>
+    <div class="setor-item"><span>🏭</span><p>Indústria</p></div>
+    <div class="setor-item"><span>🏥</span><p>Saúde</p></div>
+    <div class="setor-item"><span>🎓</span><p>Educação</p></div>
+    <div class="setor-item"><span>🏨</span><p>Hotelaria</p></div>
+    <div class="setor-item"><span>🏪</span><p>Retalho</p></div>
+    <div class="setor-item"><span>⚽</span><p>Desporto</p></div>
+    <div class="setor-item"><span>🏛️</span><p>Setor Público</p></div>
+  </div>
+</section>
+
+<section class="porque">
+  <div class="section-tag" style="color:var(--accent);">Porquê a MP Vending</div>
+  <div class="section-title">Mais do que máquinas, um parceiro de confiança</div>
+  <div class="vantagens">
+    <div class="vantagem-list">
+      <div class="vantagem"><div class="v-icon">⚡</div><div class="v-text"><h4>Resposta rápida</h4><p>Intervenção técnica em menos de 4 horas.</p></div></div>
+      <div class="vantagem"><div class="v-icon">💰</div><div class="v-text"><h4>Sem custos de instalação</h4><p>Instalação, manutenção e reabastecimento sem custo fixo.</p></div></div>
+      <div class="vantagem"><div class="v-icon">🎯</div><div class="v-text"><h4>Solução personalizada</h4><p>Cada cliente tem uma solução feita à sua medida.</p></div></div>
+      <div class="vantagem"><div class="v-icon">🌿</div><div class="v-text"><h4>Opções sustentáveis</h4><p>Máquinas eficientes e produtos com embalagens mais sustentáveis.</p></div></div>
+    </div>
+    <div class="porque-visual">
+      <h3>A nossa diferença em números</h3>
+      <div class="metric-row"><span class="metric-label">Tempo médio de resposta</span><span class="metric-val">&lt; 4h</span></div>
+      <div class="metric-row"><span class="metric-label">Disponibilidade das máquinas</span><span class="metric-val">99.2%</span></div>
+      <div class="metric-row"><span class="metric-label">Clientes satisfeitos</span><span class="metric-val">98%</span></div>
+      <div class="metric-row"><span class="metric-label">Instalação sem custos</span><span class="metric-val">100%</span></div>
+      <div class="metric-row"><span class="metric-label">Variedade de produtos</span><span class="metric-val">80+</span></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="section-tag">Clientes</div>
+  <div class="section-title">O que dizem de nós</div>
+  <div class="testi-grid">
+    <div class="testi-card"><div class="testi-stars">★★★★★</div><blockquote>"Excelente serviço! As máquinas estão sempre funcionais e o abastecimento é feito sem precisarmos de pedir."</blockquote><div class="testi-author"><div class="author-avatar">JS</div><div class="author-info"><p>João Silva</p><p>Diretor RH · TechGroup Portugal</p></div></div></div>
+    <div class="testi-card"><div class="testi-stars">★★★★★</div><blockquote>"Instalação feita em menos de um dia, sem obras nem complicações. Os colaboradores adoraram a variedade."</blockquote><div class="testi-author"><div class="author-avatar">AC</div><div class="author-info"><p>Ana Costa</p><p>Office Manager · Logística Norte</p></div></div></div>
+    <div class="testi-card"><div class="testi-stars">★★★★★</div><blockquote>"Já temos a MP Vending há 3 anos. O serviço é consistente e respondem sempre rápido. Não mudávamos por nada."</blockquote><div class="testi-author"><div class="author-avatar">MR</div><div class="author-info"><p>Miguel Rodrigues</p><p>CEO · Grupo Industrial MR</p></div></div></div>
+  </div>
+</section>
+
+<section class="contacto" id="contacto">
+  <div class="contacto-inner">
+    <div>
+      <div class="section-tag" style="color:rgba(255,255,255,0.6);">Contacto</div>
+      <div class="section-title">Pronto para começar?</div>
+      <p>Fale connosco sem compromisso. Enviamos uma proposta personalizada em menos de 24 horas.</p>
+      <div class="contact-details">
+        <div class="contact-item"><span>📍</span><a href="#">Porto, Portugal</a></div>
+        <div class="contact-item"><span>📞</span><a href="tel:+351220000000">+351 220 000 000</a></div>
+        <div class="contact-item"><span>✉️</span><a href="mailto:geral@mpvending.pt">geral@mpvending.pt</a></div>
+        <div class="contact-item"><span>🕐</span><a href="#">Seg–Sex, 8h–18h</a></div>
+      </div>
+    </div>
+    <div class="contact-form">
+      <div class="form-group"><label>Nome da empresa</label><input type="text" placeholder="Ex: Empresa Lda."></div>
+      <div class="form-group"><label>Nome do responsável</label><input type="text" placeholder="O seu nome"></div>
+      <div class="form-group"><label>Email</label><input type="email" placeholder="email@empresa.pt"></div>
+      <div class="form-group"><label>Nº de colaboradores</label><select><option>Selecionar...</option><option>1–25</option><option>26–100</option><option>101–300</option><option>300+</option></select></div>
+      <div class="form-group"><label>Mensagem (opcional)</label><textarea placeholder="Descreva brevemente o seu espaço..."></textarea></div>
+      <button class="btn-form">Enviar pedido →</button>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <a href="#" class="footer-logo">MP<span>.</span>Vending</a>
+  <p>© 2025 MP Vending · Todos os direitos reservados</p>
+  <div class="footer-links">
+    <a href="#">Privacidade</a>
+    <a href="#">Termos</a>
+    <a href="#">Cookies</a>
+  </div>
+</footer>
+</body>
+</html>
