@@ -146,10 +146,20 @@
   /* ---------- MACHINE SHOWCASE ---------- */
   .machine-grid{ display:grid; grid-template-columns:0.85fr 1.15fr; gap:64px; align-items:center; }
   @media (max-width:860px){ .machine-grid{grid-template-columns:1fr; gap:40px;} }
-  .machine-art svg{ width:100%; max-width:300px; height:auto; display:block; margin:0 auto; filter:drop-shadow(0 18px 34px rgba(11,18,32,0.18)); }
+  .machine-photo{ position:relative; border-radius:10px; overflow:hidden; aspect-ratio:4/5; box-shadow:0 18px 34px rgba(11,18,32,0.18); }
+  .machine-photo img{ width:100%; height:100%; object-fit:cover; display:block; filter:grayscale(30%) contrast(1.05); }
+  .machine-photo::after{ content:''; position:absolute; inset:0; background:linear-gradient(160deg, rgba(74,127,229,0.32), rgba(11,18,32,0.5)); mix-blend-mode:multiply; }
   .machine-specs{ list-style:none; margin-top:32px; display:flex; flex-direction:column; gap:16px; }
   .machine-specs li{ display:flex; align-items:baseline; gap:14px; font-size:14.5px; color:var(--gray); font-weight:600; }
   .machine-specs li span{ font-family:'Archivo Black'; font-size:20px; color:var(--blue-dark); min-width:52px; }
+
+  /* ---------- WATER SECTION ---------- */
+  .water-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line-dark); border:1px solid var(--line-dark); margin-top:52px; }
+  @media (max-width:700px){ .water-grid{grid-template-columns:1fr;} }
+  .water-tile{ background:var(--ink); padding:36px 28px; }
+  .water-tile svg{ margin-bottom:18px; }
+  .water-tile h3{ font-family:'Inter'; font-weight:800; font-size:16px; text-transform:none; margin-bottom:8px; }
+  .water-tile p{ font-size:14px; color:var(--gray-dark); line-height:1.55; }
 
   /* ---------- WHY US ---------- */
   .why-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line-dark); border:1px solid var(--line-dark); margin-top:52px;}
@@ -225,6 +235,7 @@
     <div class="navlinks">
       <a href="#servicos">Serviços</a>
       <a href="#maquina">A Máquina</a>
+      <a href="#agua">Água Filtrada</a>
       <a href="#setores">Setores</a>
       <a href="#sobre">Sobre</a>
     </div>
@@ -279,62 +290,15 @@
 
 <section class="off" id="maquina">
   <div class="wrap machine-grid">
-    <div class="machine-art reveal">
-      <svg viewBox="0 0 340 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Ilustração de máquina de vending combinada">
-        <rect x="10" y="10" width="320" height="440" rx="14" fill="#0B1220"/>
-        <rect x="24" y="24" width="292" height="412" rx="8" fill="none" stroke="#2A3A57" stroke-width="1.5"/>
-        <!-- display -->
-        <rect x="40" y="40" width="150" height="76" rx="4" fill="#12203B" stroke="#4A7FE5" stroke-width="1.5"/>
-        <text x="115" y="72" text-anchor="middle" font-family="Space Mono, monospace" font-size="12" fill="#4A7FE5">SELECIONE</text>
-        <text x="115" y="96" text-anchor="middle" font-family="Space Mono, monospace" font-size="10" fill="#93A0B8">CAFÉ · SNACKS · BEBIDAS</text>
-        <!-- keypad -->
-        <g fill="#12203B" stroke="#2A3A57" stroke-width="1">
-          <rect x="200" y="40" width="30" height="22" rx="3"/>
-          <rect x="236" y="40" width="30" height="22" rx="3"/>
-          <rect x="272" y="40" width="30" height="22" rx="3"/>
-          <rect x="200" y="66" width="30" height="22" rx="3"/>
-          <rect x="236" y="66" width="30" height="22" rx="3"/>
-          <rect x="272" y="66" width="30" height="22" rx="3"/>
-          <rect x="200" y="92" width="30" height="22" rx="3"/>
-          <rect x="236" y="92" width="30" height="22" rx="3"/>
-          <rect x="272" y="92" width="30" height="22" rx="3"/>
-        </g>
-        <!-- hot drinks window -->
-        <rect x="40" y="132" width="120" height="130" rx="4" fill="#0E1830" stroke="#2A3A57" stroke-width="1.5"/>
-        <circle cx="100" cy="175" r="20" fill="none" stroke="#4A7FE5" stroke-width="2"/>
-        <path d="M85 195 h30 l-4 34 a12 12 0 0 1 -22 0 Z" fill="none" stroke="#4A7FE5" stroke-width="2"/>
-        <text x="100" y="252" text-anchor="middle" font-family="Space Mono, monospace" font-size="9" fill="#93A0B8">BEBIDAS QUENTES</text>
-        <!-- snacks window -->
-        <rect x="172" y="132" width="128" height="130" rx="4" fill="#0E1830" stroke="#2A3A57" stroke-width="1.5"/>
-        <g stroke="#4A7FE5" stroke-width="1.5" fill="none">
-          <rect x="188" y="150" width="24" height="34" rx="3"/>
-          <rect x="220" y="150" width="24" height="34" rx="3"/>
-          <rect x="252" y="150" width="24" height="34" rx="3"/>
-          <rect x="188" y="192" width="24" height="34" rx="3"/>
-          <rect x="220" y="192" width="24" height="34" rx="3"/>
-          <rect x="252" y="192" width="24" height="34" rx="3"/>
-        </g>
-        <text x="236" y="252" text-anchor="middle" font-family="Space Mono, monospace" font-size="9" fill="#93A0B8">SNACKS</text>
-        <!-- payment module -->
-        <rect x="40" y="278" width="260" height="46" rx="4" fill="#12203B" stroke="#2A3A57" stroke-width="1.5"/>
-        <rect x="54" y="291" width="46" height="20" rx="3" fill="none" stroke="#4A7FE5" stroke-width="1.5"/>
-        <text x="86" y="305" text-anchor="middle" font-family="Space Mono, monospace" font-size="8" fill="#4A7FE5">NFC</text>
-        <circle cx="130" cy="301" r="9" fill="none" stroke="#4A7FE5" stroke-width="1.5"/>
-        <rect x="160" y="291" width="60" height="20" rx="3" fill="none" stroke="#2A3A57" stroke-width="1.5"/>
-        <text x="270" y="305" text-anchor="middle" font-family="Space Mono, monospace" font-size="8" fill="#93A0B8">MB WAY</text>
-        <!-- dispenser tray -->
-        <rect x="40" y="340" width="260" height="70" rx="4" fill="#0E1830" stroke="#2A3A57" stroke-width="1.5"/>
-        <rect x="60" y="380" width="220" height="8" rx="4" fill="#1B2A47"/>
-        <!-- base -->
-        <rect x="10" y="450" width="320" height="6" rx="3" fill="#2A3A57"/>
-      </svg>
+    <div class="machine-photo reveal">
+      <img src="https://images.unsplash.com/photo-1631248286273-5998135986e5?auto=format&fit=crop&w=1200&q=80" alt="Máquina de vending combinada com bebidas quentes e snacks" loading="lazy">
     </div>
     <div class="machine-copy reveal">
       <div class="section-tag mono">A NOSSA MÁQUINA</div>
       <h2>Café, snacks e<br>bebidas. Numa só<br>máquina.</h2>
       <p class="gray-text" style="margin-top:18px; font-size:15px; line-height:1.65; max-width:420px;">Instalamos máquinas combinadas de última geração — bebidas quentes, snacks e bebidas frias no mesmo equipamento. Ecrã tátil, pagamento contactless e reposição gerida por nós.</p>
       <ul class="machine-specs">
-        <li><span>+30</span> seleções de café, snacks e bebidas</li>
+        <li><span>+80</span> seleções de café, snacks e bebidas</li>
         <li><span>NFC</span> MB Way, cartão e contactless</li>
         <li><span>24H</span> monitorização remota de stock</li>
       </ul>
@@ -342,7 +306,34 @@
   </div>
 </section>
 
-<section class="dark" id="setores">
+<section class="dark" id="agua">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="section-tag mono">NOVO · SUSTENTABILIDADE</div>
+      <h2>Água filtrada.<br>Para as pessoas e<br>para o planeta.</h2>
+      <p class="gray-text" style="margin-top:16px; font-size:15px; max-width:480px;">Complementa a tua oferta com máquinas de água filtrada — menos garrafas de plástico, mais conveniência para a equipa.</p>
+    </div>
+    <div class="water-grid">
+      <div class="water-tile reveal">
+        <svg width="34" height="34" viewBox="0 0 34 34" fill="none"><path d="M17 3C17 3 7 15 7 21.5C7 26.7467 11.2533 31 16.5 31H17.5C22.7467 31 27 26.7467 27 21.5C27 15 17 3 17 3Z" stroke="#4A7FE5" stroke-width="1.8"/></svg>
+        <h3>Filtração multi-fase</h3>
+        <p>Água fresca e purificada, com ou sem gás, diretamente da rede — sem necessidade de garrafões.</p>
+      </div>
+      <div class="water-tile reveal">
+        <svg width="34" height="34" viewBox="0 0 34 34" fill="none"><path d="M4 17C4 17 10 9 17 9C24 9 30 17 30 17C30 17 24 25 17 25C10 25 4 17 4 17Z" stroke="#4A7FE5" stroke-width="1.8"/><circle cx="17" cy="17" r="4" stroke="#4A7FE5" stroke-width="1.8"/></svg>
+        <h3>Menos plástico</h3>
+        <p>Reduz drasticamente o consumo de garrafas de plástico de uso único no teu espaço de trabalho.</p>
+      </div>
+      <div class="water-tile reveal">
+        <svg width="34" height="34" viewBox="0 0 34 34" fill="none"><rect x="6" y="6" width="22" height="22" rx="4" stroke="#4A7FE5" stroke-width="1.8"/><path d="M12 17L15.5 20.5L22 13" stroke="#4A7FE5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <h3>Manutenção incluída</h3>
+        <p>Instalação, troca de filtros e assistência técnica geridas por nós — sem esforço para a tua equipa.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="dark" id="setores" style="border-top:1px solid var(--line-dark);">
   <div class="wrap">
     <div class="section-head">
       <div class="section-tag mono">ONDE ATUAMOS</div>
@@ -415,7 +406,7 @@
       </div>
 
       <form id="contactForm" action="https://api.web3forms.com/submit" method="POST">
-        <input type="hidden" name="access_key" value="d33cd99d-d70e-48e5-8157-fea4bae024f1">
+        <input type="hidden" name="access_key" value="COLOCA_AQUI_A_TUA_ACCESS_KEY">
         <input type="hidden" name="subject" value="Novo pedido de proposta — MP Vending Solutions">
         <input type="hidden" name="from_name" value="Site MP Vending Solutions">
         <input type="text" name="botcheck" style="display:none" tabindex="-1" autocomplete="off">
