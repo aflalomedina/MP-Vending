@@ -2,6 +2,10 @@
   "name": "mp-vending",
   "compatibility_date": "2026-09-09",
   "main": "src/worker.js",
+  "vars": {
+    "PORTAL_URL": "https://mpvending.luope.com",
+    "METABASE_URL": "https://bi-mpvending.luope.com"
+  },
   "assets": {
     "directory": "./",
     "binding": "ASSETS",
