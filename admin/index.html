@@ -41,6 +41,8 @@
     padding: 20px 32px;
     border-bottom: 1px solid var(--line);
     background: var(--panel);
+    flex-wrap: wrap;
+    gap: 10px;
   }
 
   .topbar .brand {
@@ -55,11 +57,44 @@
     font-weight: 600;
   }
 
+  .topbar .right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
   .topbar .updated {
     font-size: 13px;
     color: var(--muted);
     font-family: 'IBM Plex Mono', monospace;
   }
+
+  .compare-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+  }
+
+  .compare-box input[type="date"] {
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 5px 8px;
+    font-family: inherit;
+    font-size: 13px;
+  }
+
+  .compare-box button {
+    background: var(--ink);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .compare-box button:hover { background: #333744; }
 
   main {
     max-width: 1180px;
@@ -94,6 +129,15 @@
     font-size: 13px;
     color: var(--muted);
   }
+
+  .kpi .delta {
+    margin-top: 4px;
+    font-size: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .kpi .delta.up { color: var(--positive); }
+  .kpi .delta.down { color: var(--negative); }
 
   .grid-2 {
     display: grid;
@@ -148,8 +192,11 @@
   }
 
   .state.error { color: var(--negative); }
+  .state.small { padding: 14px; font-size: 13px; }
 
   .table-wrap { max-height: 360px; overflow-y: auto; }
+
+  #compareResult { margin-bottom: 14px; display: none; }
 
   @media (max-width: 860px) {
     .kpis { grid-template-columns: repeat(2, 1fr); }
@@ -164,10 +211,19 @@
     <div class="brand">MP VENDING</div>
     <h1>Painel de Vendas</h1>
   </div>
-  <div class="updated" id="updatedAt">a carregar…</div>
+  <div class="right">
+    <div class="compare-box">
+      <label for="compareDate">Comparar com:</label>
+      <input type="date" id="compareDate" />
+      <button id="compareBtn">Comparar</button>
+    </div>
+    <div class="updated" id="updatedAt">a carregar…</div>
+  </div>
 </div>
 
 <main>
+  <div id="compareResult" class="panel full"></div>
+
   <div class="kpis">
     <div class="kpi"><div class="value" id="kpiReceita">—</div><div class="label">Receita (período carregado)</div></div>
     <div class="kpi"><div class="value" id="kpiTransacoes">—</div><div class="label">Transações</div></div>
@@ -181,14 +237,20 @@
       <canvas id="chartTrend" height="220"></canvas>
     </div>
     <div class="panel">
-      <h2>Top 8 produtos</h2>
+      <h2>Top 8 produtos (receita e quantidade)</h2>
       <canvas id="chartTop" height="220"></canvas>
     </div>
   </div>
 
-  <div class="panel full">
-    <h2>Receita por máquina</h2>
-    <canvas id="chartMaquinas" height="140"></canvas>
+  <div class="grid-2">
+    <div class="panel">
+      <h2>Receita por máquina</h2>
+      <canvas id="chartMaquinas" height="200"></canvas>
+    </div>
+    <div class="panel">
+      <h2>Vendas por subfamília</h2>
+      <canvas id="chartSubfamilia" height="200"></canvas>
+    </div>
   </div>
 
   <div class="panel full">
@@ -200,10 +262,45 @@
 </main>
 
 <script>
+  // ===== Tabelas de referência (nomes em vez de códigos) =====
+
+  // Matrícula da máquina -> nome do cliente (fonte: Lista de Máquinas)
+  const MACHINES = {
+    "001": "Crossfit Foz", "002": "Futurdouro", "002-S": "Futurdouro",
+    "003": "RH Detail", "003-S": "RH Detail", "004": "Futurdouro",
+    "005": "Studio up Yoga", "006": "Adopthouse", "006-S": "Adopthouse",
+    "007": "Futurdouro", "007-S": "Futurdouro", "008": "Edinorte - Oasis",
+    "008-S": "Edinorte - Oasis", "009": "D'Casa - Construção Civil e Reabilitação",
+    "009-S": "D'Casa - Construção Civil e Reabilitação", "010": "Blue Sky Gondomar",
+    "011": "Garcia Garcia", "012": "Futurdouro", "013": "Garcia Garcia",
+    "014": "Blue Sky Gondomar", "015": "Nogueira Fernandes SA", "016": "Nogueira Fernandes SA",
+  };
+
+  // Código do produto -> nome (fonte: export de produtos) — usado na tabela de stock
+  const PRODUCTS = {"1001":"Coca Cola Zero Lata 33 Cl","1003":"Leite Uht Achocolatado Agros 200 Ml","1005":"Snack de Chocolate Snickers 50 G","1015":"MACA DESIDRAT VERDE FRUBIS 20G","1017":"Tortitas Milho Caçarola Crackies Chocolate 22,6","1018":"Tisana Pleno Chá Verde e Limão PET 33 Cl","1022":"Bolacha Maria sem Açúcar Doses","1023":"Bolachas Crackers Tuc Originais 31 G","1024":"Barras Cereais Linha Nacional Chocolate 23 G","1025":"Pastilhas Elásticas Chiclets Spearmint 16,5 G","1028":"Coca Cola Original Lata 33 Cl","1034":"Ice Tea Lipton Limão Lata 33 Cl","1035":"Ice Tea Lipton Pêssego Lata 33 Cl","1036":"Guaraná Brasil Lata 33 Cl","1037":"Refrigerante com Gás Seven Up Lata 33 Cl","1058":"Pão com Chouriço","1059":"Croissant Simples","1081":"Bolachas Marinheiras Cem Porcento Chia Mini 50 G","1093":"MACA DESIDRAT VERDE FRUBIS 20G","1095":"Tortitas Milho Caçarola Crackies Chocolate 22,6 G","1116":"REF S/G FRESKY F TROP TET 20CL","1126":"REF S/G FRESKY LAR TET 20CL","1132":"NAPOLITANAS AMANH CACAU 45GR","1133":"Snack de Chocolate Twix 50 G","1134":"Snack de Chocolate Mars 45 G","1137":"Kit Kat 41,5 Gr","1141":"Lion 42 Gr","1143":"Santal Active Drink Laranja/Cenoura","1144":"Croissant Aurora Simples 240gr","1145":"7Up 33cl - SDR","1149":"Bolacha Cracker TUC Ervas Aromáticas","1150":"Bebida Energetica Hell Classic 25cl","1151":"Sumol Laranja Lata 33cl","1152":"Ice Tea Pessego Continente 20cl","1153":"Batata Frita Barrosã 45g","1155":"BEB ENERGÉTICA BE POWER LATA 25C","1156":"Oreo original 6 66g","1157":"Bola de Carne","1159":"Pepsi Cola Zero Lata 33 Cl (SDR)","1162":"NAPOLITANA SCHOCO CHOC","1163":"ICE TEA AMANH PES TET 20CL","1165":"Cerveja sem álcool super bock 00% lata","142328343369857":"Café longo especial","142328351198514":"Café pingado especial","142328361647775":"Garoto especial","142328397222295":"Capuccino especial","142328404337638":"Mocaccino especial","143946635228":"Galão XL","1439466459485":"Chocolate Forte XL","1439466601319":"Chocolate com Leite XL","1439466666032":"Capuccino XL","1439466714544":"Chá Limão XL","1439466796034":"Capuccino Baunilha XL","147220498840130":"Café c/ Chocolate","147220551439512":"Chá Frutos Vermelhos","154039385951796":"Capuccino c/ Chocolate","154834298045497":"Copo","156465856219599":"Água quente","156507924937931":"Descafeinado Mocaccino","156508941215355":"Café Caramelo","156509064858053":"Descafeinado Garoto","158159842809787":"Café c/Chocolate Solúvel","177202241764767":"ND","17721156395079":"Fatia Bolo Cenoura com Chocolate","177211609645476":"Salame de Chocolate Ecobol","177211613580418":"Kinder Bueno","177211618916294":"Kinder Delice","177211623906713":"Napolitana Chocolate 45 Gr - Bitee","177211627053146":"Croissant Recheado com Cacau 60 Gr - Belino","17726403623638":"Açucar 1 Kg","177264039562395":"Café em Grão 1Kg","177264055854756":"Bidón 20L","177264064039992":"Descafeinado 100gr Amanhecer","177265166206250":"Cocoa GO! Choco","177271176713415":"Café Sical","177272605244484":"Trik - Salty Sticks","17728748050470":"Vendin - Preparado Base de Leite 750 Gr","177287486521866":"DaVinci - Capuccino Avelã 1 Kg","177287569984210":"Chá Limão","177287594826782":"Copos de Papel 6oz  180ml","177287602665317":"Copo Plástico Branco 165CC 3000un","177287617460114":"Paletinas madeira 90x10x1.3mm (3750un)","177287633635219":"Copos Plástico Marrom para Vending 160ml (3000un)","177295867474524":"Bolo de Laranja","177295879548985":"Batatas Fritas - Super Douradas Onduladas 40gr","177295884830458":"Dulcesol - Zebra","177295889954021":"Frisumo Laranja Lata 0.33cl","177368975262542":"Kas Limão","177401018822488":"TPA Ellectro","177447933537744":"Cretamel - Barra de Amendoim Com Mel  40 Gr","177447939281398":"Mr Brownie - Chocolate Brownies 50 Gr","177447948326298":"Fatia de Bolo iogurte","177447961528934":"SUMO AMANH 100% LAR TET 20CL","177497839052618":"Agua UP 0,5L","177573839571717":"Wafer de Cacau com Recheio Avelã - My Motto","177573853230226":"Crispy Bar de Chocolate e Aveia  40 Gr - Sante","177662150914773":"Caramel GO! Capuccino em Pó","177662163888972":"Simat - Chá de Menta","17776511432652":"Bebida Energetica Hell Zero 25cl","177765147644811":"Iogurte Liquido Longa Vida Tropical","177765185630029":"Café em Grão Caffier Robusta","1777656083835":"Copos de Plástico 166ml","177765614645747":"Limonada 500 ml - Enjoy","177765626306282":"Bolacha Fit de Cereais e Cacau 50 Gr Sante","177765632427195":"Amendoins Mel e Mostarda 70gr - Zigi","177798084506413":"Depósito SDR embalagem","177798094588166":"Coca-Coca Original Lata 33cl - SDR","177834329867156":"Fatia Bolo Ecobolos (Variados)","177834500768795":"Açucar Amanhecer 1KG Sticks 4g x250","177909675445051":"Empada de Frango","177927351666989":"Kit Kat Chunky Funky 40g","177927360149274":"Tarte de Amêndoa 80Gr","177927407477069":"Barra Go On Energy 45 Gr Sante","177927418410352":"Trik - Crackers Original 110gr","177928467281749":"Bebida Energetica Hell Classic 250ml (SDR)","178064870712285":"Kings - Soft Cookies com Pedaços de Chocolate Triplo 40gr","178064879009015":"Padaria da Arrifana - Folhado de Chocolate 4 Uni 70 Gr","178120186464327":"Guarana Antartica lata 33cl","178120191440673":"Kinder Bueno White 39g","178178992664712":"7UP - Refrigerante com Gás Zero Mint 330ml (SDR)","178178997731743":"Bitee - Croissant Recheio Cacau 60g","178179007478777":"Vidal - Mega Sweet Mix 90 Gr","178179058120132":"Poker Wafer Cacao","178179468371146":"Coca Cola Original Lata Sleek (SDR)","178179734435025":"Agua Rioba 50cl (SDR)","17821471314345":"Guaraná Brasil 33cl (Sdr)","178248662648837":"Agua S. Martinho 50cl (SDR)","178248700676561":"Açucar Sidul 1kg","178284332902345":"Tisana Pleno Chá Verde e Limão PET 33 Cl (SDR)","178292043448718":"Ristora - Chá Limão 1Kg","178300306740115":"Descafeinado Laqtia 250 g","178446984007274":"Bolo de Arroz","178447006331987":"Sande Mista Mistura Cacetinho","178447012312551":"Lanche Fiambre","178531996074917":"Bebida Energetica Hell Zero 25cl - SDR","17859574564394":"Hell Energy Coffee Latte 250ml","178595762086827":"7Up Sleek 330ml","178723567672868":"Frisumo Laranja Lata 0.33cl (SDR)","178863213801287":"Fuze Tea Pêssego Sleek 330ml - SDR","178863221831622":"Bitee - Bolachas Húngaras 70 Gr","GEN01":"Café Normal","GEN03":"Chá","GEN04":"Chocolate","GEN05":"Capuccino","GEN06":"Café Pingado","GEN07":"Galão","GEN08":"Leite","GEN10":"Chocolate c/ Leite","GEN11":"Moccaccino","GEN12":"Café Curto","GEN13":"Café Longo","GEN14":"Garoto","GEN15":"Chocolate Forte","GEN16":"Café Solúvel","GEN17":"Descafeinado Curto","GEN18":"Descafeinado Normal","GEN19":"Descafeinado Longo","GEN20":"Descafeinado Capuccino c/ chocolate","GEN21":"Descafeinado Pingado","GEN22":"Descafeinado Galão","GEN23":"Capuccino de Avelã","GEN24":"Capuccino de caramelo","GEN25":"Capuccino de baunilha","GEN31":"Leite c/ chocolate","GEN35":"Café Curto Solúvel","GEN36":"Café Longo Solúvel","GEN37":"Café Pingado Solúvel","GEN38":"Galão Solúvel","GEN39":"Capuccino Solúvel","GEN40":"Mocacciono Solúvel","GEN41":"Chocolate Crema","GEN43":"Leite com Café"};
+
+  // Nome do produto -> nome da subfamília (fonte: export de produtos + famílias)
+  const NAME_TO_SUBFAMILIA = {"Coca Cola Zero Lata 33 Cl":"Snacks","Leite Uht Achocolatado Agros 200 Ml":"Snacks","Snack de Chocolate Snickers 50 G":"Snacks","MACA DESIDRAT VERDE FRUBIS 20G":"Snacks","Tortitas Milho Caçarola Crackies Chocolate 22,6":"Snacks","Tisana Pleno Chá Verde e Limão PET 33 Cl":"Bebidas","Bolacha Maria sem Açúcar Doses":"Snacks","Bolachas Crackers Tuc Originais 31 G":"Bolachas","Barras Cereais Linha Nacional Chocolate 23 G":"Snacks","Pastilhas Elásticas Chiclets Spearmint 16,5 G":"Snacks","Coca Cola Original Lata 33 Cl":"Bebidas","Ice Tea Lipton Limão Lata 33 Cl":"Snacks","Ice Tea Lipton Pêssego Lata 33 Cl":"Snacks","Guaraná Brasil Lata 33 Cl":"Bebidas","Refrigerante com Gás Seven Up Lata 33 Cl":"Snacks","Pão com Chouriço":"Snacks","Croissant Simples":"Snacks","Bolachas Marinheiras Cem Porcento Chia Mini 50 G":"Bolachas","Tortitas Milho Caçarola Crackies Chocolate 22,6 G":"Snacks","REF S/G FRESKY F TROP TET 20CL":"Bebidas","REF S/G FRESKY LAR TET 20CL":"Snacks","NAPOLITANAS AMANH CACAU 45GR":"Snacks","Snack de Chocolate Twix 50 G":"Chocolates","Snack de Chocolate Mars 45 G":"Chocolates","Kit Kat 41,5 Gr":"Chocolates","Lion 42 Gr":"Chocolates","Santal Active Drink Laranja/Cenoura":"Bebidas","Croissant Aurora Simples 240gr":"Snacks","7Up 33cl - SDR":"Bebidas","Bolacha Cracker TUC Ervas Aromáticas":"Snacks","Bebida Energetica Hell Classic 25cl":"Bebidas","Sumol Laranja Lata 33cl":"Bebidas","Ice Tea Pessego Continente 20cl":"Bebidas","Batata Frita Barrosã 45g":"Snacks","BEB ENERGÉTICA BE POWER LATA 25C":"Snacks","Oreo original 6 66g":"Bolachas","Bola de Carne":"Frescos","Pepsi Cola Zero Lata 33 Cl (SDR)":"Bebidas","NAPOLITANA SCHOCO CHOC":"Snacks","ICE TEA AMANH PES TET 20CL":"Bebidas","Cerveja sem álcool super bock 00% lata":"Bebidas","Café longo especial":"Compostos","Café pingado especial":"Compostos","Garoto especial":"Compostos","Capuccino especial":"Compostos","Mocaccino especial":"Compostos","Galão XL":"Compostos","Chocolate Forte XL":"Compostos","Chocolate com Leite XL":"Compostos","Capuccino XL":"Compostos","Chá Limão XL":"Compostos","Capuccino Baunilha XL":"Compostos","Café c/ Chocolate":"Compostos","Chá Frutos Vermelhos":"Compostos","Capuccino c/ Chocolate":"Compostos","Copo":"Compostos","Água quente":"Compostos","Descafeinado Mocaccino":"Compostos","Café Caramelo":"Compostos","Descafeinado Garoto":"Compostos","Café c/Chocolate Solúvel":"Compostos","ND":"Snacks","Fatia Bolo Cenoura com Chocolate":"Snacks","Salame de Chocolate Ecobol":"Snacks","Kinder Bueno":"Chocolates","Kinder Delice":"Chocolates","Napolitana Chocolate 45 Gr - Bitee":"Snacks","Croissant Recheado com Cacau 60 Gr - Belino":"Snacks","Açucar 1 Kg":"Solúveis / Recipientes","Café em Grão 1Kg":"Solúveis / Recipientes","Bidón 20L":"Solúveis / Recipientes","Descafeinado 100gr Amanhecer":"Solúveis / Recipientes","Cocoa GO! Choco":"Solúveis / Recipientes","Café Sical":"Solúveis / Recipientes","Trik - Salty Sticks":"Snacks","Vendin - Preparado Base de Leite 750 Gr":"Solúveis / Recipientes","DaVinci - Capuccino Avelã 1 Kg":"Solúveis / Recipientes","Chá Limão":"Solúveis / Recipientes","Copos de Papel 6oz  180ml":"Solúveis / Recipientes","Copo Plástico Branco 165CC 3000un":"Solúveis / Recipientes","Paletinas madeira 90x10x1.3mm (3750un)":"Solúveis / Recipientes","Copos Plástico Marrom para Vending 160ml (3000un)":"Solúveis / Recipientes","Bolo de Laranja":"Snacks","Batatas Fritas - Super Douradas Onduladas 40gr":"Snacks","Dulcesol - Zebra":"Snacks","Frisumo Laranja Lata 0.33cl":"Snacks","Kas Limão":"Bebidas","TPA Ellectro":"ND","Cretamel - Barra de Amendoim Com Mel  40 Gr":"Snacks","Mr Brownie - Chocolate Brownies 50 Gr":"Chocolates","Fatia de Bolo iogurte":"Snacks","SUMO AMANH 100% LAR TET 20CL":"Bebidas","Agua UP 0,5L":"Bebidas","Wafer de Cacau com Recheio Avelã - My Motto":"Bolachas","Crispy Bar de Chocolate e Aveia  40 Gr - Sante":"Bolachas","Caramel GO! Capuccino em Pó":"Solúveis / Recipientes","Simat - Chá de Menta":"Solúveis / Recipientes","Bebida Energetica Hell Zero 25cl":"Bebidas","Iogurte Liquido Longa Vida Tropical":"ND","Café em Grão Caffier Robusta":"Solúveis / Recipientes","Copos de Plástico 166ml":"Solúveis / Recipientes","Limonada 500 ml - Enjoy":"Bebidas","Bolacha Fit de Cereais e Cacau 50 Gr Sante":"Bolachas","Amendoins Mel e Mostarda 70gr - Zigi":"Snacks","Depósito SDR embalagem":"ND","Coca-Coca Original Lata 33cl - SDR":"Bebidas","Fatia Bolo Ecobolos (Variados)":"Snacks","Açucar Amanhecer 1KG Sticks 4g x250":"Solúveis / Recipientes","Empada de Frango":"Sandes","Kit Kat Chunky Funky 40g":"Chocolates","Tarte de Amêndoa 80Gr":"Snacks","Barra Go On Energy 45 Gr Sante":"Chocolates","Trik - Crackers Original 110gr":"Snacks","Bebida Energetica Hell Classic 250ml (SDR)":"Bebidas","Kings - Soft Cookies com Pedaços de Chocolate Triplo 40gr":"Bolachas","Padaria da Arrifana - Folhado de Chocolate 4 Uni 70 Gr":"Snacks","Guarana Antartica lata 33cl":"Bebidas","Kinder Bueno White 39g":"Chocolates","7UP - Refrigerante com Gás Zero Mint 330ml (SDR)":"Bebidas","Bitee - Croissant Recheio Cacau 60g":"Snacks","Vidal - Mega Sweet Mix 90 Gr":"Snacks","Poker Wafer Cacao":"Bolachas","Coca Cola Original Lata Sleek (SDR)":"Bebidas","Agua Rioba 50cl (SDR)":"Bebidas","Guaraná Brasil 33cl (Sdr)":"Bebidas","Agua S. Martinho 50cl (SDR)":"Bebidas","Açucar Sidul 1kg":"ND","Tisana Pleno Chá Verde e Limão PET 33 Cl (SDR)":"Bebidas","Ristora - Chá Limão 1Kg":"Solúveis / Recipientes","Descafeinado Laqtia 250 g":"Solúveis / Recipientes","Bolo de Arroz":"Frescos","Sande Mista Mistura Cacetinho":"Sandes","Lanche Fiambre":"Frescos","Bebida Energetica Hell Zero 25cl - SDR":"Bebidas","Hell Energy Coffee Latte 250ml":"Bebidas","7Up Sleek 330ml":"Bebidas","Frisumo Laranja Lata 0.33cl (SDR)":"Bebidas","Fuze Tea Pêssego Sleek 330ml - SDR":"Bebidas","Bitee - Bolachas Húngaras 70 Gr":"Bolachas","Café Normal":"Compostos","Chá":"Compostos","Chocolate":"Compostos","Capuccino":"Compostos","Café Pingado":"Compostos","Galão":"Compostos","Leite":"Compostos","Chocolate c/ Leite":"Compostos","Moccaccino":"Compostos","Café Curto":"Compostos","Café Longo":"Compostos","Garoto":"Compostos","Chocolate Forte":"Compostos","Café Solúvel":"Compostos","Descafeinado Curto":"Compostos","Descafeinado Normal":"Compostos","Descafeinado Longo":"Compostos","Descafeinado Capuccino c/ chocolate":"Compostos","Descafeinado Pingado":"Compostos","Descafeinado Galão":"Compostos","Capuccino de Avelã":"Compostos","Capuccino de caramelo":"Compostos","Capuccino de baunilha":"Compostos","Leite c/ chocolate":"Compostos","Café Curto Solúvel":"Compostos","Café Longo Solúvel":"Compostos","Café Pingado Solúvel":"Compostos","Galão Solúvel":"Compostos","Capuccino Solúvel":"Compostos","Mocacciono Solúvel":"Compostos","Chocolate Crema":"Compostos","Leite com Café":"Compostos"};
+
+  function machineLabel(matricula) {
+    const cliente = MACHINES[matricula];
+    return cliente ? `${cliente} · ${matricula}` : (matricula || '—');
+  }
+
+  function productLabel(codigo) {
+    return PRODUCTS[codigo] || codigo || '—';
+  }
+
+  function subfamiliaLabel(nomeProduto) {
+    return NAME_TO_SUBFAMILIA[nomeProduto] || 'Outros';
+  }
+
+  // ===== Lógica do dashboard =====
+
   const fmtEUR = (v) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(v || 0);
   const fmtInt = (v) => new Intl.NumberFormat('pt-PT').format(v || 0);
+  const todayStr = () => new Date().toISOString().slice(0, 10);
 
-  // Converte a resposta do Metabase (cols + rows) numa lista de objetos {NOME_COLUNA: valor}
   function toObjects(payload) {
     const cols = payload.data.cols.map(c => c.name);
     return payload.data.rows.map(row => {
@@ -227,6 +324,8 @@
     }
     return map;
   }
+
+  let lastSummary = null; // guardado para poder enviar como snapshot
 
   function renderVendas(rows) {
     const receitaTotal = rows.reduce((sum, r) => sum + (Number(r.value) || 0), 0);
@@ -269,19 +368,17 @@
       },
     });
 
-    // Top produtos
-    const porProduto = groupSum(
-      rows.filter(r => r.NOME_PRODUTO),
-      r => r.NOME_PRODUTO,
-      r => Number(r.value) || 0
-    );
-    const topProdutos = Array.from(porProduto.entries())
+    // Top produtos: receita + quantidade
+    const rowsComProduto = rows.filter(r => r.NOME_PRODUTO);
+    const receitaPorProduto = groupSum(rowsComProduto, r => r.NOME_PRODUTO, r => Number(r.value) || 0);
+    const qtyPorProduto = groupSum(rowsComProduto, r => r.NOME_PRODUTO, r => Number(r.count) || 1);
+    const topProdutos = Array.from(receitaPorProduto.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8);
     new Chart(document.getElementById('chartTop'), {
       type: 'bar',
       data: {
-        labels: topProdutos.map(p => p[0]),
+        labels: topProdutos.map(p => `${p[0]} (${fmtInt(qtyPorProduto.get(p[0]))} un.)`),
         datasets: [{
           label: 'Receita (€)',
           data: topProdutos.map(p => p[1]),
@@ -290,7 +387,17 @@
       },
       options: {
         indexAxis: 'y',
-        plugins: { legend: { display: false } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const nome = topProdutos[ctx.dataIndex][0];
+                return `${fmtEUR(ctx.parsed.x)} · ${fmtInt(qtyPorProduto.get(nome))} unidades`;
+              },
+            },
+          },
+        },
         scales: { x: { beginAtZero: true } },
       },
     });
@@ -305,7 +412,7 @@
     new Chart(document.getElementById('chartMaquinas'), {
       type: 'bar',
       data: {
-        labels: maquinas.map(m => m[0]),
+        labels: maquinas.map(m => machineLabel(m[0])),
         datasets: [{
           label: 'Receita (€)',
           data: maquinas.map(m => m[1]),
@@ -317,6 +424,37 @@
         scales: { y: { beginAtZero: true } },
       },
     });
+
+    // Vendas por subfamília
+    const porSubfamilia = groupSum(
+      rowsComProduto,
+      r => subfamiliaLabel(r.NOME_PRODUTO),
+      r => Number(r.value) || 0
+    );
+    const subfamilias = Array.from(porSubfamilia.entries()).sort((a, b) => b[1] - a[1]);
+    new Chart(document.getElementById('chartSubfamilia'), {
+      type: 'bar',
+      data: {
+        labels: subfamilias.map(s => s[0]),
+        datasets: [{
+          label: 'Receita (€)',
+          data: subfamilias.map(s => s[1]),
+          backgroundColor: '#C7710A',
+        }],
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } },
+      },
+    });
+
+    lastSummary = {
+      date: todayStr(),
+      receitaTotal,
+      transacoes,
+      ticketMedio,
+      produtosDistintos,
+    };
   }
 
   function renderStock(rows) {
@@ -328,7 +466,7 @@
     const sorted = [...rows].sort((a, b) => (b.sum || 0) - (a.sum || 0));
     const linhas = sorted.map(r => `
       <tr>
-        <td>${r.CODIGO_PRODUTO ?? '—'}</td>
+        <td>${productLabel(r.CODIGO_PRODUTO)}</td>
         <td>${r.CODIGO_ARMAZEM ?? '—'}</td>
         <td class="num">${fmtInt(r.sum)}</td>
       </tr>
@@ -336,11 +474,84 @@
     wrap.innerHTML = `
       <table>
         <thead>
-          <tr><th>Código Produto</th><th>Código Armazém</th><th class="num">Stock</th></tr>
+          <tr><th>Produto</th><th>Código Armazém</th><th class="num">Stock</th></tr>
         </thead>
         <tbody>${linhas}</tbody>
       </table>
     `;
+  }
+
+  async function saveSnapshot() {
+    if (!lastSummary) return;
+    try {
+      await fetch('/api/snapshot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(lastSummary),
+      });
+    } catch {
+      // falha silenciosa — não deve incomodar o utilizador
+    }
+  }
+
+  function deltaHTML(hoje, outro) {
+    if (!outro) return '';
+    const diff = hoje - outro;
+    const pct = outro ? (diff / outro) * 100 : 0;
+    const cls = diff >= 0 ? 'up' : 'down';
+    const sinal = diff >= 0 ? '+' : '';
+    return `<div class="delta ${cls}">${sinal}${pct.toFixed(1)}%</div>`;
+  }
+
+  async function compareWithDate(date) {
+    const box = document.getElementById('compareResult');
+    box.style.display = 'block';
+    box.innerHTML = '<div class="state small">a comparar…</div>';
+
+    if (date === todayStr()) {
+      box.innerHTML = '<div class="state small">Escolhe uma data diferente de hoje para comparar.</div>';
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/snapshot?date=${date}`);
+      if (res.status === 404) {
+        box.innerHTML = `<div class="state small">Ainda não há dados guardados para ${date}. A captura de histórico começou a partir do dia em que o painel foi aberto pela primeira vez — vai ficando disponível dia a dia.</div>`;
+        return;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const outro = await res.json();
+      const hoje = lastSummary;
+
+      box.innerHTML = `
+        <h2>Hoje vs ${date}</h2>
+        <table>
+          <thead><tr><th>Métrica</th><th class="num">Hoje</th><th class="num">${date}</th><th class="num">Diferença</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Receita</td>
+              <td class="num">${fmtEUR(hoje.receitaTotal)}</td>
+              <td class="num">${fmtEUR(outro.receitaTotal)}</td>
+              <td class="num">${deltaHTML(hoje.receitaTotal, outro.receitaTotal)}</td>
+            </tr>
+            <tr>
+              <td>Transações</td>
+              <td class="num">${fmtInt(hoje.transacoes)}</td>
+              <td class="num">${fmtInt(outro.transacoes)}</td>
+              <td class="num">${deltaHTML(hoje.transacoes, outro.transacoes)}</td>
+            </tr>
+            <tr>
+              <td>Ticket médio</td>
+              <td class="num">${fmtEUR(hoje.ticketMedio)}</td>
+              <td class="num">${fmtEUR(outro.ticketMedio)}</td>
+              <td class="num">${deltaHTML(hoje.ticketMedio, outro.ticketMedio)}</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+    } catch (err) {
+      box.innerHTML = `<div class="state small error">Erro ao comparar: ${err.message}</div>`;
+    }
   }
 
   async function init() {
@@ -353,6 +564,7 @@
       renderStock(toObjects(stockRaw));
       document.getElementById('updatedAt').textContent =
         'atualizado às ' + new Date().toLocaleTimeString('pt-PT');
+      saveSnapshot();
     } catch (err) {
       document.getElementById('updatedAt').textContent = 'erro ao atualizar';
       document.querySelector('main').insertAdjacentHTML(
@@ -361,6 +573,12 @@
       );
     }
   }
+
+  document.getElementById('compareBtn').addEventListener('click', () => {
+    const date = document.getElementById('compareDate').value;
+    if (!date) return;
+    compareWithDate(date);
+  });
 
   init();
 </script>
