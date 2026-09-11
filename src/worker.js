@@ -109,6 +109,48 @@ const CARDS = {
   "layout-maquinas": 56,
 };
 
+// ===== Histórico diário (Cloudflare KV) =====
+async function handleSnapshot(request, env) {
+  const url = new URL(request.url);
+
+  if (request.method === "POST") {
+    let payload;
+    try {
+      payload = await request.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "JSON inválido" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const date = (payload && payload.date) || new Date().toISOString().slice(0, 10);
+    await env.HISTORY_KV.put(`snapshot:${date}`, JSON.stringify(payload));
+    return new Response(JSON.stringify({ ok: true, date }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (request.method === "GET") {
+    const date = url.searchParams.get("date");
+    if (!date) {
+      return new Response(JSON.stringify({ error: "Falta o parâmetro date" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const stored = await env.HISTORY_KV.get(`snapshot:${date}`);
+    if (!stored) {
+      return new Response(JSON.stringify({ error: "Sem dados guardados para essa data" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response(stored, { headers: { "Content-Type": "application/json" } });
+  }
+
+  return new Response("Método não suportado", { status: 405 });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -117,6 +159,17 @@ export default {
     if (url.pathname.startsWith("/admin") || url.pathname.startsWith("/api/")) {
       if (!checkAuth(request, env)) {
         return unauthorizedResponse();
+      }
+    }
+
+    if (url.pathname === "/api/snapshot") {
+      try {
+        return await handleSnapshot(request, env);
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
       }
     }
 
