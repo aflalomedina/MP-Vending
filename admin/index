@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MP Vending · Painel de Vendas</title>
+<meta name="robots" content="noindex, nofollow" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root {
+    --ink: #1B1F27;
+    --bg: #F6F4EF;
+    --panel: #FFFFFF;
+    --line: #DEDAD1;
+    --accent: #FF9F1C;
+    --accent-deep: #C7710A;
+    --positive: #2F9E44;
+    --negative: #E03131;
+    --muted: #6B7280;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  @font-face {
+    font-family: 'IBM Plex Mono';
+    src: local('IBM Plex Mono');
+  }
+
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+  }
+
+  .topbar .brand {
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+
+  .topbar h1 {
+    margin: 4px 0 0 0;
+    font-size: 22px;
+    font-weight: 600;
+  }
+
+  .topbar .updated {
+    font-size: 13px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  main {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 32px 64px;
+  }
+
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+
+  .kpi {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 18px 18px 16px;
+  }
+
+  .kpi .value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 30px;
+    font-weight: 600;
+    color: var(--accent-deep);
+    line-height: 1.1;
+  }
+
+  .kpi .label {
+    margin-top: 6px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 18px 20px 12px;
+  }
+
+  .panel h2 {
+    margin: 0 0 14px 0;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .panel.full { margin-bottom: 14px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  th {
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 12px;
+  }
+
+  td.num, th.num {
+    text-align: right;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .state {
+    padding: 40px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .state.error { color: var(--negative); }
+
+  .table-wrap { max-height: 360px; overflow-y: auto; }
+
+  @media (max-width: 860px) {
+    .kpis { grid-template-columns: repeat(2, 1fr); }
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="brand">MP VENDING</div>
+    <h1>Painel de Vendas</h1>
+  </div>
+  <div class="updated" id="updatedAt">a carregar…</div>
+</div>
+
+<main>
+  <div class="kpis">
+    <div class="kpi"><div class="value" id="kpiReceita">—</div><div class="label">Receita (período carregado)</div></div>
+    <div class="kpi"><div class="value" id="kpiTransacoes">—</div><div class="label">Transações</div></div>
+    <div class="kpi"><div class="value" id="kpiTicket">—</div><div class="label">Ticket médio</div></div>
+    <div class="kpi"><div class="value" id="kpiProdutos">—</div><div class="label">Produtos distintos vendidos</div></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="panel">
+      <h2>Vendas por hora</h2>
+      <canvas id="chartTrend" height="220"></canvas>
+    </div>
+    <div class="panel">
+      <h2>Top 8 produtos</h2>
+      <canvas id="chartTop" height="220"></canvas>
+    </div>
+  </div>
+
+  <div class="panel full">
+    <h2>Receita por máquina</h2>
+    <canvas id="chartMaquinas" height="140"></canvas>
+  </div>
+
+  <div class="panel full">
+    <h2>Stock por armazém</h2>
+    <div class="table-wrap" id="stockTableWrap">
+      <div class="state">a carregar…</div>
+    </div>
+  </div>
+</main>
+
+<script>
+  const fmtEUR = (v) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(v || 0);
+  const fmtInt = (v) => new Intl.NumberFormat('pt-PT').format(v || 0);
+
+  // Converte a resposta do Metabase (cols + rows) numa lista de objetos {NOME_COLUNA: valor}
+  function toObjects(payload) {
+    const cols = payload.data.cols.map(c => c.name);
+    return payload.data.rows.map(row => {
+      const obj = {};
+      cols.forEach((name, i) => { obj[name] = row[i]; });
+      return obj;
+    });
+  }
+
+  async function fetchJSON(path) {
+    const res = await fetch(path);
+    if (!res.ok) throw new Error(`${path} → HTTP ${res.status}`);
+    return res.json();
+  }
+
+  function groupSum(rows, keyFn, valueFn) {
+    const map = new Map();
+    for (const row of rows) {
+      const key = keyFn(row);
+      map.set(key, (map.get(key) || 0) + valueFn(row));
+    }
+    return map;
+  }
+
+  function renderVendas(rows) {
+    const receitaTotal = rows.reduce((sum, r) => sum + (Number(r.value) || 0), 0);
+    const transacoes = rows.reduce((sum, r) => sum + (Number(r.count) || 1), 0);
+    const ticketMedio = transacoes ? receitaTotal / transacoes : 0;
+    const produtosDistintos = new Set(rows.map(r => r.NOME_PRODUTO).filter(Boolean)).size;
+
+    document.getElementById('kpiReceita').textContent = fmtEUR(receitaTotal);
+    document.getElementById('kpiTransacoes').textContent = fmtInt(transacoes);
+    document.getElementById('kpiTicket').textContent = fmtEUR(ticketMedio);
+    document.getElementById('kpiProdutos').textContent = fmtInt(produtosDistintos);
+
+    // Tendência por hora
+    const porHora = groupSum(
+      rows,
+      r => {
+        const d = new Date(r.sale_at);
+        return isNaN(d) ? '—' : String(d.getHours()).padStart(2, '0') + ':00';
+      },
+      r => Number(r.value) || 0
+    );
+    const horas = Array.from(porHora.keys()).sort();
+    new Chart(document.getElementById('chartTrend'), {
+      type: 'line',
+      data: {
+        labels: horas,
+        datasets: [{
+          label: 'Receita (€)',
+          data: horas.map(h => porHora.get(h)),
+          borderColor: '#C7710A',
+          backgroundColor: 'rgba(255,159,28,0.12)',
+          fill: true,
+          tension: 0.25,
+          pointRadius: 2,
+        }],
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } },
+      },
+    });
+
+    // Top produtos
+    const porProduto = groupSum(
+      rows.filter(r => r.NOME_PRODUTO),
+      r => r.NOME_PRODUTO,
+      r => Number(r.value) || 0
+    );
+    const topProdutos = Array.from(porProduto.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8);
+    new Chart(document.getElementById('chartTop'), {
+      type: 'bar',
+      data: {
+        labels: topProdutos.map(p => p[0]),
+        datasets: [{
+          label: 'Receita (€)',
+          data: topProdutos.map(p => p[1]),
+          backgroundColor: '#FF9F1C',
+        }],
+      },
+      options: {
+        indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true } },
+      },
+    });
+
+    // Receita por máquina
+    const porMaquina = groupSum(
+      rows.filter(r => r.MATRICULA_MAQUINA),
+      r => r.MATRICULA_MAQUINA,
+      r => Number(r.value) || 0
+    );
+    const maquinas = Array.from(porMaquina.entries()).sort((a, b) => b[1] - a[1]);
+    new Chart(document.getElementById('chartMaquinas'), {
+      type: 'bar',
+      data: {
+        labels: maquinas.map(m => m[0]),
+        datasets: [{
+          label: 'Receita (€)',
+          data: maquinas.map(m => m[1]),
+          backgroundColor: '#1B1F27',
+        }],
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } },
+      },
+    });
+  }
+
+  function renderStock(rows) {
+    const wrap = document.getElementById('stockTableWrap');
+    if (!rows.length) {
+      wrap.innerHTML = '<div class="state">Sem dados de stock.</div>';
+      return;
+    }
+    const sorted = [...rows].sort((a, b) => (b.sum || 0) - (a.sum || 0));
+    const linhas = sorted.map(r => `
+      <tr>
+        <td>${r.CODIGO_PRODUTO ?? '—'}</td>
+        <td>${r.CODIGO_ARMAZEM ?? '—'}</td>
+        <td class="num">${fmtInt(r.sum)}</td>
+      </tr>
+    `).join('');
+    wrap.innerHTML = `
+      <table>
+        <thead>
+          <tr><th>Código Produto</th><th>Código Armazém</th><th class="num">Stock</th></tr>
+        </thead>
+        <tbody>${linhas}</tbody>
+      </table>
+    `;
+  }
+
+  async function init() {
+    try {
+      const [vendasRaw, stockRaw] = await Promise.all([
+        fetchJSON('/api/vendas-diarias'),
+        fetchJSON('/api/stock-armazens'),
+      ]);
+      renderVendas(toObjects(vendasRaw));
+      renderStock(toObjects(stockRaw));
+      document.getElementById('updatedAt').textContent =
+        'atualizado às ' + new Date().toLocaleTimeString('pt-PT');
+    } catch (err) {
+      document.getElementById('updatedAt').textContent = 'erro ao atualizar';
+      document.querySelector('main').insertAdjacentHTML(
+        'afterbegin',
+        `<div class="state error">Não foi possível carregar os dados: ${err.message}</div>`
+      );
+    }
+  }
+
+  init();
+</script>
+
+</body>
+</html>
