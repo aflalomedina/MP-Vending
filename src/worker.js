@@ -92,6 +92,20 @@ const CARDS = {
   "layout-maquinas": 56,
 };
 
+function checkAuth(request, env) {
+  const authHeader = request.headers.get("Authorization");
+  if (!authHeader || !authHeader.startsWith("Basic ")) return false;
+  const decoded = atob(authHeader.slice(6));
+  const [user, pass] = decoded.split(":");
+  return user === env.ADMIN_USER && pass === env.ADMIN_PASSWORD;
+}
+
+function unauthorizedResponse() {
+  return new Response("Autenticação necessária", {
+    status: 401,
+    headers: { "WWW-Authenticate": 'Basic realm="MP Vending Admin"' },
+  });
+}
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
