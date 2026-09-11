@@ -1,4 +1,22 @@
-// Sessão em cache (dura enquanto o Worker estiver "quente")
+// ===== Autenticação simples (HTTP Basic) para /admin e /api =====
+function checkAuth(request, env) {
+  const authHeader = request.headers.get("Authorization");
+  if (!authHeader || !authHeader.startsWith("Basic ")) return false;
+  const decoded = atob(authHeader.slice(6));
+  const sep = decoded.indexOf(":");
+  const user = decoded.slice(0, sep);
+  const pass = decoded.slice(sep + 1);
+  return user === env.ADMIN_USER && pass === env.ADMIN_PASSWORD;
+}
+
+function unauthorizedResponse() {
+  return new Response("Autenticação necessária", {
+    status: 401,
+    headers: { "WWW-Authenticate": 'Basic realm="MP Vending Admin"' },
+  });
+}
+
+// ===== Sessão do portal Metabase (em cache enquanto o Worker está "quente") =====
 let cachedSession = null;
 let cachedAt = 0;
 const SESSION_TTL_MS = 1000 * 60 * 60 * 6; // reautentica no máximo a cada 6h
@@ -22,12 +40,10 @@ async function getSession(env) {
 
   const loginUrl = `${env.PORTAL_URL}/app/index.php?r=user/login`;
 
-  // 1. GET à página de login para obter um PHPSESSID válido
   const getRes = await fetch(loginUrl, { redirect: "manual" });
   const initialCookies = extractCookies(getRes);
   const phpSessId = initialCookies["PHPSESSID"];
 
-  // 2. POST das credenciais, associadas a esse PHPSESSID
   const body = new URLSearchParams();
   body.set("UserLogin[username]", env.PORTAL_USER);
   body.set("UserLogin[password]", env.PORTAL_PASS);
@@ -86,29 +102,23 @@ async function queryCard(env, cardId) {
   return res.json();
 }
 
+// mapeia nomes amigáveis -> ID do card no Metabase
 const CARDS = {
   "vendas-diarias": 54,
   "stock-armazens": 55,
   "layout-maquinas": 56,
 };
 
-function checkAuth(request, env) {
-  const authHeader = request.headers.get("Authorization");
-  if (!authHeader || !authHeader.startsWith("Basic ")) return false;
-  const decoded = atob(authHeader.slice(6));
-  const [user, pass] = decoded.split(":");
-  return user === env.ADMIN_USER && pass === env.ADMIN_PASSWORD;
-}
-
-function unauthorizedResponse() {
-  return new Response("Autenticação necessária", {
-    status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="MP Vending Admin"' },
-  });
-}
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    // Protege /admin e /api — ninguém vê dados sem password
+    if (url.pathname.startsWith("/admin") || url.pathname.startsWith("/api/")) {
+      if (!checkAuth(request, env)) {
+        return unauthorizedResponse();
+      }
+    }
 
     if (url.pathname.startsWith("/api/")) {
       const key = url.pathname.replace("/api/", "");
@@ -134,6 +144,7 @@ export default {
       }
     }
 
+    // tudo o resto continua a servir o site normal (index.html, /admin, imagens, etc.)
     return env.ASSETS.fetch(request);
   },
 };
