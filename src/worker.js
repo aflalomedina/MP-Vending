@@ -88,6 +88,8 @@ async function queryCard(env, cardId) {
 
 const CARDS = {
   "vendas-diarias": 54,
+  "stock-armazens": 55,
+  "layout-maquinas": 56,
 };
 
 export default {
