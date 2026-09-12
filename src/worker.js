@@ -107,6 +107,7 @@ const CARDS = {
   "vendas-diarias": 54,
   "stock-armazens": 55,
   "layout-maquinas": 56,
+  "metodos-pagamento": 52,
 };
 
 // ===== Histórico diário (Cloudflare KV) =====
