@@ -380,6 +380,14 @@
         <canvas id="chartSubfamilia" height="200"></canvas>
       </div>
     </div>
+
+    <div class="panel" style="max-width:340px;">
+      <h2>Receita por método de pagamento</h2>
+      <canvas id="chartPagamentos" height="140"></canvas>
+      <p style="font-size:11px;color:var(--muted);margin-top:8px;">
+        Alguns tipos ainda aparecem como "Tipo N" — tradução completa por confirmar.
+      </p>
+    </div>
   </div>
 
   <div id="view-stocks" class="view">
@@ -438,11 +446,18 @@
     </div>
 
     <div class="panel full">
-      <h2>Receita por método de pagamento (hoje)</h2>
-      <canvas id="chartPagamentos" height="160"></canvas>
-      <p style="font-size:12px;color:var(--muted);margin-top:8px;">
-        Alguns tipos ainda aparecem como "Tipo N" — a tradução completa (Multibanco, MB Way, Loupe) fica a aguardar confirmação.
-      </p>
+      <h2>Vendas por dia do mês</h2>
+      <div style="margin-bottom:12px;">
+        <label for="monthFilter" style="font-size:13px;color:var(--muted);margin-right:8px;">Mês:</label>
+        <select id="monthFilter" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;"></select>
+      </div>
+      <canvas id="chartVendasMes" height="200"></canvas>
+    </div>
+
+    <div class="panel full">
+      <h2>Acumulado mensal (desde o início dos dados)</h2>
+      <div id="monthCheckboxes" style="margin-bottom:12px;display:flex;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--muted);"></div>
+      <canvas id="chartAcumuladoMensal" height="220"></canvas>
     </div>
 
     <div class="panel full">
@@ -619,7 +634,97 @@
       </table>
     `;
 
-    renderPagamentos();
+    renderVendasPorDiaMes();
+    renderAcumuladoMensal();
+  }
+
+  function monthsAvailable() {
+    return Array.from(new Set(Object.keys(HISTORICO).map(d => d.slice(0, 7)))).sort();
+  }
+
+  function monthName(ym) {
+    const nomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const [y, m] = ym.split('-');
+    return `${nomes[parseInt(m, 10) - 1]} ${y}`;
+  }
+
+  let chartVendasMesInstance = null;
+  function renderVendasPorDiaMes() {
+    const select = document.getElementById('monthFilter');
+    const meses = monthsAvailable();
+    if (!meses.length) return;
+    if (!select.options.length) {
+      select.innerHTML = meses.map(m => `<option value="${m}">${monthName(m)}</option>`).join('');
+      select.value = meses[meses.length - 1];
+      select.onchange = drawVendasMes;
+    }
+    drawVendasMes();
+  }
+
+  function drawVendasMes() {
+    const mes = document.getElementById('monthFilter').value;
+    const dias = Object.keys(HISTORICO).filter(d => d.startsWith(mes)).sort();
+    const labels = dias.map(d => String(parseInt(d.slice(8, 10), 10)));
+    const valores = dias.map(d => HISTORICO[d].receitaTotal || 0);
+
+    if (chartVendasMesInstance) chartVendasMesInstance.destroy();
+    chartVendasMesInstance = new Chart(document.getElementById('chartVendasMes'), {
+      type: 'bar',
+      data: { labels, datasets: [{ label: 'Receita (€)', data: valores, backgroundColor: '#FF9F1C' }] },
+      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+    });
+  }
+
+  const CORES_MESES = ['#FF9F1C', '#1B1F27', '#2F9E44', '#C7710A', '#6B7280', '#E03131', '#0EA5E9', '#A855F7', '#84CC16', '#DB2777'];
+
+  let chartAcumuladoInstance = null;
+  function renderAcumuladoMensal() {
+    const container = document.getElementById('monthCheckboxes');
+    const meses = monthsAvailable();
+    if (!meses.length) return;
+    if (!container.childElementCount) {
+      container.innerHTML = meses.map((m, i) => `
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+          <input type="checkbox" class="month-toggle" value="${m}" ${i >= meses.length - 3 ? 'checked' : ''} />
+          ${monthName(m)}
+        </label>
+      `).join('');
+      container.querySelectorAll('.month-toggle').forEach(cb => cb.addEventListener('change', drawAcumulado));
+    }
+    drawAcumulado();
+  }
+
+  function drawAcumulado() {
+    const selecionados = Array.from(document.querySelectorAll('.month-toggle:checked')).map(cb => cb.value);
+    const datasets = selecionados.map((mes, i) => {
+      const dias = Object.keys(HISTORICO).filter(d => d.startsWith(mes)).sort();
+      let acumulado = 0;
+      const pontos = dias.map(d => {
+        acumulado += HISTORICO[d].receitaTotal || 0;
+        return Math.round(acumulado * 100) / 100;
+      });
+      return {
+        label: monthName(mes),
+        data: pontos,
+        borderColor: CORES_MESES[i % CORES_MESES.length],
+        backgroundColor: 'transparent',
+        tension: 0.2,
+        pointRadius: 1,
+      };
+    });
+
+    const maxDias = Math.max(0, ...datasets.map(ds => ds.data.length));
+    const labels = Array.from({ length: maxDias }, (_, i) => String(i + 1));
+
+    if (chartAcumuladoInstance) chartAcumuladoInstance.destroy();
+    chartAcumuladoInstance = new Chart(document.getElementById('chartAcumuladoMensal'), {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        plugins: { legend: { position: 'bottom' } },
+        scales: { y: { beginAtZero: true }, x: { title: { display: true, text: 'Dia do mês' } } },
+      },
+    });
   }
 
   function renderPagamentos() {
@@ -1109,6 +1214,7 @@
         const porTipo = groupSum(lastPagamentosRows, r => String(r.type), r => Number(r.sum) || 0);
         lastSummary.porTipoPagamento = Object.fromEntries(porTipo);
       }
+      renderPagamentos();
       document.getElementById('updatedAt').textContent =
         'atualizado às ' + new Date().toLocaleTimeString('pt-PT');
       saveSnapshot();
