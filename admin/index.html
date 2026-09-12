@@ -344,6 +344,7 @@
 <div class="tabs">
   <button class="tab-btn active" data-view="diarias">Vendas Diárias</button>
   <button class="tab-btn" data-view="stocks">Stocks</button>
+  <button class="tab-btn" data-view="financeiro">Financeiro</button>
   <button class="tab-btn" data-view="site">Site</button>
 </div>
 
@@ -405,7 +406,40 @@
 
     <div class="panel full">
       <h2>Stock por armazém</h2>
+      <div style="margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap;">
+        <div>
+          <label for="warehouseFilter" style="font-size:13px;color:var(--muted);margin-right:8px;">Filtrar por armazém:</label>
+          <select id="warehouseFilter" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;">
+            <option value="">Todos</option>
+          </select>
+        </div>
+        <div>
+          <label for="productFilter" style="font-size:13px;color:var(--muted);margin-right:8px;">Filtrar por produto:</label>
+          <select id="productFilter" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;">
+            <option value="">Todos</option>
+          </select>
+        </div>
+      </div>
       <div class="table-wrap" id="stockTableWrap"><div class="state small">a carregar…</div></div>
+    </div>
+  </div>
+
+  <div id="view-financeiro" class="view">
+    <div class="kpis">
+      <div class="kpi"><div class="value" id="finReceita">—</div><div class="label">Receita</div></div>
+      <div class="kpi"><div class="value" id="finCusto">—</div><div class="label">Custo dos produtos vendidos</div></div>
+      <div class="kpi"><div class="value" id="finLucro">—</div><div class="label">Lucro bruto</div></div>
+      <div class="kpi"><div class="value" id="finMargem">—</div><div class="label">Margem bruta</div></div>
+    </div>
+
+    <div class="panel full">
+      <h2>Lucro bruto por subfamília</h2>
+      <canvas id="chartLucroSubfamilia" height="180"></canvas>
+    </div>
+
+    <div class="panel full">
+      <h2>Margem por produto (vendas de hoje)</h2>
+      <div class="table-wrap" id="financeiroTableWrap"><div class="state small">a carregar…</div></div>
     </div>
   </div>
 
@@ -488,10 +522,92 @@
     return map;
   }
 
+  // Nome do produto -> preço de custo s/ IVA (fonte: export de produtos, coluna PRECO_PRODUTO)
+  const NAME_TO_COST = {"Coca Cola Zero Lata 33 Cl":0.66,"Leite Uht Achocolatado Agros 200 Ml":0.34,"Snack de Chocolate Snickers 50 G":0.455,"MACA DESIDRAT VERDE FRUBIS 20G":0.0,"Tortitas Milho Caçarola Crackies Chocolate 22,6":0.0,"Tisana Pleno Chá Verde e Limão PET 33 Cl":0.495,"Bolacha Maria sem Açúcar Doses":0.0,"Bolachas Crackers Tuc Originais 31 G":0.373,"Barras Cereais Linha Nacional Chocolate 23 G":0.0,"Pastilhas Elásticas Chiclets Spearmint 16,5 G":0.0,"Coca Cola Original Lata 33 Cl":0.45,"Ice Tea Lipton Limão Lata 33 Cl":0.0,"Ice Tea Lipton Pêssego Lata 33 Cl":0.0,"Guaraná Brasil Lata 33 Cl":0.415,"Refrigerante com Gás Seven Up Lata 33 Cl":0.0,"Pão com Chouriço":0.0,"Croissant Simples":0.44,"Bolachas Marinheiras Cem Porcento Chia Mini 50 G":0.534,"Tortitas Milho Caçarola Crackies Chocolate 22,6 G":0.0,"REF S/G FRESKY F TROP TET 20CL":0.199,"REF S/G FRESKY LAR TET 20CL":0.0,"NAPOLITANAS AMANH CACAU 45GR":0.0,"Snack de Chocolate Twix 50 G":0.455,"Snack de Chocolate Mars 45 G":0.465,"Kit Kat 41,5 Gr":0.471,"Lion 42 Gr":0.449,"Santal Active Drink Laranja/Cenoura":0.449,"Croissant Aurora Simples 240gr":0.0,"7Up 33cl - SDR":0.54,"Bolacha Cracker TUC Ervas Aromáticas":0.0,"Bebida Energetica Hell Classic 25cl":0.64,"Sumol Laranja Lata 33cl":0.58,"Ice Tea Pessego Continente 20cl":0.1611,"Batata Frita Barrosã 45g":0.0,"BEB ENERGÉTICA BE POWER LATA 25C":0.0,"Oreo original 6 66g":0.41,"Bola de Carne":0.58,"Pepsi Cola Zero Lata 33 Cl (SDR)":0.428,"NAPOLITANA SCHOCO CHOC":0.225,"ICE TEA AMANH PES TET 20CL":0.0,"Cerveja sem álcool super bock 00% lata":0.0,"Café longo especial":0.0,"Café pingado especial":0.0,"Garoto especial":0.0,"Capuccino especial":0.0,"Mocaccino especial":0.0,"Galão XL":0.0,"Chocolate Forte XL":0.0,"Chocolate com Leite XL":0.0,"Capuccino XL":0.0,"Chá Limão XL":0.0,"Capuccino Baunilha XL":0.0,"Café c/ Chocolate":0.0712,"Chá Frutos Vermelhos":0.0,"Capuccino c/ Chocolate":0.0,"Copo":0.0,"Água quente":0.0,"Descafeinado Mocaccino":0.0265,"Café Caramelo":0.0709,"Descafeinado Garoto":0.0421,"Café c/Chocolate Solúvel":0.0,"ND":0.0,"Fatia Bolo Cenoura com Chocolate":0.43,"Salame de Chocolate Ecobol":0.39,"Kinder Bueno":0.58,"Kinder Delice":0.0,"Napolitana Chocolate 45 Gr - Bitee":0.251,"Croissant Recheado com Cacau 60 Gr - Belino":0.388,"Açucar 1 Kg":0.0,"Café em Grão 1Kg":0.0,"Bidón 20L":0.0,"Descafeinado 100gr Amanhecer":2.24,"Cocoa GO! Choco":4.926,"Café Sical":0.0,"Trik - Salty Sticks":0.247,"Vendin - Preparado Base de Leite 750 Gr":2.899,"DaVinci - Capuccino Avelã 1 Kg":4.22,"Chá Limão":0.0,"Copos de Papel 6oz  180ml":0.018,"Copo Plástico Branco 165CC 3000un":0.0,"Paletinas madeira 90x10x1.3mm (3750un)":0.004,"Copos Plástico Marrom para Vending 160ml (3000un)":0.0,"Bolo de Laranja":0.0,"Batatas Fritas - Super Douradas Onduladas 40gr":0.499,"Dulcesol - Zebra":0.33,"Frisumo Laranja Lata 0.33cl":0.375,"Kas Limão":0.41,"TPA Ellectro":136.0,"Cretamel - Barra de Amendoim Com Mel  40 Gr":0.364,"Mr Brownie - Chocolate Brownies 50 Gr":0.398,"Fatia de Bolo iogurte":0.43,"SUMO AMANH 100% LAR TET 20CL":0.0,"Agua UP 0,5L":0.12,"Wafer de Cacau com Recheio Avelã - My Motto":0.22,"Crispy Bar de Chocolate e Aveia  40 Gr - Sante":0.364,"Caramel GO! Capuccino em Pó":5.362,"Simat - Chá de Menta":6.25,"Bebida Energetica Hell Zero 25cl":0.64,"Iogurte Liquido Longa Vida Tropical":0.2475,"Café em Grão Caffier Robusta":7.79,"Copos de Plástico 166ml":0.014,"Limonada 500 ml - Enjoy":0.453,"Bolacha Fit de Cereais e Cacau 50 Gr Sante":0.386,"Amendoins Mel e Mostarda 70gr - Zigi":0.446,"Depósito SDR embalagem":0.1,"Coca-Coca Original Lata 33cl - SDR":0.0,"Fatia Bolo Ecobolos (Variados)":0.43,"Açucar Amanhecer 1KG Sticks 4g x250":1.99,"Empada de Frango":0.53,"Kit Kat Chunky Funky 40g":0.47,"Tarte de Amêndoa 80Gr":0.47,"Barra Go On Energy 45 Gr Sante":0.45,"Trik - Crackers Original 110gr":0.47,"Bebida Energetica Hell Classic 250ml (SDR)":0.5609,"Kings - Soft Cookies com Pedaços de Chocolate Triplo 40gr":0.404,"Padaria da Arrifana - Folhado de Chocolate 4 Uni 70 Gr":0.522,"Guarana Antartica lata 33cl":0.595,"Kinder Bueno White 39g":0.795,"7UP - Refrigerante com Gás Zero Mint 330ml (SDR)":0.486,"Bitee - Croissant Recheio Cacau 60g":0.342,"Vidal - Mega Sweet Mix 90 Gr":0.462,"Poker Wafer Cacao":0.23,"Coca Cola Original Lata Sleek (SDR)":0.66,"Agua Rioba 50cl (SDR)":0.13,"Guaraná Brasil 33cl (Sdr)":0.53,"Agua S. Martinho 50cl (SDR)":0.12,"Açucar Sidul 1kg":0.72,"Tisana Pleno Chá Verde e Limão PET 33 Cl (SDR)":0.59,"Ristora - Chá Limão 1Kg":3.98,"Descafeinado Laqtia 250 g":6.55,"Bolo de Arroz":0.47,"Sande Mista Mistura Cacetinho":0.0,"Lanche Fiambre":0.55,"Bebida Energetica Hell Zero 25cl - SDR":0.64,"Hell Energy Coffee Latte 250ml":0.81,"7Up Sleek 330ml":0.43,"Frisumo Laranja Lata 0.33cl (SDR)":0.33,"Fuze Tea Pêssego Sleek 330ml - SDR":0.5364,"Bitee - Bolachas Húngaras 70 Gr":0.432,"Café Normal":0.0628,"Chá":0.0509,"Chocolate":0.0212,"Capuccino":0.0645,"Café Pingado":0.0645,"Galão":0.0645,"Leite":0.0163,"Chocolate c/ Leite":0.0246,"Moccaccino":0.0672,"Café Curto":0.0628,"Café Longo":0.0628,"Garoto":0.0645,"Chocolate Forte":0.0,"Café Solúvel":0.0,"Descafeinado Curto":0.0172,"Descafeinado Normal":0.0172,"Descafeinado Longo":0.0172,"Descafeinado Capuccino c/ chocolate":0.0189,"Descafeinado Pingado":0.0421,"Descafeinado Galão":0.0421,"Capuccino de Avelã":0.0,"Capuccino de caramelo":0.0726,"Capuccino de baunilha":0.0,"Leite c/ chocolate":0.0246,"Café Curto Solúvel":0.0,"Café Longo Solúvel":0.0,"Café Pingado Solúvel":0.0,"Galão Solúvel":0.0,"Capuccino Solúvel":0.0,"Mocacciono Solúvel":0.0,"Chocolate Crema":0.0,"Leite com Café":0.0645};
+
+  function custoUnitario(nome) {
+    return NAME_TO_COST[nome] || 0;
+  }
+
+  let lastVendasRows = [];
   let lastSummary = null; // guardado para poder enviar como snapshot
+
+  function renderFinanceiro() {
+    const rows = lastVendasRows.filter(r => r.NOME_PRODUTO);
+    if (!rows.length) return;
+
+    let receitaTotal = 0, custoTotal = 0;
+    const porProduto = new Map();
+    const porSubfamilia = new Map();
+
+    for (const r of rows) {
+      const nome = r.NOME_PRODUTO;
+      const valor = Number(r.value) || 0;
+      const qtd = Number(r.count) || 1;
+      const custo = custoUnitario(nome) * qtd;
+
+      receitaTotal += valor;
+      custoTotal += custo;
+
+      const p = porProduto.get(nome) || { receita: 0, custo: 0, qtd: 0 };
+      p.receita += valor; p.custo += custo; p.qtd += qtd;
+      porProduto.set(nome, p);
+
+      const sub = subfamiliaLabel(nome);
+      const s = porSubfamilia.get(sub) || 0;
+      porSubfamilia.set(sub, s + (valor - custo));
+    }
+
+    const lucroTotal = receitaTotal - custoTotal;
+    const margemTotal = receitaTotal ? (lucroTotal / receitaTotal) * 100 : 0;
+
+    document.getElementById('finReceita').textContent = fmtEUR(receitaTotal);
+    document.getElementById('finCusto').textContent = fmtEUR(custoTotal);
+    document.getElementById('finLucro').textContent = fmtEUR(lucroTotal);
+    document.getElementById('finMargem').textContent = margemTotal.toFixed(1) + '%';
+
+    // Gráfico: lucro por subfamília
+    const subEntries = Array.from(porSubfamilia.entries()).sort((a, b) => b[1] - a[1]);
+    new Chart(document.getElementById('chartLucroSubfamilia'), {
+      type: 'bar',
+      data: {
+        labels: subEntries.map(s => s[0]),
+        datasets: [{ label: 'Lucro bruto (€)', data: subEntries.map(s => s[1]), backgroundColor: '#2F9E44' }],
+      },
+      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+    });
+
+    // Tabela por produto
+    const linhas = Array.from(porProduto.entries())
+      .sort((a, b) => b[1].receita - a[1].receita)
+      .map(([nome, p]) => {
+        const lucro = p.receita - p.custo;
+        const margem = p.receita ? (lucro / p.receita) * 100 : 0;
+        return `
+          <tr>
+            <td>${nome}</td>
+            <td class="num">${fmtInt(p.qtd)}</td>
+            <td class="num">${fmtEUR(p.receita)}</td>
+            <td class="num">${fmtEUR(p.custo)}</td>
+            <td class="num">${fmtEUR(lucro)}</td>
+            <td class="num">${margem.toFixed(1)}%</td>
+          </tr>
+        `;
+      }).join('');
+
+    document.getElementById('financeiroTableWrap').innerHTML = `
+      <table>
+        <thead>
+          <tr><th>Produto</th><th class="num">Qtd</th><th class="num">Receita</th><th class="num">Custo</th><th class="num">Lucro</th><th class="num">Margem</th></tr>
+        </thead>
+        <tbody>${linhas}</tbody>
+      </table>
+    `;
+  }
   let HISTORICO = {}; // resumo diário 2026-02-25 → hoje, carregado de admin/historico.json
 
   function renderVendas(rows) {
+    lastVendasRows = rows;
     const receitaTotal = rows.reduce((sum, r) => sum + (Number(r.value) || 0), 0);
     const transacoes = rows.reduce((sum, r) => sum + (Number(r.count) || 1), 0);
     const ticketMedio = transacoes ? receitaTotal / transacoes : 0;
@@ -621,28 +737,63 @@
     };
   }
 
-  function renderStock(rows) {
+  const WAREHOUSES = { "7": "A Minha Box", "3": "Armazém Medina" };
+  function warehouseLabel(codigo) {
+    return WAREHOUSES[codigo] || codigo || '—';
+  }
+
+  let allStockRows = [];
+
+  function paintStockTable(rows) {
     const wrap = document.getElementById('stockTableWrap');
     if (!rows.length) {
-      wrap.innerHTML = '<div class="state">Sem dados de stock.</div>';
+      wrap.innerHTML = '<div class="state small">Sem dados para este filtro.</div>';
       return;
     }
     const sorted = [...rows].sort((a, b) => (b.sum || 0) - (a.sum || 0));
     const linhas = sorted.map(r => `
       <tr>
         <td>${productLabel(r.CODIGO_PRODUTO)}</td>
-        <td>${r.CODIGO_ARMAZEM ?? '—'}</td>
+        <td>${warehouseLabel(r.CODIGO_ARMAZEM)}</td>
         <td class="num">${fmtInt(r.sum)}</td>
       </tr>
     `).join('');
     wrap.innerHTML = `
       <table>
         <thead>
-          <tr><th>Produto</th><th>Código Armazém</th><th class="num">Stock</th></tr>
+          <tr><th>Produto</th><th>Armazém</th><th class="num">Stock</th></tr>
         </thead>
         <tbody>${linhas}</tbody>
       </table>
     `;
+  }
+
+  function applyStockFilters() {
+    const wh = document.getElementById('warehouseFilter').value;
+    const prod = document.getElementById('productFilter').value;
+    let rows = allStockRows;
+    if (wh) rows = rows.filter(r => String(r.CODIGO_ARMAZEM) === wh);
+    if (prod) rows = rows.filter(r => String(r.CODIGO_PRODUTO) === prod);
+    paintStockTable(rows);
+  }
+
+  function renderStock(rows) {
+    allStockRows = rows;
+
+    const whSelect = document.getElementById('warehouseFilter');
+    const armazens = Array.from(new Set(rows.map(r => String(r.CODIGO_ARMAZEM)))).sort();
+    whSelect.innerHTML = '<option value="">Todos</option>' +
+      armazens.map(a => `<option value="${a}">${warehouseLabel(a)}</option>`).join('');
+    whSelect.onchange = applyStockFilters;
+
+    const prodSelect = document.getElementById('productFilter');
+    const produtos = Array.from(new Set(rows.map(r => String(r.CODIGO_PRODUTO))))
+      .sort((a, b) => productLabel(a).localeCompare(productLabel(b)));
+    prodSelect.innerHTML = '<option value="">Todos</option>' +
+      produtos.map(p => `<option value="${p}">${productLabel(p)}</option>`).join('');
+    prodSelect.onchange = applyStockFilters;
+
+    paintStockTable(rows);
   }
 
   async function saveSnapshot() {
@@ -870,6 +1021,17 @@
     renderTop7Dias();
   }
 
+  let financeiroLoaded = false;
+  function loadFinanceiroView() {
+    if (financeiroLoaded) return;
+    if (!lastVendasRows.length) {
+      document.getElementById('financeiroTableWrap').innerHTML = '<div class="state small">a carregar dados de vendas…</div>';
+      return;
+    }
+    financeiroLoaded = true;
+    renderFinanceiro();
+  }
+
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -877,6 +1039,7 @@
       btn.classList.add('active');
       document.getElementById('view-' + btn.dataset.view).classList.add('active');
       if (btn.dataset.view === 'stocks') loadStocksView();
+      if (btn.dataset.view === 'financeiro') loadFinanceiroView();
     });
   });
 
