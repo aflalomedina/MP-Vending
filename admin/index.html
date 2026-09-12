@@ -664,6 +664,7 @@
   function renderStockAlerts(rows) {
     const wrap = document.getElementById('stockAlertsWrap');
     const baixos = rows
+      .filter(r => subfamiliaLabel(r.NOME_PRODUTO) !== 'Compostos')
       .filter(r => Number(r.STOCK_MIN_CONF) > 0 && Number(r.sum) < Number(r.STOCK_MIN_CONF))
       .sort((a, b) => (Number(a.sum) - Number(a.STOCK_MIN_CONF)) - (Number(b.sum) - Number(b.STOCK_MIN_CONF)));
 
