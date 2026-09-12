@@ -322,6 +322,12 @@
 
     <div class="panel full">
       <h2>Stock atual — máquinas de snacks (matrícula "-S")</h2>
+      <div style="margin-bottom:12px;">
+        <label for="snackMachineFilter" style="font-size:13px;color:var(--muted);margin-right:8px;">Filtrar por máquina:</label>
+        <select id="snackMachineFilter" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;">
+          <option value="">Todas</option>
+        </select>
+      </div>
       <div class="table-wrap" id="snackStockWrap"><div class="state small">a carregar…</div></div>
     </div>
 
@@ -672,34 +678,52 @@
     `;
   }
 
+  let snackStockRows = [];
+
+  function paintSnackStockTable(rows) {
+    const wrap = document.getElementById('snackStockWrap');
+    if (!rows.length) {
+      wrap.innerHTML = '<div class="state small">Sem dados para esta máquina.</div>';
+      return;
+    }
+    const linhas = rows.map(r => `
+      <tr>
+        <td>${machineLabel(r.MATRICULA_MAQUINA)}</td>
+        <td>${r.CODIGO_SELETOR ?? '—'}</td>
+        <td>${r.NOME_PRODUTO ?? '—'}</td>
+        <td class="num">${fmtInt(r.sum)}</td>
+        <td class="num">${fmtInt(r.CAPACIDADE_SELETOR)}</td>
+      </tr>
+    `).join('');
+    wrap.innerHTML = `
+      <table>
+        <thead><tr><th>Máquina</th><th>Slot</th><th>Produto</th><th class="num">Stock</th><th class="num">Capacidade</th></tr></thead>
+        <tbody>${linhas}</tbody>
+      </table>
+    `;
+  }
+
   async function renderSnackStock() {
     const wrap = document.getElementById('snackStockWrap');
     try {
       const raw = await fetchJSON('/api/layout-maquinas');
       const rows = toObjects(raw).filter(r => (r.MATRICULA_MAQUINA || '').endsWith('-S'));
-      if (!rows.length) {
-        wrap.innerHTML = '<div class="state small">Sem máquinas de snacks encontradas.</div>';
-        return;
-      }
-      const sorted = [...rows].sort((a, b) => {
+      snackStockRows = [...rows].sort((a, b) => {
         const m = (a.MATRICULA_MAQUINA || '').localeCompare(b.MATRICULA_MAQUINA || '');
         return m !== 0 ? m : (b.sum || 0) - (a.sum || 0);
       });
-      const linhas = sorted.map(r => `
-        <tr>
-          <td>${machineLabel(r.MATRICULA_MAQUINA)}</td>
-          <td>${r.CODIGO_SELETOR ?? '—'}</td>
-          <td>${r.NOME_PRODUTO ?? '—'}</td>
-          <td class="num">${fmtInt(r.sum)}</td>
-          <td class="num">${fmtInt(r.CAPACIDADE_SELETOR)}</td>
-        </tr>
-      `).join('');
-      wrap.innerHTML = `
-        <table>
-          <thead><tr><th>Máquina</th><th>Slot</th><th>Produto</th><th class="num">Stock</th><th class="num">Capacidade</th></tr></thead>
-          <tbody>${linhas}</tbody>
-        </table>
-      `;
+
+      // popula o dropdown com as máquinas snack encontradas
+      const select = document.getElementById('snackMachineFilter');
+      const matriculas = Array.from(new Set(snackStockRows.map(r => r.MATRICULA_MAQUINA))).sort();
+      select.innerHTML = '<option value="">Todas</option>' +
+        matriculas.map(m => `<option value="${m}">${machineLabel(m)}</option>`).join('');
+      select.onchange = () => {
+        const val = select.value;
+        paintSnackStockTable(val ? snackStockRows.filter(r => r.MATRICULA_MAQUINA === val) : snackStockRows);
+      };
+
+      paintSnackStockTable(snackStockRows);
     } catch (err) {
       wrap.innerHTML = `<div class="state small error">Erro: ${err.message}</div>`;
     }
@@ -712,21 +736,33 @@
       const data = res.ok ? await res.json() : {};
       const dias = Object.keys(data).sort().slice(-7);
       const totais = new Map();
+      const qtds = new Map();
       for (const dia of dias) {
         for (const [nome, v] of Object.entries(data[dia])) {
           totais.set(nome, (totais.get(nome) || 0) + v.valor);
+          qtds.set(nome, (qtds.get(nome) || 0) + v.qtd);
         }
       }
       const top = Array.from(totais.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
       new Chart(canvas, {
         type: 'bar',
         data: {
-          labels: top.map(t => t[0]),
+          labels: top.map(t => `${t[0]} (${fmtInt(qtds.get(t[0]))} un.)`),
           datasets: [{ label: 'Receita (€)', data: top.map(t => t[1]), backgroundColor: '#FF9F1C' }],
         },
         options: {
           indexAxis: 'y',
-          plugins: { legend: { display: false } },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const nome = top[ctx.dataIndex][0];
+                  return `${fmtEUR(ctx.parsed.x)} · ${fmtInt(qtds.get(nome))} unidades`;
+                },
+              },
+            },
+          },
           scales: { x: { beginAtZero: true } },
         },
       });
