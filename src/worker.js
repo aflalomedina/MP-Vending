@@ -152,7 +152,66 @@ async function handleSnapshot(request, env) {
   return new Response("Método não suportado", { status: 405 });
 }
 
+// ===== Web Analytics (Cloudflare RUM via GraphQL) =====
+async function handleSiteAnalytics(env) {
+  const end = new Date();
+  const start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000); // últimos 30 dias
+
+  const query = `
+    query($acc: String!, $site: String!, $s: Date!, $e: Date!) {
+      viewer {
+        accounts(filter: { accountTag: $acc }) {
+          rumPageloadEventsAdaptiveGroups(
+            filter: { siteTag: $site, date_geq: $s, date_leq: $e, bot: 0 }
+            limit: 10000
+            orderBy: [date_ASC]
+          ) {
+            count
+            sum { visits }
+            dimensions {
+              date
+              requestPath
+              deviceType
+              refererHost
+              countryName
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const variables = {
+    acc: env.CF_ACCOUNT_TAG,
+    site: env.CF_SITE_TAG,
+    s: start.toISOString().slice(0, 10),
+    e: end.toISOString().slice(0, 10),
+  };
+
+  const res = await fetch("https://api.cloudflare.com/client/v4/graphql", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${env.CF_API_TOKEN}`,
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Cloudflare GraphQL respondeu ${res.status}`);
+  }
+
+  const json = await res.json();
+  if (json.errors) {
+    throw new Error(json.errors.map((e) => e.message).join("; "));
+  }
+
+  const groups = json.data?.viewer?.accounts?.[0]?.rumPageloadEventsAdaptiveGroups || [];
+  return groups;
+}
+
 export default {
+
   async fetch(request, env) {
     const url = new URL(request.url);
 
@@ -169,6 +228,20 @@ export default {
       } catch (err) {
         return new Response(JSON.stringify({ error: err.message }), {
           status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    if (url.pathname === "/api/site-analytics") {
+      try {
+        const groups = await handleSiteAnalytics(env);
+        return new Response(JSON.stringify({ groups }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 502,
           headers: { "Content-Type": "application/json" },
         });
       }
