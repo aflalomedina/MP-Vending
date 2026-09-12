@@ -202,6 +202,54 @@
     .kpis { grid-template-columns: repeat(2, 1fr); }
     .grid-2 { grid-template-columns: 1fr; }
   }
+  .tabs {
+    display: flex;
+    gap: 4px;
+    padding: 0 32px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .tab-btn {
+    border: none;
+    background: none;
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    font-family: inherit;
+  }
+
+  .tab-btn.active {
+    color: var(--accent-deep);
+    border-bottom-color: var(--accent);
+  }
+
+  .view { display: none; }
+  .view.active { display: block; }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .badge.P { background: #FFF3CD; color: #8A6D00; }
+  .badge.E { background: #FCE0E0; color: #B42318; }
+
+  .placeholder-box {
+    background: var(--panel);
+    border: 1px dashed var(--line);
+    border-radius: 6px;
+    padding: 32px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+  }
 </style>
 </head>
 <body>
@@ -221,42 +269,73 @@
   </div>
 </div>
 
+<div class="tabs">
+  <button class="tab-btn active" data-view="diarias">Vendas Diárias</button>
+  <button class="tab-btn" data-view="stocks">Stocks</button>
+  <button class="tab-btn" data-view="site">Site</button>
+</div>
+
 <main>
-  <div id="compareResult" class="panel full"></div>
+  <div id="view-diarias" class="view active">
+    <div id="compareResult" class="panel full"></div>
 
-  <div class="kpis">
-    <div class="kpi"><div class="value" id="kpiReceita">—</div><div class="label">Receita (período carregado)</div></div>
-    <div class="kpi"><div class="value" id="kpiTransacoes">—</div><div class="label">Transações</div></div>
-    <div class="kpi"><div class="value" id="kpiTicket">—</div><div class="label">Ticket médio</div></div>
-    <div class="kpi"><div class="value" id="kpiProdutos">—</div><div class="label">Produtos distintos vendidos</div></div>
+    <div class="kpis">
+      <div class="kpi"><div class="value" id="kpiReceita">—</div><div class="label">Receita (período carregado)</div></div>
+      <div class="kpi"><div class="value" id="kpiTransacoes">—</div><div class="label">Transações</div></div>
+      <div class="kpi"><div class="value" id="kpiTicket">—</div><div class="label">Ticket médio</div></div>
+      <div class="kpi"><div class="value" id="kpiProdutos">—</div><div class="label">Produtos distintos vendidos</div></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <h2>Vendas por hora</h2>
+        <canvas id="chartTrend" height="220"></canvas>
+      </div>
+      <div class="panel">
+        <h2>Top 8 produtos (receita e quantidade)</h2>
+        <canvas id="chartTop" height="220"></canvas>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <h2>Receita por máquina</h2>
+        <canvas id="chartMaquinas" height="200"></canvas>
+      </div>
+      <div class="panel">
+        <h2>Vendas por subfamília</h2>
+        <canvas id="chartSubfamilia" height="200"></canvas>
+      </div>
+    </div>
   </div>
 
-  <div class="grid-2">
-    <div class="panel">
-      <h2>Vendas por hora</h2>
-      <canvas id="chartTrend" height="220"></canvas>
+  <div id="view-stocks" class="view">
+    <div class="panel full">
+      <h2>Alertas de stock baixo</h2>
+      <div id="stockAlertsWrap"><div class="state small">a carregar…</div></div>
     </div>
-    <div class="panel">
-      <h2>Top 8 produtos (receita e quantidade)</h2>
-      <canvas id="chartTop" height="220"></canvas>
+
+    <div class="panel full">
+      <h2>Top produtos — últimos 7 dias</h2>
+      <canvas id="chartTop7" height="180"></canvas>
+    </div>
+
+    <div class="panel full">
+      <h2>Stock atual — máquinas de snacks (matrícula "-S")</h2>
+      <div class="table-wrap" id="snackStockWrap"><div class="state small">a carregar…</div></div>
+    </div>
+
+    <div class="panel full">
+      <h2>Stock por armazém</h2>
+      <div class="table-wrap" id="stockTableWrap"><div class="state small">a carregar…</div></div>
     </div>
   </div>
 
-  <div class="grid-2">
-    <div class="panel">
-      <h2>Receita por máquina</h2>
-      <canvas id="chartMaquinas" height="200"></canvas>
-    </div>
-    <div class="panel">
-      <h2>Vendas por subfamília</h2>
-      <canvas id="chartSubfamilia" height="200"></canvas>
-    </div>
-  </div>
-
-  <div class="panel full">
-    <h2>Stock por armazém</h2>
-    <div class="table-wrap" id="stockTableWrap">
-      <div class="state">a carregar…</div>
+  <div id="view-site" class="view">
+    <div class="placeholder-box">
+      Ainda não há analytics ligado ao site. Recomendo o Cloudflare Web Analytics
+      (gratuito, sem cookies, fácil de ativar já que o site está na Cloudflare) —
+      depois de ativado, esta vista passa a mostrar visitas, páginas mais vistas e origem do tráfego.
     </div>
   </div>
 </main>
@@ -569,6 +648,111 @@
       box.innerHTML = `<div class="state small error">Erro ao comparar: ${err.message}</div>`;
     }
   }
+
+  // Produtos assinalados no SEMAFORO_PRODUTO (P = stock baixo, E = esgotado) — a confirmar com a equipa
+  const STOCK_ALERTS = [{"codigo":"142328361647775","nome":"Garoto especial ","semaforo":"P"},{"codigo":"142328397222295","nome":"Capuccino especial","semaforo":"P"},{"codigo":"142328404337638","nome":"Mocaccino especial","semaforo":"P"},{"codigo":"GEN01","nome":"Café Normal","semaforo":"P"},{"codigo":"GEN03","nome":"Chá","semaforo":"P"},{"codigo":"GEN05","nome":"Capuccino","semaforo":"P"},{"codigo":"GEN12","nome":"Café Curto","semaforo":"P"},{"codigo":"GEN13","nome":"Café Longo","semaforo":"E"},{"codigo":"GEN43","nome":"Leite com Café","semaforo":"P"}];
+
+  function renderStockAlerts() {
+    const wrap = document.getElementById('stockAlertsWrap');
+    if (!STOCK_ALERTS.length) {
+      wrap.innerHTML = '<div class="state small">Sem alertas de momento.</div>';
+      return;
+    }
+    const linhas = STOCK_ALERTS.map(a => `
+      <tr>
+        <td>${a.nome}</td>
+        <td><span class="badge ${a.semaforo}">${a.semaforo === 'E' ? 'Esgotado' : 'Stock baixo'}</span></td>
+      </tr>
+    `).join('');
+    wrap.innerHTML = `
+      <table>
+        <thead><tr><th>Produto</th><th>Estado</th></tr></thead>
+        <tbody>${linhas}</tbody>
+      </table>
+    `;
+  }
+
+  async function renderSnackStock() {
+    const wrap = document.getElementById('snackStockWrap');
+    try {
+      const raw = await fetchJSON('/api/layout-maquinas');
+      const rows = toObjects(raw).filter(r => (r.MATRICULA_MAQUINA || '').endsWith('-S'));
+      if (!rows.length) {
+        wrap.innerHTML = '<div class="state small">Sem máquinas de snacks encontradas.</div>';
+        return;
+      }
+      const sorted = [...rows].sort((a, b) => {
+        const m = (a.MATRICULA_MAQUINA || '').localeCompare(b.MATRICULA_MAQUINA || '');
+        return m !== 0 ? m : (b.sum || 0) - (a.sum || 0);
+      });
+      const linhas = sorted.map(r => `
+        <tr>
+          <td>${machineLabel(r.MATRICULA_MAQUINA)}</td>
+          <td>${r.CODIGO_SELETOR ?? '—'}</td>
+          <td>${r.NOME_PRODUTO ?? '—'}</td>
+          <td class="num">${fmtInt(r.sum)}</td>
+          <td class="num">${fmtInt(r.CAPACIDADE_SELETOR)}</td>
+        </tr>
+      `).join('');
+      wrap.innerHTML = `
+        <table>
+          <thead><tr><th>Máquina</th><th>Slot</th><th>Produto</th><th class="num">Stock</th><th class="num">Capacidade</th></tr></thead>
+          <tbody>${linhas}</tbody>
+        </table>
+      `;
+    } catch (err) {
+      wrap.innerHTML = `<div class="state small error">Erro: ${err.message}</div>`;
+    }
+  }
+
+  async function renderTop7Dias() {
+    const canvas = document.getElementById('chartTop7');
+    try {
+      const res = await fetch('/admin/produtos_recentes.json');
+      const data = res.ok ? await res.json() : {};
+      const dias = Object.keys(data).sort().slice(-7);
+      const totais = new Map();
+      for (const dia of dias) {
+        for (const [nome, v] of Object.entries(data[dia])) {
+          totais.set(nome, (totais.get(nome) || 0) + v.valor);
+        }
+      }
+      const top = Array.from(totais.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: top.map(t => t[0]),
+          datasets: [{ label: 'Receita (€)', data: top.map(t => t[1]), backgroundColor: '#FF9F1C' }],
+        },
+        options: {
+          indexAxis: 'y',
+          plugins: { legend: { display: false } },
+          scales: { x: { beginAtZero: true } },
+        },
+      });
+    } catch (err) {
+      canvas.insertAdjacentHTML('afterend', `<div class="state small error">Erro: ${err.message}</div>`);
+    }
+  }
+
+  let stocksLoaded = false;
+  function loadStocksView() {
+    if (stocksLoaded) return;
+    stocksLoaded = true;
+    renderStockAlerts();
+    renderSnackStock();
+    renderTop7Dias();
+  }
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('view-' + btn.dataset.view).classList.add('active');
+      if (btn.dataset.view === 'stocks') loadStocksView();
+    });
+  });
 
   async function init() {
     try {
