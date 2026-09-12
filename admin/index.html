@@ -661,24 +661,29 @@
     }
   }
 
-  // Produtos assinalados no SEMAFORO_PRODUTO (P = stock baixo, E = esgotado) — a confirmar com a equipa
-  const STOCK_ALERTS = [{"codigo":"142328361647775","nome":"Garoto especial ","semaforo":"P"},{"codigo":"142328397222295","nome":"Capuccino especial","semaforo":"P"},{"codigo":"142328404337638","nome":"Mocaccino especial","semaforo":"P"},{"codigo":"GEN01","nome":"Café Normal","semaforo":"P"},{"codigo":"GEN03","nome":"Chá","semaforo":"P"},{"codigo":"GEN05","nome":"Capuccino","semaforo":"P"},{"codigo":"GEN12","nome":"Café Curto","semaforo":"P"},{"codigo":"GEN13","nome":"Café Longo","semaforo":"E"},{"codigo":"GEN43","nome":"Leite com Café","semaforo":"P"}];
-
-  function renderStockAlerts() {
+  function renderStockAlerts(rows) {
     const wrap = document.getElementById('stockAlertsWrap');
-    if (!STOCK_ALERTS.length) {
-      wrap.innerHTML = '<div class="state small">Sem alertas de momento.</div>';
+    const baixos = rows
+      .filter(r => Number(r.STOCK_MIN_CONF) > 0 && Number(r.sum) < Number(r.STOCK_MIN_CONF))
+      .sort((a, b) => (Number(a.sum) - Number(a.STOCK_MIN_CONF)) - (Number(b.sum) - Number(b.STOCK_MIN_CONF)));
+
+    if (!baixos.length) {
+      wrap.innerHTML = '<div class="state small">Sem produtos abaixo do stock mínimo neste momento.</div>';
       return;
     }
-    const linhas = STOCK_ALERTS.map(a => `
+    const linhas = baixos.map(r => `
       <tr>
-        <td>${a.nome}</td>
-        <td><span class="badge ${a.semaforo}">${a.semaforo === 'E' ? 'Esgotado' : 'Stock baixo'}</span></td>
+        <td>${r.NOME_PRODUTO ?? '—'}</td>
+        <td>${machineLabel(r.MATRICULA_MAQUINA)}</td>
+        <td>${r.CODIGO_SELETOR ?? '—'}</td>
+        <td class="num">${fmtInt(r.sum)}</td>
+        <td class="num">${fmtInt(r.STOCK_MIN_CONF)}</td>
+        <td><span class="badge E">Abaixo do mínimo</span></td>
       </tr>
     `).join('');
     wrap.innerHTML = `
       <table>
-        <thead><tr><th>Produto</th><th>Estado</th></tr></thead>
+        <thead><tr><th>Produto</th><th>Máquina</th><th>Slot</th><th class="num">Stock atual</th><th class="num">Mínimo</th><th>Estado</th></tr></thead>
         <tbody>${linhas}</tbody>
       </table>
     `;
@@ -709,17 +714,23 @@
     `;
   }
 
-  async function renderSnackStock() {
-    const wrap = document.getElementById('snackStockWrap');
+  async function loadLayoutAndRender() {
+    const alertsWrap = document.getElementById('stockAlertsWrap');
+    const snackWrap = document.getElementById('snackStockWrap');
     try {
       const raw = await fetchJSON('/api/layout-maquinas');
-      const rows = toObjects(raw).filter(r => isSnackMachine(r.MATRICULA_MAQUINA));
+      const allRows = toObjects(raw);
+
+      // Alertas: todas as máquinas
+      renderStockAlerts(allRows);
+
+      // Tabela de stock: só máquinas de snacks
+      const rows = allRows.filter(r => isSnackMachine(r.MATRICULA_MAQUINA));
       snackStockRows = [...rows].sort((a, b) => {
         const m = (a.MATRICULA_MAQUINA || '').localeCompare(b.MATRICULA_MAQUINA || '');
         return m !== 0 ? m : (b.sum || 0) - (a.sum || 0);
       });
 
-      // popula o dropdown com as máquinas snack encontradas
       const select = document.getElementById('snackMachineFilter');
       const matriculas = Array.from(new Set(snackStockRows.map(r => r.MATRICULA_MAQUINA))).sort();
       select.innerHTML = '<option value="">Todas</option>' +
@@ -731,7 +742,8 @@
 
       paintSnackStockTable(snackStockRows);
     } catch (err) {
-      wrap.innerHTML = `<div class="state small error">Erro: ${err.message}</div>`;
+      alertsWrap.innerHTML = `<div class="state small error">Erro: ${err.message}</div>`;
+      snackWrap.innerHTML = `<div class="state small error">Erro: ${err.message}</div>`;
     }
   }
 
@@ -781,8 +793,7 @@
   function loadStocksView() {
     if (stocksLoaded) return;
     stocksLoaded = true;
-    renderStockAlerts();
-    renderSnackStock();
+    loadLayoutAndRender();
     renderTop7Dias();
   }
 
