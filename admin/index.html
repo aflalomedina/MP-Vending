@@ -250,6 +250,78 @@
     color: var(--muted);
     font-size: 14px;
   }
+
+  @media (max-width: 640px) {
+    .topbar {
+      padding: 14px 16px;
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .topbar h1 { font-size: 19px; }
+
+    .topbar .right {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .compare-box { flex-wrap: wrap; }
+
+    .compare-box input[type="date"] {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .compare-box button { width: 100%; }
+
+    .updated { text-align: left; font-size: 12px; }
+
+    .tabs {
+      padding: 0 8px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      white-space: nowrap;
+    }
+
+    .tab-btn {
+      padding: 10px 12px;
+      font-size: 12.5px;
+      flex: 0 0 auto;
+    }
+
+    main { padding: 16px 12px 40px; }
+
+    .kpis {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .kpi { padding: 12px 12px 10px; }
+    .kpi .value { font-size: 21px; }
+    .kpi .label { font-size: 11px; }
+
+    .grid-2 { gap: 8px; margin-bottom: 8px; }
+
+    .panel { padding: 14px 14px 10px; }
+    .panel.full { margin-bottom: 8px; }
+    .panel h2 { font-size: 14px; }
+
+    table { font-size: 12px; min-width: 480px; }
+    th, td { padding: 6px 8px; }
+
+    .table-wrap { max-height: 300px; overflow-x: auto; }
+
+    #snackMachineFilter { width: 100%; margin-top: 4px; }
+
+    canvas { max-width: 100%; }
+  }
+
+  @media (max-width: 400px) {
+    .kpis { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
