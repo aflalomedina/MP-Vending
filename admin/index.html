@@ -475,12 +475,34 @@
   </div>
 
   <div id="view-site" class="view">
-    <div class="placeholder-box">
-      Ainda não há analytics ligado ao site. Recomendo o Cloudflare Web Analytics
-      (gratuito, sem cookies, fácil de ativar já que o site está na Cloudflare) —
-      depois de ativado, esta vista passa a mostrar visitas, páginas mais vistas e origem do tráfego.
+    <div class="kpis">
+      <div class="kpi"><div class="value" id="siteVisitas">—</div><div class="label">Visitas (últimos 30 dias)</div></div>
+      <div class="kpi"><div class="value" id="sitePageviews">—</div><div class="label">Pageviews</div></div>
+      <div class="kpi"><div class="value" id="sitePaginas">—</div><div class="label">Páginas distintas visitadas</div></div>
+    </div>
+
+    <div class="panel full">
+      <h2>Visitas por dia</h2>
+      <canvas id="chartSiteTrend" height="180"></canvas>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <h2>Páginas mais vistas</h2>
+        <div class="table-wrap" id="sitePaginasWrap"><div class="state small">a carregar…</div></div>
+      </div>
+      <div class="panel">
+        <h2>Origem do tráfego</h2>
+        <div class="table-wrap" id="siteReferrersWrap"><div class="state small">a carregar…</div></div>
+      </div>
+    </div>
+
+    <div class="panel full" style="max-width:340px;">
+      <h2>Dispositivos</h2>
+      <canvas id="chartSiteDevices" height="140"></canvas>
     </div>
   </div>
+
 </main>
 
 <script>
@@ -1281,6 +1303,95 @@
     renderFinanceiro();
   }
 
+  let siteLoaded = false;
+  function loadSiteView() {
+    if (siteLoaded) return;
+    siteLoaded = true;
+    renderSiteAnalytics();
+  }
+
+  async function renderSiteAnalytics() {
+    try {
+      const res = await fetch('/api/site-analytics');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      const groups = data.groups || [];
+
+      if (!groups.length) {
+        document.querySelector('#view-site').insertAdjacentHTML(
+          'afterbegin',
+          '<div class="state small">Ainda não há dados suficientes (pode demorar algumas horas a aparecer tráfego novo).</div>'
+        );
+        return;
+      }
+
+      const totalPageviews = groups.reduce((s, g) => s + (g.count || 0), 0);
+      const totalVisitas = groups.reduce((s, g) => s + (g.sum?.visits || 0), 0);
+      const paginasDistintas = new Set(groups.map(g => g.dimensions.requestPath)).size;
+
+      document.getElementById('sitePageviews').textContent = fmtInt(totalPageviews);
+      document.getElementById('siteVisitas').textContent = fmtInt(totalVisitas);
+      document.getElementById('sitePaginas').textContent = fmtInt(paginasDistintas);
+
+      // Visitas por dia
+      const porDia = groupSum(groups, g => g.dimensions.date, g => g.sum?.visits || 0);
+      const dias = Array.from(porDia.keys()).sort();
+      new Chart(document.getElementById('chartSiteTrend'), {
+        type: 'line',
+        data: {
+          labels: dias,
+          datasets: [{
+            label: 'Visitas',
+            data: dias.map(d => porDia.get(d)),
+            borderColor: '#FF9F1C',
+            backgroundColor: 'rgba(255,159,28,0.12)',
+            fill: true,
+            tension: 0.25,
+            pointRadius: 2,
+          }],
+        },
+        options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+      });
+
+      // Páginas mais vistas
+      const porPagina = groupSum(groups, g => g.dimensions.requestPath || '/', g => g.count || 0);
+      const topPaginas = Array.from(porPagina.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      document.getElementById('sitePaginasWrap').innerHTML = `
+        <table>
+          <thead><tr><th>Página</th><th class="num">Pageviews</th></tr></thead>
+          <tbody>${topPaginas.map(p => `<tr><td>${p[0]}</td><td class="num">${fmtInt(p[1])}</td></tr>`).join('')}</tbody>
+        </table>
+      `;
+
+      // Origem do tráfego
+      const porReferrer = groupSum(groups, g => g.dimensions.refererHost || 'Direto', g => g.count || 0);
+      const topReferrers = Array.from(porReferrer.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      document.getElementById('siteReferrersWrap').innerHTML = `
+        <table>
+          <thead><tr><th>Origem</th><th class="num">Pageviews</th></tr></thead>
+          <tbody>${topReferrers.map(r => `<tr><td>${r[0]}</td><td class="num">${fmtInt(r[1])}</td></tr>`).join('')}</tbody>
+        </table>
+      `;
+
+      // Dispositivos
+      const porDispositivo = groupSum(groups, g => g.dimensions.deviceType || 'Desconhecido', g => g.count || 0);
+      const dispositivos = Array.from(porDispositivo.entries()).sort((a, b) => b[1] - a[1]);
+      new Chart(document.getElementById('chartSiteDevices'), {
+        type: 'doughnut',
+        data: {
+          labels: dispositivos.map(d => d[0]),
+          datasets: [{ data: dispositivos.map(d => d[1]), backgroundColor: ['#FF9F1C', '#1B1F27', '#2F9E44', '#6B7280'] }],
+        },
+        options: { plugins: { legend: { position: 'right' } } },
+      });
+    } catch (err) {
+      document.querySelector('#view-site').insertAdjacentHTML(
+        'afterbegin',
+        `<div class="state error">Não foi possível carregar os dados de analytics: ${err.message}</div>`
+      );
+    }
+  }
+
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -1289,6 +1400,7 @@
       document.getElementById('view-' + btn.dataset.view).classList.add('active');
       if (btn.dataset.view === 'stocks') loadStocksView();
       if (btn.dataset.view === 'financeiro') loadFinanceiroView();
+      if (btn.dataset.view === 'site') loadSiteView();
     });
   });
 
