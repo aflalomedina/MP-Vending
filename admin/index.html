@@ -447,12 +447,20 @@
 
     <div class="panel full">
       <h2>Vendas por dia do mês</h2>
-      <div style="margin-bottom:12px;">
-        <label for="monthFilter" style="font-size:13px;color:var(--muted);margin-right:8px;">Mês:</label>
-        <select id="monthFilter" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;"></select>
+      <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+        <div>
+          <label for="monthFilter" style="font-size:13px;color:var(--muted);margin-right:8px;">Mês:</label>
+          <select id="monthFilter" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;"></select>
+        </div>
+        <div style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;">
+          <span style="display:inline-block;width:10px;height:10px;background:#FF9F1C;border-radius:2px;"></span> Dias úteis
+          <span style="display:inline-block;width:10px;height:10px;background:#D1CCC0;border-radius:2px;margin-left:8px;"></span> Fim de semana
+        </div>
       </div>
       <canvas id="chartVendasMes" height="200"></canvas>
     </div>
+
+    <div class="panel full" id="projecaoPanel"></div>
 
     <div class="panel full">
       <h2>Acumulado mensal (desde o início dos dados)</h2>
@@ -635,6 +643,7 @@
     `;
 
     renderVendasPorDiaMes();
+    renderProjecaoMensal();
     renderAcumuladoMensal();
   }
 
@@ -646,6 +655,60 @@
     const nomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     const [y, m] = ym.split('-');
     return `${nomes[parseInt(m, 10) - 1]} ${y}`;
+  }
+
+  function mediasPorDiaSemana() {
+    const somas = Array(7).fill(0);
+    const contagens = Array(7).fill(0);
+    for (const [data, resumo] of Object.entries(HISTORICO)) {
+      const dow = parseDataLocal(data).getDay();
+      somas[dow] += resumo.receitaTotal || 0;
+      contagens[dow] += 1;
+    }
+    return somas.map((s, i) => contagens[i] ? s / contagens[i] : 0);
+  }
+
+  function renderProjecaoMensal() {
+    const panel = document.getElementById('projecaoPanel');
+    const hoje = new Date();
+    const anoAtual = hoje.getFullYear();
+    const mesAtual = hoje.getMonth(); // 0-indexed
+    const mesKey = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}`;
+
+    const diasDoMesRegistados = Object.keys(HISTORICO).filter(d => d.startsWith(mesKey));
+    if (!diasDoMesRegistados.length) {
+      panel.innerHTML = '<div class="state small">Ainda sem dados suficientes este mês para projetar.</div>';
+      return;
+    }
+
+    const receitaAteAgora = diasDoMesRegistados.reduce((s, d) => s + (HISTORICO[d].receitaTotal || 0), 0);
+    const mediasDow = mediasPorDiaSemana();
+
+    const diasNoMes = new Date(anoAtual, mesAtual + 1, 0).getDate();
+    const diasJaContados = new Set(diasDoMesRegistados);
+    let receitaProjetadaRestante = 0;
+    let diasEmFalta = 0;
+    for (let dia = 1; dia <= diasNoMes; dia++) {
+      const dataStr = `${mesKey}-${String(dia).padStart(2, '0')}`;
+      if (diasJaContados.has(dataStr)) continue;
+      const dow = new Date(anoAtual, mesAtual, dia).getDay();
+      receitaProjetadaRestante += mediasDow[dow];
+      diasEmFalta++;
+    }
+
+    const totalProjetado = receitaAteAgora + receitaProjetadaRestante;
+
+    panel.innerHTML = `
+      <h2>Projeção para ${monthName(mesKey)}</h2>
+      <div class="kpis" style="margin-bottom:0;">
+        <div class="kpi"><div class="value">${fmtEUR(receitaAteAgora)}</div><div class="label">Já faturado (${diasDoMesRegistados.length} dias)</div></div>
+        <div class="kpi"><div class="value">${fmtEUR(receitaProjetadaRestante)}</div><div class="label">Estimado p/ ${diasEmFalta} dias em falta</div></div>
+        <div class="kpi"><div class="value" style="color:var(--positive);">${fmtEUR(totalProjetado)}</div><div class="label">Total projetado do mês</div></div>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-top:10px;">
+        Estimativa baseada na média histórica de receita para cada dia da semana (ex: uma sexta-feira usa a média de todas as sextas-feiras já registadas), não numa simples média diária — para refletir o padrão de dias úteis vs. fim de semana.
+      </p>
+    `;
   }
 
   let chartVendasMesInstance = null;
@@ -661,21 +724,52 @@
     drawVendasMes();
   }
 
+  const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+  function parseDataLocal(dateStr) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+
+  function diaSemanaAbrev(dateStr) {
+    return DIAS_SEMANA[parseDataLocal(dateStr).getDay()];
+  }
+
+  function isFimDeSemana(dateStr) {
+    const dow = parseDataLocal(dateStr).getDay();
+    return dow === 0 || dow === 6;
+  }
+
   function drawVendasMes() {
     const mes = document.getElementById('monthFilter').value;
     const dias = Object.keys(HISTORICO).filter(d => d.startsWith(mes)).sort();
-    const labels = dias.map(d => String(parseInt(d.slice(8, 10), 10)));
+    const labels = dias.map(d => [String(parseInt(d.slice(8, 10), 10)), diaSemanaAbrev(d)]);
     const valores = dias.map(d => HISTORICO[d].receitaTotal || 0);
+    const cores = dias.map(d => isFimDeSemana(d) ? '#D1CCC0' : '#FF9F1C');
 
     if (chartVendasMesInstance) chartVendasMesInstance.destroy();
     chartVendasMesInstance = new Chart(document.getElementById('chartVendasMes'), {
       type: 'bar',
-      data: { labels, datasets: [{ label: 'Receita (€)', data: valores, backgroundColor: '#FF9F1C' }] },
-      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+      data: { labels, datasets: [{ label: 'Receita (€)', data: valores, backgroundColor: cores }] },
+      options: {
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: (items) => {
+                const d = dias[items[0].dataIndex];
+                return `Dia ${parseInt(d.slice(8, 10), 10)} (${diaSemanaAbrev(d)})`;
+              },
+            },
+          },
+        },
+        scales: { y: { beginAtZero: true } },
+      },
     });
   }
 
   const CORES_MESES = ['#FF9F1C', '#1B1F27', '#2F9E44', '#C7710A', '#6B7280', '#E03131', '#0EA5E9', '#A855F7', '#84CC16', '#DB2777'];
+
 
   let chartAcumuladoInstance = null;
   function renderAcumuladoMensal() {
