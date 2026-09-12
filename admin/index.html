@@ -451,10 +451,12 @@
         <div>
           <label for="monthFilter" style="font-size:13px;color:var(--muted);margin-right:8px;">Mês:</label>
           <select id="monthFilter" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;"></select>
+          <span id="diasUteisInfo" style="font-size:12px;color:var(--muted);margin-left:10px;"></span>
         </div>
         <div style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;">
           <span style="display:inline-block;width:10px;height:10px;background:#FF9F1C;border-radius:2px;"></span> Dias úteis
           <span style="display:inline-block;width:10px;height:10px;background:#D1CCC0;border-radius:2px;margin-left:8px;"></span> Fim de semana
+          <span style="display:inline-block;width:10px;height:10px;background:#E03131;border-radius:2px;margin-left:8px;"></span> Feriado
         </div>
       </div>
       <canvas id="chartVendasMes" height="200"></canvas>
@@ -679,10 +681,47 @@
     return `${nomes[parseInt(m, 10) - 1]} ${y}`;
   }
 
+  // Feriados nacionais obrigatórios de Portugal em 2026
+  const FERIADOS_2026 = new Set([
+    '2026-01-01', // Ano Novo
+    '2026-04-03', // Sexta-feira Santa
+    '2026-04-05', // Páscoa
+    '2026-04-25', // Dia da Liberdade
+    '2026-05-01', // Dia do Trabalhador
+    '2026-06-04', // Corpo de Deus
+    '2026-06-10', // Dia de Portugal
+    '2026-08-15', // Assunção de Nossa Senhora
+    '2026-10-05', // Implantação da República
+    '2026-11-01', // Todos os Santos
+    '2026-12-01', // Restauração da Independência
+    '2026-12-08', // Imaculada Conceição
+    '2026-12-25', // Natal
+  ]);
+
+  function isFeriado(dateStr) {
+    return FERIADOS_2026.has(dateStr);
+  }
+
+  function isDiaUtil(dateStr) {
+    return !isFimDeSemana(dateStr) && !isFeriado(dateStr);
+  }
+
+  function diasUteisNoMes(mesKey) {
+    const [y, m] = mesKey.split('-').map(Number);
+    const diasNoMes = new Date(y, m, 0).getDate();
+    let uteis = 0;
+    for (let dia = 1; dia <= diasNoMes; dia++) {
+      const dataStr = `${mesKey}-${String(dia).padStart(2, '0')}`;
+      if (isDiaUtil(dataStr)) uteis++;
+    }
+    return uteis;
+  }
+
   function mediasPorDiaSemana() {
     const somas = Array(7).fill(0);
     const contagens = Array(7).fill(0);
     for (const [data, resumo] of Object.entries(HISTORICO)) {
+      if (data.startsWith('2026-08')) continue; // agosto excluído — mês atípico
       const dow = parseDataLocal(data).getDay();
       somas[dow] += resumo.receitaTotal || 0;
       contagens[dow] += 1;
@@ -719,16 +758,25 @@
     }
 
     const totalProjetado = receitaAteAgora + receitaProjetadaRestante;
+    const diasUteis = diasUteisNoMes(mesKey);
+    const feriadosDoMes = [];
+    for (let dia = 1; dia <= diasNoMes; dia++) {
+      const dataStr = `${mesKey}-${String(dia).padStart(2, '0')}`;
+      if (isFeriado(dataStr)) feriadosDoMes.push(`${dia} (${diaSemanaAbrev(dataStr)})`);
+    }
+    const feriadosTexto = feriadosDoMes.length
+      ? `Feriados este mês: ${feriadosDoMes.join(', ')}.`
+      : 'Sem feriados nacionais este mês.';
 
     panel.innerHTML = `
-      <h2>Projeção para ${monthName(mesKey)}</h2>
+      <h2>Projeção para ${monthName(mesKey)} <span style="font-weight:400;color:var(--muted);font-size:13px;">— ${diasUteis} dias úteis no mês</span></h2>
       <div class="kpis" style="margin-bottom:0;">
         <div class="kpi"><div class="value">${fmtEUR(receitaAteAgora)}</div><div class="label">Já faturado (${diasDoMesRegistados.length} dias)</div></div>
         <div class="kpi"><div class="value">${fmtEUR(receitaProjetadaRestante)}</div><div class="label">Estimado p/ ${diasEmFalta} dias em falta</div></div>
         <div class="kpi"><div class="value" style="color:var(--positive);">${fmtEUR(totalProjetado)}</div><div class="label">Total projetado do mês</div></div>
       </div>
       <p style="font-size:12px;color:var(--muted);margin-top:10px;">
-        Estimativa baseada na média histórica de receita para cada dia da semana (ex: uma sexta-feira usa a média de todas as sextas-feiras já registadas), não numa simples média diária — para refletir o padrão de dias úteis vs. fim de semana.
+        Estimativa baseada na média histórica de receita para cada dia da semana (excluindo agosto, mês atípico), não numa simples média diária — para refletir o padrão de dias úteis vs. fim de semana. ${feriadosTexto}
       </p>
     `;
   }
@@ -767,7 +815,10 @@
     const dias = Object.keys(HISTORICO).filter(d => d.startsWith(mes)).sort();
     const labels = dias.map(d => [String(parseInt(d.slice(8, 10), 10)), diaSemanaAbrev(d)]);
     const valores = dias.map(d => HISTORICO[d].receitaTotal || 0);
-    const cores = dias.map(d => isFimDeSemana(d) ? '#D1CCC0' : '#FF9F1C');
+    const cores = dias.map(d => isFeriado(d) ? '#E03131' : isFimDeSemana(d) ? '#D1CCC0' : '#FF9F1C');
+
+    document.getElementById('diasUteisInfo').textContent =
+      `${diasUteisNoMes(mes)} dias úteis neste mês`;
 
     if (chartVendasMesInstance) chartVendasMesInstance.destroy();
     chartVendasMesInstance = new Chart(document.getElementById('chartVendasMes'), {
@@ -780,7 +831,8 @@
             callbacks: {
               title: (items) => {
                 const d = dias[items[0].dataIndex];
-                return `Dia ${parseInt(d.slice(8, 10), 10)} (${diaSemanaAbrev(d)})`;
+                const tag = isFeriado(d) ? ' — feriado' : '';
+                return `Dia ${parseInt(d.slice(8, 10), 10)} (${diaSemanaAbrev(d)})${tag}`;
               },
             },
           },
