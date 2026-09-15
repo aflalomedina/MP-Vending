@@ -133,12 +133,31 @@ async function handleSnapshot(request, env) {
 
   if (request.method === "GET") {
     const date = url.searchParams.get("date");
+
     if (!date) {
-      return new Response(JSON.stringify({ error: "Falta o parâmetro date" }), {
-        status: 400,
+      // sem data específica: devolve TODOS os snapshots guardados, para uso no gráfico acumulado
+      const all = {};
+      let cursor;
+      do {
+        const listed = await env.HISTORY_KV.list({ prefix: "snapshot:", cursor });
+        for (const key of listed.keys) {
+          const value = await env.HISTORY_KV.get(key.name);
+          if (value) {
+            try {
+              all[key.name.replace("snapshot:", "")] = JSON.parse(value);
+            } catch {
+              // ignora entradas corrompidas
+            }
+          }
+        }
+        cursor = listed.list_complete ? undefined : listed.cursor;
+      } while (cursor);
+
+      return new Response(JSON.stringify(all), {
         headers: { "Content-Type": "application/json" },
       });
     }
+
     const stored = await env.HISTORY_KV.get(`snapshot:${date}`);
     if (!stored) {
       return new Response(JSON.stringify({ error: "Sem dados guardados para essa data" }), {
