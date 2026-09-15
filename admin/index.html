@@ -462,14 +462,20 @@
       <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
         Média mensal calculada com 6 meses completos de histórico (mar–ago). "Ritmo" projeta o mês atual até ao fim, com base no que já vendeu.
       </div>
-      <div style="margin-bottom:12px;">
-        <label for="previsaoOrdenar" style="font-size:13px;color:var(--muted);margin-right:8px;">Ordenar por:</label>
-        <select id="previsaoOrdenar" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;">
-          <option value="projecao">Projeção (maior primeiro)</option>
-          <option value="ritmo_alto">Ritmo mais alto vs média</option>
-          <option value="ritmo_baixo">Ritmo mais baixo vs média</option>
-          <option value="media">Média mensal (maior primeiro)</option>
-        </select>
+      <div style="margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
+        <div>
+          <label for="previsaoOrdenar" style="font-size:13px;color:var(--muted);margin-right:8px;">Ordenar por:</label>
+          <select id="previsaoOrdenar" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;">
+            <option value="projecao">Projeção (maior primeiro)</option>
+            <option value="ritmo_alto">Ritmo mais alto vs média</option>
+            <option value="ritmo_baixo">Ritmo mais baixo vs média</option>
+            <option value="media">Média mensal (maior primeiro)</option>
+          </select>
+        </div>
+        <div>
+          <label for="previsaoPesquisa" style="font-size:13px;color:var(--muted);margin-right:8px;">Procurar produto:</label>
+          <input type="text" id="previsaoPesquisa" placeholder="ex: café, coca cola…" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;" />
+        </div>
       </div>
       <div class="table-wrap" id="previsaoCompraWrap"><div class="state small">a carregar…</div></div>
     </div>
@@ -1739,23 +1745,32 @@
 
   let previsaoCompraData = null;
 
-  function paintPrevisaoCompra(ordenarPor) {
+  function paintPrevisaoCompra(ordenarPor, termoPesquisa) {
     if (!previsaoCompraData) return;
     const wrap = document.getElementById('previsaoCompraWrap');
+    const termo = (termoPesquisa || '').trim().toLowerCase();
+
     let linhas = Object.entries(previsaoCompraData)
       .filter(([nome]) => subfamiliaLabel(nome) !== 'Compostos')
+      .filter(([nome]) => !termo || nome.toLowerCase().includes(termo))
       .map(([nome, d]) => ({
         nome,
-        media: d.mediaMensal,
+        media: d.mediaMensal, // pode ser null (produto novo)
         esteMs: d.esteMs,
         projecao: d.projecao,
-        ritmo: d.mediaMensal ? (d.projecao / d.mediaMensal) * 100 : (d.projecao > 0 ? 999 : 0),
+        novo: !!d.novo,
+        ritmo: (d.mediaMensal && d.mediaMensal > 0) ? (d.projecao / d.mediaMensal) * 100 : null,
       }));
 
-    if (ordenarPor === 'ritmo_alto') linhas.sort((a, b) => b.ritmo - a.ritmo);
-    else if (ordenarPor === 'ritmo_baixo') linhas.sort((a, b) => a.ritmo - b.ritmo);
-    else if (ordenarPor === 'media') linhas.sort((a, b) => b.media - a.media);
+    if (ordenarPor === 'ritmo_alto') linhas.sort((a, b) => (b.ritmo ?? -1) - (a.ritmo ?? -1));
+    else if (ordenarPor === 'ritmo_baixo') linhas.sort((a, b) => (a.ritmo ?? 9999) - (b.ritmo ?? 9999));
+    else if (ordenarPor === 'media') linhas.sort((a, b) => (b.media ?? -1) - (a.media ?? -1));
     else linhas.sort((a, b) => b.projecao - a.projecao);
+
+    if (!linhas.length) {
+      wrap.innerHTML = '<div class="state small">Sem produtos para este filtro.</div>';
+      return;
+    }
 
     wrap.innerHTML = `
       <table>
@@ -1770,6 +1785,17 @@
         </thead>
         <tbody>
           ${linhas.map(l => {
+            if (l.novo) {
+              return `
+                <tr>
+                  <td>${l.nome} <span class="badge P">Novo</span></td>
+                  <td class="num">—</td>
+                  <td class="num">${fmtInt(l.esteMs)}</td>
+                  <td class="num">${fmtInt(l.projecao)}</td>
+                  <td class="num">—</td>
+                </tr>
+              `;
+            }
             const cor = l.ritmo >= 115 ? 'var(--positive)' : l.ritmo <= 85 ? 'var(--negative)' : 'inherit';
             return `
               <tr>
@@ -1792,8 +1818,11 @@
       const res = await fetch('/admin/produtos_media_mensal.json');
       previsaoCompraData = res.ok ? await res.json() : {};
       const select = document.getElementById('previsaoOrdenar');
-      select.onchange = () => paintPrevisaoCompra(select.value);
-      paintPrevisaoCompra(select.value);
+      const pesquisa = document.getElementById('previsaoPesquisa');
+      const redesenhar = () => paintPrevisaoCompra(select.value, pesquisa.value);
+      select.onchange = redesenhar;
+      pesquisa.oninput = redesenhar;
+      redesenhar();
     } catch (err) {
       wrap.innerHTML = `<div class="state small error">Erro: ${err.message}</div>`;
     }
