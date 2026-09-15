@@ -1248,8 +1248,8 @@
   }
 
   function renderPagamentos(canvasId, tableId, labelId) {
-    const rows = lastVendasRows.filter(r => r.ID !== undefined && r.ID !== null && r.ID !== '');
-    const porTipo = groupSum(rows, r => String(r.ID), r => Number(r.value) || 0);
+    const rows = lastVendasRows.filter(r => r.id !== undefined && r.id !== null && r.id !== '');
+    const porTipo = groupSum(rows, r => String(r.id), r => Number(r.value) || 0);
     const tipos = Array.from(porTipo.entries()).sort((a, b) => b[1] - a[1]);
     const canvas = document.getElementById(canvasId);
     const wrap = tableId ? document.getElementById(tableId) : null;
@@ -1951,8 +1951,8 @@
         const porPDV = groupSum(rowsPDV, r => pdvLabel(r.MATRICULA_MAQUINA), r => Number(r.value) || 0);
         lastSummary.porPontoVenda = Object.fromEntries(porPDV);
 
-        const rowsPagamento = lastVendasRows.filter(r => r.ID !== undefined && r.ID !== null && r.ID !== '');
-        const porTipo = groupSum(rowsPagamento, r => String(r.ID), r => Number(r.value) || 0);
+        const rowsPagamento = lastVendasRows.filter(r => r.id !== undefined && r.id !== null && r.id !== '');
+        const porTipo = groupSum(rowsPagamento, r => String(r.id), r => Number(r.value) || 0);
         lastSummary.porTipoPagamento = Object.fromEntries(porTipo);
 
         HISTORICO[lastSummary.date] = { ...HISTORICO[lastSummary.date], ...lastSummary };
