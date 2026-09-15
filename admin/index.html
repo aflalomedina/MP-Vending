@@ -380,14 +380,6 @@
         <canvas id="chartSubfamilia" height="200"></canvas>
       </div>
     </div>
-
-    <div class="panel" style="max-width:340px;">
-      <h2>Receita por método de pagamento</h2>
-      <canvas id="chartPagamentos" height="140"></canvas>
-      <p style="font-size:11px;color:var(--muted);margin-top:8px;">
-        Alguns tipos ainda aparecem como "Tipo N" — tradução completa por confirmar.
-      </p>
-    </div>
   </div>
 
   <div id="view-stocks" class="view">
@@ -440,6 +432,12 @@
       <div class="kpi"><div class="value" id="finMargem">—</div><div class="label">Margem bruta</div></div>
     </div>
 
+    <div class="panel full" style="max-width:480px;">
+      <h2>Métodos de pagamento (hoje)</h2>
+      <canvas id="chartPagamentos" height="140"></canvas>
+      <div class="table-wrap" id="pagamentosTableWrap" style="margin-top:12px;"></div>
+    </div>
+
     <div class="panel full">
       <h2>Lucro bruto por subfamília</h2>
       <canvas id="chartLucroSubfamilia" height="180"></canvas>
@@ -468,6 +466,28 @@
       <h2>Acumulado mensal (desde o início dos dados)</h2>
       <div id="monthCheckboxes" style="margin-bottom:12px;display:flex;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--muted);"></div>
       <canvas id="chartAcumuladoMensal" height="220"></canvas>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <h2>Ticket médio — evolução diária</h2>
+        <canvas id="chartTicketDiario" height="200"></canvas>
+      </div>
+      <div class="panel">
+        <h2>Transações — evolução diária</h2>
+        <canvas id="chartTransacoesDiario" height="200"></canvas>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <h2>Ticket médio por mês</h2>
+        <canvas id="chartTicketMensal" height="200"></canvas>
+      </div>
+      <div class="panel">
+        <h2>Transações por mês</h2>
+        <canvas id="chartTransacoesMensal" height="200"></canvas>
+      </div>
     </div>
 
     <div class="panel full">
@@ -547,6 +567,21 @@
     return NAME_TO_SUBFAMILIA[nomeProduto] || 'Outros';
   }
 
+  // Produtos a agrupar sob um nome comum nos gráficos de "top produtos"
+  const PRODUCT_GROUP = {
+    'Café Longo': 'Cafés',
+    'Café Curto': 'Cafés',
+    'Café Normal': 'Cafés',
+  };
+  function displayProductName(nome) {
+    return PRODUCT_GROUP[nome] || nome;
+  }
+
+  function truncar(str, max = 22) {
+    if (!str) return str;
+    return str.length > max ? str.slice(0, max - 1) + '…' : str;
+  }
+
   // ===== Lógica do dashboard =====
 
   const fmtEUR = (v) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(v || 0);
@@ -580,8 +615,8 @@
   // Nome do produto -> preço de custo s/ IVA (fonte: export de produtos, coluna PRECO_PRODUTO)
   const NAME_TO_COST = {"Coca Cola Zero Lata 33 Cl":0.66,"Leite Uht Achocolatado Agros 200 Ml":0.34,"Snack de Chocolate Snickers 50 G":0.455,"MACA DESIDRAT VERDE FRUBIS 20G":0.0,"Tortitas Milho Caçarola Crackies Chocolate 22,6":0.0,"Tisana Pleno Chá Verde e Limão PET 33 Cl":0.495,"Bolacha Maria sem Açúcar Doses":0.0,"Bolachas Crackers Tuc Originais 31 G":0.373,"Barras Cereais Linha Nacional Chocolate 23 G":0.0,"Pastilhas Elásticas Chiclets Spearmint 16,5 G":0.0,"Coca Cola Original Lata 33 Cl":0.45,"Ice Tea Lipton Limão Lata 33 Cl":0.0,"Ice Tea Lipton Pêssego Lata 33 Cl":0.0,"Guaraná Brasil Lata 33 Cl":0.415,"Refrigerante com Gás Seven Up Lata 33 Cl":0.0,"Pão com Chouriço":0.0,"Croissant Simples":0.44,"Bolachas Marinheiras Cem Porcento Chia Mini 50 G":0.534,"Tortitas Milho Caçarola Crackies Chocolate 22,6 G":0.0,"REF S/G FRESKY F TROP TET 20CL":0.199,"REF S/G FRESKY LAR TET 20CL":0.0,"NAPOLITANAS AMANH CACAU 45GR":0.0,"Snack de Chocolate Twix 50 G":0.455,"Snack de Chocolate Mars 45 G":0.465,"Kit Kat 41,5 Gr":0.471,"Lion 42 Gr":0.449,"Santal Active Drink Laranja/Cenoura":0.449,"Croissant Aurora Simples 240gr":0.0,"7Up 33cl - SDR":0.54,"Bolacha Cracker TUC Ervas Aromáticas":0.0,"Bebida Energetica Hell Classic 25cl":0.64,"Sumol Laranja Lata 33cl":0.58,"Ice Tea Pessego Continente 20cl":0.1611,"Batata Frita Barrosã 45g":0.0,"BEB ENERGÉTICA BE POWER LATA 25C":0.0,"Oreo original 6 66g":0.41,"Bola de Carne":0.58,"Pepsi Cola Zero Lata 33 Cl (SDR)":0.428,"NAPOLITANA SCHOCO CHOC":0.225,"ICE TEA AMANH PES TET 20CL":0.0,"Cerveja sem álcool super bock 00% lata":0.0,"Café longo especial":0.0,"Café pingado especial":0.0,"Garoto especial":0.0,"Capuccino especial":0.0,"Mocaccino especial":0.0,"Galão XL":0.0,"Chocolate Forte XL":0.0,"Chocolate com Leite XL":0.0,"Capuccino XL":0.0,"Chá Limão XL":0.0,"Capuccino Baunilha XL":0.0,"Café c/ Chocolate":0.0712,"Chá Frutos Vermelhos":0.0,"Capuccino c/ Chocolate":0.0,"Copo":0.0,"Água quente":0.0,"Descafeinado Mocaccino":0.0265,"Café Caramelo":0.0709,"Descafeinado Garoto":0.0421,"Café c/Chocolate Solúvel":0.0,"ND":0.0,"Fatia Bolo Cenoura com Chocolate":0.43,"Salame de Chocolate Ecobol":0.39,"Kinder Bueno":0.58,"Kinder Delice":0.0,"Napolitana Chocolate 45 Gr - Bitee":0.251,"Croissant Recheado com Cacau 60 Gr - Belino":0.388,"Açucar 1 Kg":0.0,"Café em Grão 1Kg":0.0,"Bidón 20L":0.0,"Descafeinado 100gr Amanhecer":2.24,"Cocoa GO! Choco":4.926,"Café Sical":0.0,"Trik - Salty Sticks":0.247,"Vendin - Preparado Base de Leite 750 Gr":2.899,"DaVinci - Capuccino Avelã 1 Kg":4.22,"Chá Limão":0.0,"Copos de Papel 6oz  180ml":0.018,"Copo Plástico Branco 165CC 3000un":0.0,"Paletinas madeira 90x10x1.3mm (3750un)":0.004,"Copos Plástico Marrom para Vending 160ml (3000un)":0.0,"Bolo de Laranja":0.0,"Batatas Fritas - Super Douradas Onduladas 40gr":0.499,"Dulcesol - Zebra":0.33,"Frisumo Laranja Lata 0.33cl":0.375,"Kas Limão":0.41,"TPA Ellectro":136.0,"Cretamel - Barra de Amendoim Com Mel  40 Gr":0.364,"Mr Brownie - Chocolate Brownies 50 Gr":0.398,"Fatia de Bolo iogurte":0.43,"SUMO AMANH 100% LAR TET 20CL":0.0,"Agua UP 0,5L":0.12,"Wafer de Cacau com Recheio Avelã - My Motto":0.22,"Crispy Bar de Chocolate e Aveia  40 Gr - Sante":0.364,"Caramel GO! Capuccino em Pó":5.362,"Simat - Chá de Menta":6.25,"Bebida Energetica Hell Zero 25cl":0.64,"Iogurte Liquido Longa Vida Tropical":0.2475,"Café em Grão Caffier Robusta":7.79,"Copos de Plástico 166ml":0.014,"Limonada 500 ml - Enjoy":0.453,"Bolacha Fit de Cereais e Cacau 50 Gr Sante":0.386,"Amendoins Mel e Mostarda 70gr - Zigi":0.446,"Depósito SDR embalagem":0.1,"Coca-Coca Original Lata 33cl - SDR":0.0,"Fatia Bolo Ecobolos (Variados)":0.43,"Açucar Amanhecer 1KG Sticks 4g x250":1.99,"Empada de Frango":0.53,"Kit Kat Chunky Funky 40g":0.47,"Tarte de Amêndoa 80Gr":0.47,"Barra Go On Energy 45 Gr Sante":0.45,"Trik - Crackers Original 110gr":0.47,"Bebida Energetica Hell Classic 250ml (SDR)":0.5609,"Kings - Soft Cookies com Pedaços de Chocolate Triplo 40gr":0.404,"Padaria da Arrifana - Folhado de Chocolate 4 Uni 70 Gr":0.522,"Guarana Antartica lata 33cl":0.595,"Kinder Bueno White 39g":0.795,"7UP - Refrigerante com Gás Zero Mint 330ml (SDR)":0.486,"Bitee - Croissant Recheio Cacau 60g":0.342,"Vidal - Mega Sweet Mix 90 Gr":0.462,"Poker Wafer Cacao":0.23,"Coca Cola Original Lata Sleek (SDR)":0.66,"Agua Rioba 50cl (SDR)":0.13,"Guaraná Brasil 33cl (Sdr)":0.53,"Agua S. Martinho 50cl (SDR)":0.12,"Açucar Sidul 1kg":0.72,"Tisana Pleno Chá Verde e Limão PET 33 Cl (SDR)":0.59,"Ristora - Chá Limão 1Kg":3.98,"Descafeinado Laqtia 250 g":6.55,"Bolo de Arroz":0.47,"Sande Mista Mistura Cacetinho":0.0,"Lanche Fiambre":0.55,"Bebida Energetica Hell Zero 25cl - SDR":0.64,"Hell Energy Coffee Latte 250ml":0.81,"7Up Sleek 330ml":0.43,"Frisumo Laranja Lata 0.33cl (SDR)":0.33,"Fuze Tea Pêssego Sleek 330ml - SDR":0.5364,"Bitee - Bolachas Húngaras 70 Gr":0.432,"Café Normal":0.0628,"Chá":0.0509,"Chocolate":0.0212,"Capuccino":0.0645,"Café Pingado":0.0645,"Galão":0.0645,"Leite":0.0163,"Chocolate c/ Leite":0.0246,"Moccaccino":0.0672,"Café Curto":0.0628,"Café Longo":0.0628,"Garoto":0.0645,"Chocolate Forte":0.0,"Café Solúvel":0.0,"Descafeinado Curto":0.0172,"Descafeinado Normal":0.0172,"Descafeinado Longo":0.0172,"Descafeinado Capuccino c/ chocolate":0.0189,"Descafeinado Pingado":0.0421,"Descafeinado Galão":0.0421,"Capuccino de Avelã":0.0,"Capuccino de caramelo":0.0726,"Capuccino de baunilha":0.0,"Leite c/ chocolate":0.0246,"Café Curto Solúvel":0.0,"Café Longo Solúvel":0.0,"Café Pingado Solúvel":0.0,"Galão Solúvel":0.0,"Capuccino Solúvel":0.0,"Mocacciono Solúvel":0.0,"Chocolate Crema":0.0,"Leite com Café":0.0645};
 
-  // Código do método de pagamento -> nome (a completar; 1 = Dinheiro confirmado)
-  const PAYMENT_TYPES = { "1": "Dinheiro" };
+  // Código do método de pagamento -> nome
+  const PAYMENT_TYPES = { "1": "Dinheiro", "5": "MB WAY", "8": "Loupe", "10": "Cartão" };
   function paymentLabel(type) {
     return PAYMENT_TYPES[String(type)] || `Tipo ${type}`;
   }
@@ -594,7 +629,75 @@
   let lastSummary = null; // guardado para poder enviar como snapshot
   let lastPagamentosRows = [];
 
+  function renderTicketETransacoes() {
+    const dias = Object.keys(HISTORICO).sort();
+    if (!dias.length) return;
+
+    // --- Diário ---
+    new Chart(document.getElementById('chartTicketDiario'), {
+      type: 'line',
+      data: {
+        labels: dias,
+        datasets: [{
+          label: 'Ticket médio (€)',
+          data: dias.map(d => HISTORICO[d].ticketMedio || 0),
+          borderColor: '#C7710A',
+          backgroundColor: 'rgba(255,159,28,0.1)',
+          fill: true,
+          tension: 0.2,
+          pointRadius: 0,
+        }],
+      },
+      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+    });
+
+    new Chart(document.getElementById('chartTransacoesDiario'), {
+      type: 'bar',
+      data: {
+        labels: dias,
+        datasets: [{ label: 'Transações', data: dias.map(d => HISTORICO[d].transacoes || 0), backgroundColor: '#1B1F27' }],
+      },
+      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+    });
+
+    // --- Mensal (agregado) ---
+    const porMes = new Map();
+    for (const d of dias) {
+      const mes = d.slice(0, 7);
+      const m = porMes.get(mes) || { receita: 0, transacoes: 0 };
+      m.receita += HISTORICO[d].receitaTotal || 0;
+      m.transacoes += HISTORICO[d].transacoes || 0;
+      porMes.set(mes, m);
+    }
+    const meses = Array.from(porMes.keys()).sort();
+
+    new Chart(document.getElementById('chartTicketMensal'), {
+      type: 'bar',
+      data: {
+        labels: meses.map(monthName),
+        datasets: [{
+          label: 'Ticket médio (€)',
+          data: meses.map(m => { const v = porMes.get(m); return v.transacoes ? v.receita / v.transacoes : 0; }),
+          backgroundColor: '#FF9F1C',
+        }],
+      },
+      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+    });
+
+    new Chart(document.getElementById('chartTransacoesMensal'), {
+      type: 'bar',
+      data: {
+        labels: meses.map(monthName),
+        datasets: [{ label: 'Transações', data: meses.map(m => porMes.get(m).transacoes), backgroundColor: '#2F9E44' }],
+      },
+      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+    });
+  }
+
   function renderFinanceiro() {
+    renderPagamentos();
+    renderTicketETransacoes();
+
     const rows = lastVendasRows.filter(r => r.NOME_PRODUTO);
     if (!rows.length) return;
 
@@ -898,6 +1001,7 @@
   function renderPagamentos() {
     const porTipo = groupSum(lastPagamentosRows, r => String(r.type), r => Number(r.sum) || 0);
     const tipos = Array.from(porTipo.entries()).sort((a, b) => b[1] - a[1]);
+    const wrap = document.getElementById('pagamentosTableWrap');
 
     if (!tipos.length) {
       document.getElementById('chartPagamentos').insertAdjacentHTML(
@@ -905,6 +1009,22 @@
       );
       return;
     }
+
+    const totalGeral = tipos.reduce((s, t) => s + t[1], 0);
+    wrap.innerHTML = `
+      <table>
+        <thead><tr><th>Método</th><th class="num">Total</th><th class="num">%</th></tr></thead>
+        <tbody>
+          ${tipos.map(t => `
+            <tr>
+              <td>${paymentLabel(t[0])}</td>
+              <td class="num">${fmtEUR(t[1])}</td>
+              <td class="num">${totalGeral ? ((t[1] / totalGeral) * 100).toFixed(1) : '0.0'}%</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
 
     new Chart(document.getElementById('chartPagamentos'), {
       type: 'doughnut',
@@ -920,7 +1040,7 @@
           legend: { position: 'right' },
           tooltip: {
             callbacks: {
-              label: (ctx) => `${ctx.label}: ${fmtEUR(ctx.parsed)}`,
+              label: (ctx) => `${ctx.label}: ${fmtEUR(ctx.parsed)} (${totalGeral ? ((ctx.parsed / totalGeral) * 100).toFixed(1) : '0.0'}%)`,
             },
           },
         },
@@ -971,17 +1091,17 @@
       },
     });
 
-    // Top produtos: receita + quantidade
+    // Top produtos: receita + quantidade (cafés agrupados; nomes longos truncados)
     const rowsComProduto = rows.filter(r => r.NOME_PRODUTO);
-    const receitaPorProduto = groupSum(rowsComProduto, r => r.NOME_PRODUTO, r => Number(r.value) || 0);
-    const qtyPorProduto = groupSum(rowsComProduto, r => r.NOME_PRODUTO, r => Number(r.count) || 1);
+    const receitaPorProduto = groupSum(rowsComProduto, r => displayProductName(r.NOME_PRODUTO), r => Number(r.value) || 0);
+    const qtyPorProduto = groupSum(rowsComProduto, r => displayProductName(r.NOME_PRODUTO), r => Number(r.count) || 1);
     const topProdutos = Array.from(receitaPorProduto.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8);
     new Chart(document.getElementById('chartTop'), {
       type: 'bar',
       data: {
-        labels: topProdutos.map(p => `${p[0]} (${fmtInt(qtyPorProduto.get(p[0]))} un.)`),
+        labels: topProdutos.map(p => `${truncar(p[0])} (${fmtInt(qtyPorProduto.get(p[0]))} un.)`),
         datasets: [{
           label: 'Receita (€)',
           data: topProdutos.map(p => p[1]),
@@ -994,6 +1114,7 @@
           legend: { display: false },
           tooltip: {
             callbacks: {
+              title: (items) => topProdutos[items[0].dataIndex][0],
               label: (ctx) => {
                 const nome = topProdutos[ctx.dataIndex][0];
                 return `${fmtEUR(ctx.parsed.x)} · ${fmtInt(qtyPorProduto.get(nome))} unidades`;
@@ -1312,7 +1433,7 @@
       new Chart(canvas, {
         type: 'bar',
         data: {
-          labels: top.map(t => `${t[0]} (${fmtInt(qtds.get(t[0]))} un.)`),
+          labels: top.map(t => `${truncar(t[0])} (${fmtInt(qtds.get(t[0]))} un.)`),
           datasets: [{ label: 'Receita (€)', data: top.map(t => t[1]), backgroundColor: '#FF9F1C' }],
         },
         options: {
@@ -1321,6 +1442,7 @@
             legend: { display: false },
             tooltip: {
               callbacks: {
+                title: (items) => top[items[0].dataIndex][0],
                 label: (ctx) => {
                   const nome = top[ctx.dataIndex][0];
                   return `${fmtEUR(ctx.parsed.x)} · ${fmtInt(qtds.get(nome))} unidades`;
@@ -1458,21 +1580,24 @@
 
   async function init() {
     try {
-      const [vendasRaw, stockRaw, historicoRaw, pagamentosRaw] = await Promise.all([
+      const [vendasRaw, stockRaw, historicoRaw, pagamentosRaw, liveSnapshots] = await Promise.all([
         fetchJSON('/api/vendas-diarias'),
         fetchJSON('/api/stock-armazens'),
         fetch('/admin/historico.json').then(r => r.ok ? r.json() : {}).catch(() => ({})),
         fetchJSON('/api/metodos-pagamento').catch(() => null),
+        fetch('/api/snapshot').then(r => r.ok ? r.json() : {}).catch(() => ({})),
       ]);
-      HISTORICO = historicoRaw || {};
+      // funde o histórico estático (25 fev → export) com os snapshots capturados dia a dia na KV
+      // (a KV tem prioridade em datas repetidas, por serem mais recentes)
+      HISTORICO = { ...(historicoRaw || {}), ...(liveSnapshots || {}) };
       renderVendas(toObjects(vendasRaw));
+      if (lastSummary) HISTORICO[lastSummary.date] = { ...HISTORICO[lastSummary.date], ...lastSummary };
       renderStock(toObjects(stockRaw));
       if (pagamentosRaw) lastPagamentosRows = toObjects(pagamentosRaw);
       if (lastSummary && lastPagamentosRows.length) {
         const porTipo = groupSum(lastPagamentosRows, r => String(r.type), r => Number(r.sum) || 0);
         lastSummary.porTipoPagamento = Object.fromEntries(porTipo);
       }
-      renderPagamentos();
       document.getElementById('updatedAt').textContent =
         'atualizado às ' + new Date().toLocaleTimeString('pt-PT');
       saveSnapshot();
