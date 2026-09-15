@@ -409,10 +409,11 @@
       <canvas id="chartPDVTipo" height="220"></canvas>
     </div>
 
-    <div class="panel" style="max-width:340px;">
-      <h2>Vendas por método de pagamento</h2>
+    <div class="panel full" style="max-width:480px;">
+      <h2>Métodos de pagamento</h2>
       <div id="pagamentosDataLabelDiarias" style="font-size:12px;color:var(--muted);margin-bottom:8px;"></div>
       <canvas id="chartPagamentosDiarias" height="140"></canvas>
+      <div class="table-wrap" id="pagamentosTableWrapDiarias" style="margin-top:12px;"></div>
     </div>
   </div>
 
@@ -553,13 +554,6 @@
       <h2>Margem por produto (vendas de hoje)</h2>
       <div class="table-wrap" id="financeiroTableWrap"><div class="state small">a carregar…</div></div>
     </div>
-
-    <div class="panel full" style="max-width:480px;">
-      <h2>Métodos de pagamento</h2>
-      <div id="pagamentosDataLabel" style="font-size:12px;color:var(--muted);margin-bottom:8px;"></div>
-      <canvas id="chartPagamentos" height="140"></canvas>
-      <div class="table-wrap" id="pagamentosTableWrap" style="margin-top:12px;"></div>
-    </div>
   </div>
 
   <div id="view-site" class="view">
@@ -609,6 +603,9 @@
   };
 
   // Nome do ponto de venda, sem a matrícula (para agregar várias máquinas do mesmo local)
+  // Máquinas a excluir de todos os reports de vendas (ex: ponto de venda encerrado)
+  const MAQUINAS_EXCLUIDAS = new Set(['005']);
+
   function pdvLabel(matricula) {
     return MACHINES[matricula] || matricula || '—';
   }
@@ -787,7 +784,7 @@
   let vistaPDVTipoAtual = 'pdv';
 
   function drawPDVTipoChart() {
-    const rows = lastVendasRows.filter(r => r.MATRICULA_MAQUINA);
+    const rows = lastVendasRows.filter(r => r.MATRICULA_MAQUINA && !MAQUINAS_EXCLUIDAS.has(r.MATRICULA_MAQUINA));
     const canvas = document.getElementById('chartPDVTipo');
     if (chartPDVTipoInstance) chartPDVTipoInstance.destroy();
 
@@ -882,7 +879,7 @@
 
   let chartPDVHojeInstance = null;
   function renderReceitaPDVHoje() {
-    const rows = lastVendasRows.filter(r => r.MATRICULA_MAQUINA);
+    const rows = lastVendasRows.filter(r => r.MATRICULA_MAQUINA && !MAQUINAS_EXCLUIDAS.has(r.MATRICULA_MAQUINA));
     const porPDV = groupSum(rows, r => pdvLabel(r.MATRICULA_MAQUINA), r => Number(r.value) || 0);
     const entradas = Array.from(porPDV.entries()).sort((a, b) => b[1] - a[1]);
 
@@ -912,6 +909,7 @@
       if (!data.startsWith(mesAtual)) continue;
       if (!resumo.porPontoVenda) continue;
       for (const [pdv, valor] of Object.entries(resumo.porPontoVenda)) {
+        if (pdv === 'Studio up Yoga') continue;
         porPDV.set(pdv, (porPDV.get(pdv) || 0) + valor);
       }
     }
@@ -941,7 +939,6 @@
   }
 
   function renderFinanceiro() {
-    renderPagamentos('chartPagamentos', 'pagamentosTableWrap', 'pagamentosDataLabel');
     renderTicketETransacoes();
     renderCrescimentoMensal();
     renderReceitaPDVHoje();
@@ -1386,7 +1383,7 @@
 
     // Receita por máquina
     const porMaquina = groupSum(
-      rows.filter(r => r.MATRICULA_MAQUINA),
+      rows.filter(r => r.MATRICULA_MAQUINA && !MAQUINAS_EXCLUIDAS.has(r.MATRICULA_MAQUINA)),
       r => r.MATRICULA_MAQUINA,
       r => Number(r.value) || 0
     );
@@ -1947,7 +1944,7 @@
       HISTORICO = { ...(historicoRaw || {}), ...(liveSnapshots || {}) };
       renderVendas(toObjects(vendasRaw));
       if (lastSummary) {
-        const rowsPDV = lastVendasRows.filter(r => r.MATRICULA_MAQUINA);
+        const rowsPDV = lastVendasRows.filter(r => r.MATRICULA_MAQUINA && !MAQUINAS_EXCLUIDAS.has(r.MATRICULA_MAQUINA));
         const porPDV = groupSum(rowsPDV, r => pdvLabel(r.MATRICULA_MAQUINA), r => Number(r.value) || 0);
         lastSummary.porPontoVenda = Object.fromEntries(porPDV);
 
@@ -1958,7 +1955,7 @@
         HISTORICO[lastSummary.date] = { ...HISTORICO[lastSummary.date], ...lastSummary };
       }
       renderStock(toObjects(stockRaw));
-      renderPagamentos('chartPagamentosDiarias', null, 'pagamentosDataLabelDiarias');
+      renderPagamentos('chartPagamentosDiarias', 'pagamentosTableWrapDiarias', 'pagamentosDataLabelDiarias');
       drawPDVTipoChart();
       document.getElementById('updatedAt').textContent =
         'atualizado às ' + new Date().toLocaleTimeString('pt-PT');
