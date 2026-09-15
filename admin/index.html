@@ -1694,13 +1694,15 @@
   function paintPrevisaoCompra(ordenarPor) {
     if (!previsaoCompraData) return;
     const wrap = document.getElementById('previsaoCompraWrap');
-    let linhas = Object.entries(previsaoCompraData).map(([nome, d]) => ({
-      nome,
-      media: d.mediaMensal,
-      esteMs: d.esteMs,
-      projecao: d.projecao,
-      ritmo: d.mediaMensal ? (d.projecao / d.mediaMensal) * 100 : (d.projecao > 0 ? 999 : 0),
-    }));
+    let linhas = Object.entries(previsaoCompraData)
+      .filter(([nome]) => subfamiliaLabel(nome) !== 'Compostos')
+      .map(([nome, d]) => ({
+        nome,
+        media: d.mediaMensal,
+        esteMs: d.esteMs,
+        projecao: d.projecao,
+        ritmo: d.mediaMensal ? (d.projecao / d.mediaMensal) * 100 : (d.projecao > 0 ? 999 : 0),
+      }));
 
     if (ordenarPor === 'ritmo_alto') linhas.sort((a, b) => b.ritmo - a.ritmo);
     else if (ordenarPor === 'ritmo_baixo') linhas.sort((a, b) => a.ritmo - b.ritmo);
