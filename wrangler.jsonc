@@ -6,6 +6,9 @@
     "PORTAL_URL": "https://mpvending.luope.com",
     "METABASE_URL": "https://bi-mpvending.luope.com"
   },
+  "kv_namespaces": [
+    { "binding": "HISTORY_KV", "id": "df59f2be482b493ca5f075ef1903a9e3" }
+  ],
   "assets": {
     "directory": "./",
     "binding": "ASSETS",
