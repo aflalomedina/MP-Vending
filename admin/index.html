@@ -382,7 +382,8 @@
     </div>
 
     <div class="panel" style="max-width:340px;">
-      <h2>Vendas de hoje por método de pagamento</h2>
+      <h2>Vendas por método de pagamento</h2>
+      <div id="pagamentosDataLabelDiarias" style="font-size:12px;color:var(--muted);margin-bottom:8px;"></div>
       <canvas id="chartPagamentosDiarias" height="140"></canvas>
     </div>
   </div>
@@ -484,7 +485,8 @@
     </div>
 
     <div class="panel full" style="max-width:480px;">
-      <h2>Métodos de pagamento (hoje)</h2>
+      <h2>Métodos de pagamento</h2>
+      <div id="pagamentosDataLabel" style="font-size:12px;color:var(--muted);margin-bottom:8px;"></div>
       <canvas id="chartPagamentos" height="140"></canvas>
       <div class="table-wrap" id="pagamentosTableWrap" style="margin-top:12px;"></div>
     </div>
@@ -662,7 +664,7 @@
   }
 
   function renderFinanceiro() {
-    renderPagamentos('chartPagamentos', 'pagamentosTableWrap');
+    renderPagamentos('chartPagamentos', 'pagamentosTableWrap', 'pagamentosDataLabel');
     renderTicketETransacoes();
 
     const rows = lastVendasRows.filter(r => r.NOME_PRODUTO);
@@ -965,11 +967,21 @@
     });
   }
 
-  function renderPagamentos(canvasId, tableId) {
-    const porTipo = groupSum(lastPagamentosRows, r => String(r.type), r => Number(r.sum) || 0);
+  function renderPagamentos(canvasId, tableId, labelId) {
+    const datasDisponiveis = lastPagamentosRows.map(r => String(r.sale_day).slice(0, 10)).filter(Boolean);
+    const diaMaisRecente = datasDisponiveis.length ? datasDisponiveis.sort().at(-1) : null;
+    const rowsDia = diaMaisRecente
+      ? lastPagamentosRows.filter(r => String(r.sale_day).slice(0, 10) === diaMaisRecente)
+      : [];
+    const porTipo = groupSum(rowsDia, r => String(r.type), r => Number(r.sum) || 0);
     const tipos = Array.from(porTipo.entries()).sort((a, b) => b[1] - a[1]);
     const canvas = document.getElementById(canvasId);
     const wrap = tableId ? document.getElementById(tableId) : null;
+
+    if (labelId && diaMaisRecente) {
+      const sufixo = diaMaisRecente === todayStr() ? ' (hoje)' : ' — dados mais recentes disponíveis (ainda não há os de hoje)';
+      document.getElementById(labelId).textContent = `Dados de ${diaMaisRecente}${sufixo}`;
+    }
 
     if (!tipos.length) {
       canvas.insertAdjacentHTML(
@@ -1395,7 +1407,8 @@
       const totais = new Map();
       const qtds = new Map();
       for (const dia of dias) {
-        for (const [nome, v] of Object.entries(data[dia])) {
+        for (const [nomeOriginal, v] of Object.entries(data[dia])) {
+          const nome = displayProductName(nomeOriginal);
           totais.set(nome, (totais.get(nome) || 0) + v.valor);
           qtds.set(nome, (qtds.get(nome) || 0) + v.qtd);
         }
@@ -1566,10 +1579,12 @@
       renderStock(toObjects(stockRaw));
       if (pagamentosRaw) lastPagamentosRows = toObjects(pagamentosRaw);
       if (lastSummary && lastPagamentosRows.length) {
-        const porTipo = groupSum(lastPagamentosRows, r => String(r.type), r => Number(r.sum) || 0);
+        const hoje = todayStr();
+        const rowsHoje = lastPagamentosRows.filter(r => String(r.sale_day).slice(0, 10) === hoje);
+        const porTipo = groupSum(rowsHoje, r => String(r.type), r => Number(r.sum) || 0);
         lastSummary.porTipoPagamento = Object.fromEntries(porTipo);
       }
-      renderPagamentos('chartPagamentosDiarias', null);
+      renderPagamentos('chartPagamentosDiarias', null, 'pagamentosDataLabelDiarias');
       document.getElementById('updatedAt').textContent =
         'atualizado às ' + new Date().toLocaleTimeString('pt-PT');
       saveSnapshot();
