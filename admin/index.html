@@ -380,6 +380,11 @@
         <canvas id="chartSubfamilia" height="200"></canvas>
       </div>
     </div>
+
+    <div class="panel" style="max-width:340px;">
+      <h2>Vendas de hoje por método de pagamento</h2>
+      <canvas id="chartPagamentosDiarias" height="140"></canvas>
+    </div>
   </div>
 
   <div id="view-stocks" class="view">
@@ -432,12 +437,6 @@
       <div class="kpi"><div class="value" id="finMargem">—</div><div class="label">Margem bruta</div></div>
     </div>
 
-    <div class="panel full" style="max-width:480px;">
-      <h2>Métodos de pagamento (hoje)</h2>
-      <canvas id="chartPagamentos" height="140"></canvas>
-      <div class="table-wrap" id="pagamentosTableWrap" style="margin-top:12px;"></div>
-    </div>
-
     <div class="panel full">
       <h2>Lucro bruto por subfamília</h2>
       <canvas id="chartLucroSubfamilia" height="180"></canvas>
@@ -470,17 +469,6 @@
 
     <div class="grid-2">
       <div class="panel">
-        <h2>Ticket médio — evolução diária</h2>
-        <canvas id="chartTicketDiario" height="200"></canvas>
-      </div>
-      <div class="panel">
-        <h2>Transações — evolução diária</h2>
-        <canvas id="chartTransacoesDiario" height="200"></canvas>
-      </div>
-    </div>
-
-    <div class="grid-2">
-      <div class="panel">
         <h2>Ticket médio por mês</h2>
         <canvas id="chartTicketMensal" height="200"></canvas>
       </div>
@@ -493,6 +481,12 @@
     <div class="panel full">
       <h2>Margem por produto (vendas de hoje)</h2>
       <div class="table-wrap" id="financeiroTableWrap"><div class="state small">a carregar…</div></div>
+    </div>
+
+    <div class="panel full" style="max-width:480px;">
+      <h2>Métodos de pagamento (hoje)</h2>
+      <canvas id="chartPagamentos" height="140"></canvas>
+      <div class="table-wrap" id="pagamentosTableWrap" style="margin-top:12px;"></div>
     </div>
   </div>
 
@@ -633,33 +627,6 @@
     const dias = Object.keys(HISTORICO).sort();
     if (!dias.length) return;
 
-    // --- Diário ---
-    new Chart(document.getElementById('chartTicketDiario'), {
-      type: 'line',
-      data: {
-        labels: dias,
-        datasets: [{
-          label: 'Ticket médio (€)',
-          data: dias.map(d => HISTORICO[d].ticketMedio || 0),
-          borderColor: '#C7710A',
-          backgroundColor: 'rgba(255,159,28,0.1)',
-          fill: true,
-          tension: 0.2,
-          pointRadius: 0,
-        }],
-      },
-      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
-    });
-
-    new Chart(document.getElementById('chartTransacoesDiario'), {
-      type: 'bar',
-      data: {
-        labels: dias,
-        datasets: [{ label: 'Transações', data: dias.map(d => HISTORICO[d].transacoes || 0), backgroundColor: '#1B1F27' }],
-      },
-      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
-    });
-
     // --- Mensal (agregado) ---
     const porMes = new Map();
     for (const d of dias) {
@@ -695,7 +662,7 @@
   }
 
   function renderFinanceiro() {
-    renderPagamentos();
+    renderPagamentos('chartPagamentos', 'pagamentosTableWrap');
     renderTicketETransacoes();
 
     const rows = lastVendasRows.filter(r => r.NOME_PRODUTO);
@@ -998,35 +965,39 @@
     });
   }
 
-  function renderPagamentos() {
+  function renderPagamentos(canvasId, tableId) {
     const porTipo = groupSum(lastPagamentosRows, r => String(r.type), r => Number(r.sum) || 0);
     const tipos = Array.from(porTipo.entries()).sort((a, b) => b[1] - a[1]);
-    const wrap = document.getElementById('pagamentosTableWrap');
+    const canvas = document.getElementById(canvasId);
+    const wrap = tableId ? document.getElementById(tableId) : null;
 
     if (!tipos.length) {
-      document.getElementById('chartPagamentos').insertAdjacentHTML(
+      canvas.insertAdjacentHTML(
         'afterend', '<div class="state small">Sem dados de métodos de pagamento para hoje.</div>'
       );
       return;
     }
 
     const totalGeral = tipos.reduce((s, t) => s + t[1], 0);
-    wrap.innerHTML = `
-      <table>
-        <thead><tr><th>Método</th><th class="num">Total</th><th class="num">%</th></tr></thead>
-        <tbody>
-          ${tipos.map(t => `
-            <tr>
-              <td>${paymentLabel(t[0])}</td>
-              <td class="num">${fmtEUR(t[1])}</td>
-              <td class="num">${totalGeral ? ((t[1] / totalGeral) * 100).toFixed(1) : '0.0'}%</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    `;
 
-    new Chart(document.getElementById('chartPagamentos'), {
+    if (wrap) {
+      wrap.innerHTML = `
+        <table>
+          <thead><tr><th>Método</th><th class="num">Total</th><th class="num">%</th></tr></thead>
+          <tbody>
+            ${tipos.map(t => `
+              <tr>
+                <td>${paymentLabel(t[0])}</td>
+                <td class="num">${fmtEUR(t[1])}</td>
+                <td class="num">${totalGeral ? ((t[1] / totalGeral) * 100).toFixed(1) : '0.0'}%</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    new Chart(canvas, {
       type: 'doughnut',
       data: {
         labels: tipos.map(t => paymentLabel(t[0])),
@@ -1598,6 +1569,7 @@
         const porTipo = groupSum(lastPagamentosRows, r => String(r.type), r => Number(r.sum) || 0);
         lastSummary.porTipoPagamento = Object.fromEntries(porTipo);
       }
+      renderPagamentos('chartPagamentosDiarias', null);
       document.getElementById('updatedAt').textContent =
         'atualizado às ' + new Date().toLocaleTimeString('pt-PT');
       saveSnapshot();
