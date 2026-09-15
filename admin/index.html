@@ -783,16 +783,64 @@
 
   function drawPDVTipoChart() {
     const rows = lastVendasRows.filter(r => r.MATRICULA_MAQUINA);
-    const keyFn = vistaPDVTipoAtual === 'pdv'
-      ? (r => pdvLabel(r.MATRICULA_MAQUINA))
-      : (r => tipoMaquinaLabel(r.MATRICULA_MAQUINA));
+    const canvas = document.getElementById('chartPDVTipo');
+    if (chartPDVTipoInstance) chartPDVTipoInstance.destroy();
 
-    const agrupado = groupSum(rows, keyFn, r => Number(r.value) || 0);
+    if (vistaPDVTipoAtual === 'pdv') {
+      // barras empilhadas: Bebidas Quentes + Snacks por ponto de venda
+      const porPDVQuente = groupSum(
+        rows.filter(r => !isSnackMachine(r.MATRICULA_MAQUINA)),
+        r => pdvLabel(r.MATRICULA_MAQUINA), r => Number(r.value) || 0
+      );
+      const porPDVSnack = groupSum(
+        rows.filter(r => isSnackMachine(r.MATRICULA_MAQUINA)),
+        r => pdvLabel(r.MATRICULA_MAQUINA), r => Number(r.value) || 0
+      );
+      const pdvs = Array.from(new Set([...porPDVQuente.keys(), ...porPDVSnack.keys()]));
+      const totalPorPDV = pdvs.map(p => (porPDVQuente.get(p) || 0) + (porPDVSnack.get(p) || 0));
+      // ordena pelo total (café + snacks), maior primeiro
+      const ordem = pdvs.map((p, i) => [p, totalPorPDV[i]]).sort((a, b) => b[1] - a[1]).map(x => x[0]);
+      const totalGeral = totalPorPDV.reduce((s, v) => s + v, 0);
+
+      chartPDVTipoInstance = new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: ordem.map(p => truncar(p, 30)),
+          datasets: [
+            { label: 'Bebidas Quentes', data: ordem.map(p => porPDVQuente.get(p) || 0), backgroundColor: '#C7710A' },
+            { label: 'Snacks', data: ordem.map(p => porPDVSnack.get(p) || 0), backgroundColor: '#FF9F1C' },
+          ],
+        },
+        options: {
+          indexAxis: 'y',
+          plugins: {
+            legend: { display: true, position: 'top' },
+            tooltip: {
+              callbacks: {
+                title: (items) => ordem[items[0].dataIndex],
+                label: (ctx) => {
+                  const pct = totalGeral ? ((ctx.parsed.x / totalGeral) * 100).toFixed(1) : '0.0';
+                  return `${ctx.dataset.label}: ${fmtEUR(ctx.parsed.x)} (${pct}% do total)`;
+                },
+                footer: (items) => {
+                  const p = ordem[items[0].dataIndex];
+                  const totalP = (porPDVQuente.get(p) || 0) + (porPDVSnack.get(p) || 0);
+                  return `Total: ${fmtEUR(totalP)}`;
+                },
+              },
+            },
+          },
+          scales: { x: { stacked: true, beginAtZero: true }, y: { stacked: true } },
+        },
+      });
+      return;
+    }
+
+    // vista "Tipo de Máquina": Bebidas Quentes vs Snacks, gráfico simples
+    const agrupado = groupSum(rows, r => tipoMaquinaLabel(r.MATRICULA_MAQUINA), r => Number(r.value) || 0);
     const entradas = Array.from(agrupado.entries()).sort((a, b) => b[1] - a[1]);
     const total = entradas.reduce((s, e) => s + e[1], 0);
 
-    const canvas = document.getElementById('chartPDVTipo');
-    if (chartPDVTipoInstance) chartPDVTipoInstance.destroy();
     chartPDVTipoInstance = new Chart(canvas, {
       type: 'bar',
       data: {
