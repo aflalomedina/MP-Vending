@@ -480,6 +480,25 @@
     </div>
 
     <div class="panel full">
+      <h2>Crescimento mês a mês</h2>
+      <canvas id="chartCrescimentoMensal" height="180"></canvas>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <h2>Receita de hoje por ponto de venda</h2>
+        <canvas id="chartPDVHoje" height="220"></canvas>
+      </div>
+      <div class="panel">
+        <h2>Receita por ponto de venda este mês</h2>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
+          Soma dos dias já disponíveis este mês com esta informação.
+        </div>
+        <canvas id="chartPDVMes" height="220"></canvas>
+      </div>
+    </div>
+
+    <div class="panel full">
       <h2>Margem por produto (vendas de hoje)</h2>
       <div class="table-wrap" id="financeiroTableWrap"><div class="state small">a carregar…</div></div>
     </div>
@@ -528,15 +547,20 @@
 
   // Matrícula da máquina -> Ponto de Venda (fonte: Lista de Máquinas)
   const MACHINES = {
-    "001": "Recepção", "002": "Central Park", "002-S": "Central Park",
-    "003": "Gondomar Premium", "003-S": "Gondomar Premium", "004": "Guifões - Green Park",
-    "005": "Recepção", "006": "Bosque", "006-S": "Bosque",
-    "007": "House Factory (Refeitório)", "007-S": "House Factory (Refeitório)",
-    "008": "Direção Obra", "008-S": "Direção Obra",
-    "009": "Gondomar", "009-S": "Gondomar", "010": "Blue Sky Gondomar",
-    "011": "Jardins do Oriente", "012": "Águas Santas", "013": "Jardins do Oriente",
-    "014": "Blue Sky Gondomar", "015": "Armazém", "016": "Armazém",
+    "001": "Recepção (Crossfit Foz)", "002": "Central Park", "002-S": "Central Park",
+    "003": "Gondomar Premium", "003-S": "Gondomar Premium", "004": "Guifões",
+    "005": "Studio up Yoga", "006": "Bosque - Adopthouse", "006-S": "Bosque - Adopthouse",
+    "007": "House Factory", "007-S": "House Factory",
+    "008": "Oasis - Edinorte", "008-S": "Oasis - Edinorte",
+    "009": "D'Casa Gondomar", "009-S": "D'Casa Gondomar", "010": "Bluesky Gondomar",
+    "011": "Jardins do Oriente - Garcia Garcia", "012": "Águas Santas (só café)", "013": "Jardins do Oriente - Garcia Garcia",
+    "014": "Bluesky Gondomar", "015": "Nogueira - Perafita", "016": "Nogueira - Perafita",
   };
+
+  // Nome do ponto de venda, sem a matrícula (para agregar várias máquinas do mesmo local)
+  function pdvLabel(matricula) {
+    return MACHINES[matricula] || matricula || '—';
+  }
 
   // Matrículas de máquinas de snacks (todas as "-S" mais estas três sem sufixo)
   const SNACK_EXTRA = new Set(["013", "014", "016"]);
@@ -663,9 +687,114 @@
     });
   }
 
+  function renderCrescimentoMensal() {
+    const dias = Object.keys(HISTORICO).sort();
+    if (!dias.length) return;
+
+    const porMes = new Map();
+    for (const d of dias) {
+      const mes = d.slice(0, 7);
+      porMes.set(mes, (porMes.get(mes) || 0) + (HISTORICO[d].receitaTotal || 0));
+    }
+    const meses = Array.from(porMes.keys()).sort();
+
+    // ignora o último mês se tiver muito poucos dias registados (distorce a % de crescimento)
+    const crescimentos = [];
+    const labels = [];
+    for (let i = 1; i < meses.length; i++) {
+      const anterior = porMes.get(meses[i - 1]);
+      const atual = porMes.get(meses[i]);
+      const pct = anterior ? ((atual - anterior) / anterior) * 100 : 0;
+      labels.push(monthName(meses[i]));
+      crescimentos.push(Math.round(pct * 10) / 10);
+    }
+
+    new Chart(document.getElementById('chartCrescimentoMensal'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Crescimento (%)',
+          data: crescimentos,
+          backgroundColor: crescimentos.map(v => v >= 0 ? '#2F9E44' : '#E03131'),
+        }],
+      },
+      options: {
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (ctx) => `${ctx.parsed.y >= 0 ? '+' : ''}${ctx.parsed.y}% vs. mês anterior` } },
+        },
+        scales: { y: { ticks: { callback: (v) => v + '%' } } },
+      },
+    });
+  }
+
+  let chartPDVHojeInstance = null;
+  function renderReceitaPDVHoje() {
+    const rows = lastVendasRows.filter(r => r.MATRICULA_MAQUINA);
+    const porPDV = groupSum(rows, r => pdvLabel(r.MATRICULA_MAQUINA), r => Number(r.value) || 0);
+    const entradas = Array.from(porPDV.entries()).sort((a, b) => b[1] - a[1]);
+
+    if (chartPDVHojeInstance) chartPDVHojeInstance.destroy();
+    chartPDVHojeInstance = new Chart(document.getElementById('chartPDVHoje'), {
+      type: 'bar',
+      data: {
+        labels: entradas.map(e => truncar(e[0], 26)),
+        datasets: [{ label: 'Receita (€)', data: entradas.map(e => e[1]), backgroundColor: '#FF9F1C' }],
+      },
+      options: {
+        indexAxis: 'y',
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { title: (items) => entradas[items[0].dataIndex][0] } },
+        },
+        scales: { x: { beginAtZero: true } },
+      },
+    });
+  }
+
+  let chartPDVMesInstance = null;
+  function renderReceitaPDVMes() {
+    const mesAtual = todayStr().slice(0, 7);
+    const porPDV = new Map();
+    for (const [data, resumo] of Object.entries(HISTORICO)) {
+      if (!data.startsWith(mesAtual)) continue;
+      if (!resumo.porPontoVenda) continue;
+      for (const [pdv, valor] of Object.entries(resumo.porPontoVenda)) {
+        porPDV.set(pdv, (porPDV.get(pdv) || 0) + valor);
+      }
+    }
+    const entradas = Array.from(porPDV.entries()).sort((a, b) => b[1] - a[1]);
+    const canvas = document.getElementById('chartPDVMes');
+
+    if (chartPDVMesInstance) chartPDVMesInstance.destroy();
+    if (!entradas.length) {
+      canvas.insertAdjacentHTML('afterend', '<div class="state small">Ainda sem dias suficientes capturados este mês com esta informação.</div>');
+      return;
+    }
+    chartPDVMesInstance = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: entradas.map(e => truncar(e[0], 26)),
+        datasets: [{ label: 'Receita (€)', data: entradas.map(e => e[1]), backgroundColor: '#1B1F27' }],
+      },
+      options: {
+        indexAxis: 'y',
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { title: (items) => entradas[items[0].dataIndex][0] } },
+        },
+        scales: { x: { beginAtZero: true } },
+      },
+    });
+  }
+
   function renderFinanceiro() {
     renderPagamentos('chartPagamentos', 'pagamentosTableWrap', 'pagamentosDataLabel');
     renderTicketETransacoes();
+    renderCrescimentoMensal();
+    renderReceitaPDVHoje();
+    renderReceitaPDVMes();
 
     const rows = lastVendasRows.filter(r => r.NOME_PRODUTO);
     if (!rows.length) return;
@@ -1575,7 +1704,12 @@
       // (a KV tem prioridade em datas repetidas, por serem mais recentes)
       HISTORICO = { ...(historicoRaw || {}), ...(liveSnapshots || {}) };
       renderVendas(toObjects(vendasRaw));
-      if (lastSummary) HISTORICO[lastSummary.date] = { ...HISTORICO[lastSummary.date], ...lastSummary };
+      if (lastSummary) {
+        const rowsPDV = lastVendasRows.filter(r => r.MATRICULA_MAQUINA);
+        const porPDV = groupSum(rowsPDV, r => pdvLabel(r.MATRICULA_MAQUINA), r => Number(r.value) || 0);
+        lastSummary.porPontoVenda = Object.fromEntries(porPDV);
+        HISTORICO[lastSummary.date] = { ...HISTORICO[lastSummary.date], ...lastSummary };
+      }
       renderStock(toObjects(stockRaw));
       if (pagamentosRaw) lastPagamentosRows = toObjects(pagamentosRaw);
       if (lastSummary && lastPagamentosRows.length) {
