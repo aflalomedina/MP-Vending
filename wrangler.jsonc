@@ -4,7 +4,9 @@
   "main": "src/worker.js",
   "vars": {
     "PORTAL_URL": "https://mpvending.luope.com",
-    "METABASE_URL": "https://bi-mpvending.luope.com"
+    "METABASE_URL": "https://bi-mpvending.luope.com",
+    "CF_ACCOUNT_TAG": "630cd4039c2c7b8438b980090c85b3b8",
+    "CF_SITE_TAG": "b810eae6e207447c83953edea034ff8a"
   },
   "kv_namespaces": [
     { "binding": "HISTORY_KV", "id": "df59f2be482b493ca5f075ef1903a9e3" }
