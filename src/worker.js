@@ -229,6 +229,75 @@ async function handleSiteAnalytics(env) {
   return groups;
 }
 
+// ===== Despesas mensais (Cloudflare KV) =====
+async function handleDespesas(request, env) {
+  const url = new URL(request.url);
+
+  if (request.method === "POST") {
+    let payload;
+    try {
+      payload = await request.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "JSON inválido" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const { categoria, descricao, valor, data } = payload || {};
+    if (!categoria || !data || typeof valor !== "number") {
+      return new Response(JSON.stringify({ error: "Faltam campos (categoria, valor, data)" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const id = crypto.randomUUID();
+    const registo = { id, categoria, descricao: descricao || "", valor, data, criadoEm: new Date().toISOString() };
+    await env.HISTORY_KV.put(`despesa:${id}`, JSON.stringify(registo));
+    return new Response(JSON.stringify({ ok: true, id }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (request.method === "GET") {
+    const despesas = [];
+    let cursor;
+    do {
+      const listed = await env.HISTORY_KV.list({ prefix: "despesa:", cursor });
+      for (const key of listed.keys) {
+        const value = await env.HISTORY_KV.get(key.name);
+        if (value) {
+          try {
+            despesas.push(JSON.parse(value));
+          } catch {
+            // ignora entradas corrompidas
+          }
+        }
+      }
+      cursor = listed.list_complete ? undefined : listed.cursor;
+    } while (cursor);
+
+    return new Response(JSON.stringify({ despesas }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (request.method === "DELETE") {
+    const id = url.searchParams.get("id");
+    if (!id) {
+      return new Response(JSON.stringify({ error: "Falta o parâmetro id" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    await env.HISTORY_KV.delete(`despesa:${id}`);
+    return new Response(JSON.stringify({ ok: true }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  return new Response("Método não suportado", { status: 405 });
+}
+
 export default {
 
   async fetch(request, env) {
@@ -261,6 +330,17 @@ export default {
       } catch (err) {
         return new Response(JSON.stringify({ error: err.message }), {
           status: 502,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    if (url.pathname === "/api/despesas") {
+      try {
+        return await handleDespesas(request, env);
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
           headers: { "Content-Type": "application/json" },
         });
       }
