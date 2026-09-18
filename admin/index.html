@@ -481,6 +481,23 @@
       </div>
       <div class="table-wrap" id="previsaoCompraWrap"><div class="state small">a carregar…</div></div>
     </div>
+
+    <div class="panel full">
+      <h2>Vendas por produto — dia, mês e ano</h2>
+      <div style="margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
+        <div>
+          <label for="vendasProdutoCategoria" style="font-size:13px;color:var(--muted);margin-right:8px;">Categoria:</label>
+          <select id="vendasProdutoCategoria" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;">
+            <option value="">Todas</option>
+          </select>
+        </div>
+        <div>
+          <label for="vendasProdutoPesquisa" style="font-size:13px;color:var(--muted);margin-right:8px;">Procurar produto:</label>
+          <input type="text" id="vendasProdutoPesquisa" placeholder="ex: café, coca cola…" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;" />
+        </div>
+      </div>
+      <div class="table-wrap" id="vendasProdutoWrap"><div class="state small">a carregar…</div></div>
+    </div>
   </div>
 
   <div id="view-financeiro" class="view">
@@ -703,6 +720,28 @@
   }
 
   // Produtos a agrupar sob um nome comum nos gráficos de "top produtos"
+  // Fusão de variantes do mesmo produto (SDR e nomes duplicados) — usado para juntar "hoje" (dados ao vivo) com "mês/ano" (histórico)
+  const SDR_RE1 = /\s*\(sdr\)\s*$/i;
+  const SDR_RE2 = /\s*-\s*sdr\s*$/i;
+  function normalizarSDR(nome) {
+    return (nome || '').replace(SDR_RE1, '').replace(SDR_RE2, '').trim();
+  }
+  const GRUPOS_PRODUTO = {
+    'Guarana Antartica lata 33cl': 'Guaraná Brasil 33cl',
+    'Agua UP 0,5L': 'Agua S. Martinho 50cl',
+    'Agua Rioba 50cl': 'Agua S. Martinho 50cl',
+    'Bebida Energetica Hell Classic 25cl': 'Bebida Energetica Hell Classic 250ml',
+    'Bebida Energetica Hell Zero 25cl': 'Bebida Energetica Hell Classic 250ml',
+    'Coca Cola Original Lata Sleek': 'Coca Cola Original Lata 33 Cl',
+    'Croissant Recheado com Cacau 60 Gr - Belino': 'Bitee - Croissant Recheio Cacau 60g',
+    '7Up 33cl': '7Up Sleek 330ml',
+    'REF S/G FRESKY LAR TET 20CL': 'REF S/G FRESKY F TROP TET 20CL',
+  };
+  function canonicalProduto(nome) {
+    const n = normalizarSDR(nome);
+    return GRUPOS_PRODUTO[n] || n;
+  }
+
   const PRODUCT_GROUP = {
     'Café Longo': 'Cafés',
     'Café Curto': 'Cafés',
@@ -801,25 +840,48 @@
     });
   }
 
+  function totalMensalProjetado(mesKey) {
+    const dias = Object.keys(HISTORICO).filter(d => d.startsWith(mesKey));
+    const receitaAteAgora = dias.reduce((s, d) => s + (HISTORICO[d].receitaTotal || 0), 0);
+
+    if (mesKey !== todayStr().slice(0, 7)) {
+      return receitaAteAgora; // mês já fechado, é a soma real
+    }
+
+    // mês em curso: projeta os dias que faltam com a média histórica por dia da semana
+    const mediasDow = mediasPorDiaSemana();
+    const [y, m] = mesKey.split('-').map(Number);
+    const diasNoMes = new Date(y, m, 0).getDate();
+    const diasJaContados = new Set(dias);
+    let restante = 0;
+    for (let dia = 1; dia <= diasNoMes; dia++) {
+      const dataStr = `${mesKey}-${String(dia).padStart(2, '0')}`;
+      if (diasJaContados.has(dataStr)) continue;
+      const dow = new Date(y, m - 1, dia).getDay();
+      restante += mediasDow[dow];
+    }
+    return receitaAteAgora + restante;
+  }
+
   function renderCrescimentoMensal() {
     const dias = Object.keys(HISTORICO).sort();
     if (!dias.length) return;
 
-    const porMes = new Map();
-    for (const d of dias) {
-      const mes = d.slice(0, 7);
-      porMes.set(mes, (porMes.get(mes) || 0) + (HISTORICO[d].receitaTotal || 0));
-    }
-    const meses = Array.from(porMes.keys()).sort();
+    // meses considerados: fevereiro fica de fora (mês parcial, atípico), tal como no resto do dashboard
+    const todosMeses = Array.from(new Set(dias.map(d => d.slice(0, 7)))).sort();
+    const meses = todosMeses.filter(m => m !== '2026-02');
+    const mesAtual = todayStr().slice(0, 7);
 
-    // ignora o último mês se tiver muito poucos dias registados (distorce a % de crescimento)
+    const totais = new Map(meses.map(m => [m, totalMensalProjetado(m)]));
+
     const crescimentos = [];
     const labels = [];
     for (let i = 1; i < meses.length; i++) {
-      const anterior = porMes.get(meses[i - 1]);
-      const atual = porMes.get(meses[i]);
+      const anterior = totais.get(meses[i - 1]);
+      const atual = totais.get(meses[i]);
       const pct = anterior ? ((atual - anterior) / anterior) * 100 : 0;
-      labels.push(monthName(meses[i]));
+      const projetado = meses[i] === mesAtual;
+      labels.push(monthName(meses[i]) + (projetado ? ' (projetado)' : ''));
       crescimentos.push(Math.round(pct * 10) / 10);
     }
 
@@ -1795,6 +1857,90 @@
     loadLayoutAndRender();
     renderTop7Dias();
     renderPrevisaoCompra();
+    renderVendasPorProduto();
+  }
+
+  let mensalCompletoData = null;
+
+  function paintVendasPorProduto(categoriaFiltro, termoPesquisa) {
+    const wrap = document.getElementById('vendasProdutoWrap');
+    if (!mensalCompletoData) return;
+
+    const termo = (termoPesquisa || '').trim().toLowerCase();
+    const mesAtual = todayStr().slice(0, 7);
+    const anoAtual = todayStr().slice(0, 4);
+
+    // "hoje" a partir dos dados ao vivo, agrupado com o mesmo critério canónico
+    const hojePorProduto = groupSum(
+      lastVendasRows.filter(r => r.NOME_PRODUTO),
+      r => canonicalProduto(r.NOME_PRODUTO),
+      r => Number(r.count) || 1
+    );
+
+    let produtos = Object.keys(mensalCompletoData);
+    // inclui também produtos que só vendem hoje e ainda não estão no histórico
+    for (const nome of hojePorProduto.keys()) {
+      if (!produtos.includes(nome)) produtos.push(nome);
+    }
+
+    let linhas = produtos
+      .filter(nome => !categoriaFiltro || subfamiliaLabel(nome) === categoriaFiltro)
+      .filter(nome => !termo || nome.toLowerCase().includes(termo))
+      .map(nome => {
+        const meses = mensalCompletoData[nome] || {};
+        const hoje = hojePorProduto.get(nome) || 0;
+        const esteMs = meses[mesAtual] || 0;
+        const esteAno = Object.entries(meses)
+          .filter(([mes]) => mes.startsWith(anoAtual))
+          .reduce((s, [, qtd]) => s + qtd, 0);
+        return { nome, hoje, esteMs, esteAno };
+      })
+      .filter(l => l.hoje > 0 || l.esteMs > 0 || l.esteAno > 0)
+      .sort((a, b) => b.esteAno - a.esteAno);
+
+    if (!linhas.length) {
+      wrap.innerHTML = '<div class="state small">Sem produtos para este filtro.</div>';
+      return;
+    }
+
+    wrap.innerHTML = `
+      <table>
+        <thead>
+          <tr><th>Produto</th><th class="num">Hoje</th><th class="num">Este mês</th><th class="num">Este ano</th></tr>
+        </thead>
+        <tbody>
+          ${linhas.map(l => `
+            <tr>
+              <td>${l.nome}</td>
+              <td class="num">${fmtInt(l.hoje)}</td>
+              <td class="num">${fmtInt(l.esteMs)}</td>
+              <td class="num">${fmtInt(l.esteAno)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  async function renderVendasPorProduto() {
+    const wrap = document.getElementById('vendasProdutoWrap');
+    try {
+      const res = await fetch('/admin/produtos_mensal_completo.json');
+      mensalCompletoData = res.ok ? await res.json() : {};
+
+      const categorias = Array.from(new Set(Object.keys(mensalCompletoData).map(subfamiliaLabel))).sort();
+      const selectCat = document.getElementById('vendasProdutoCategoria');
+      selectCat.innerHTML = '<option value="">Todas</option>' +
+        categorias.map(c => `<option value="${c}">${c}</option>`).join('');
+
+      const pesquisa = document.getElementById('vendasProdutoPesquisa');
+      const redesenhar = () => paintVendasPorProduto(selectCat.value, pesquisa.value);
+      selectCat.onchange = redesenhar;
+      pesquisa.oninput = redesenhar;
+      redesenhar();
+    } catch (err) {
+      wrap.innerHTML = `<div class="state small error">Erro: ${err.message}</div>`;
+    }
   }
 
   let previsaoCompraData = null;
