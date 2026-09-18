@@ -181,7 +181,7 @@ async function handleSiteAnalytics(env) {
       viewer {
         accounts(filter: { accountTag: $acc }) {
           rumPageloadEventsAdaptiveGroups(
-            filter: { siteTag: $site, date_geq: $s, date_leq: $e, bot: 0 }
+            filter: { siteTag: $site, date_geq: $s, date_leq: $e }
             limit: 10000
             orderBy: [date_ASC]
           ) {
@@ -226,7 +226,15 @@ async function handleSiteAnalytics(env) {
   }
 
   const groups = json.data?.viewer?.accounts?.[0]?.rumPageloadEventsAdaptiveGroups || [];
-  return groups;
+  return {
+    groups,
+    debug: {
+      dateRange: { s: variables.s, e: variables.e },
+      accountTagSet: !!env.CF_ACCOUNT_TAG,
+      siteTagSet: !!env.CF_SITE_TAG,
+      rawGroupCount: groups.length,
+    },
+  };
 }
 
 // ===== Despesas mensais (Cloudflare KV) =====
@@ -323,8 +331,8 @@ export default {
 
     if (url.pathname === "/api/site-analytics") {
       try {
-        const groups = await handleSiteAnalytics(env);
-        return new Response(JSON.stringify({ groups }), {
+        const resultado = await handleSiteAnalytics(env);
+        return new Response(JSON.stringify(resultado), {
           headers: { "Content-Type": "application/json" },
         });
       } catch (err) {
