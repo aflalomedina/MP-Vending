@@ -421,7 +421,19 @@
   <div id="view-stocks" class="view">
     <div class="panel full">
       <h2>Alertas de stock baixo</h2>
-      <div id="stockAlertsWrap"><div class="state small">a carregar…</div></div>
+      <div style="margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
+        <div>
+          <label for="alertaMaquinaFiltro" style="font-size:13px;color:var(--muted);margin-right:8px;">Máquina:</label>
+          <select id="alertaMaquinaFiltro" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;">
+            <option value="">Todas</option>
+          </select>
+        </div>
+        <div>
+          <label for="alertaProdutoPesquisa" style="font-size:13px;color:var(--muted);margin-right:8px;">Procurar produto:</label>
+          <input type="text" id="alertaProdutoPesquisa" placeholder="ex: café, água…" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;" />
+        </div>
+      </div>
+      <div id="stockAlertsWrap" style="max-height:340px;overflow-y:auto;"><div class="state small">a carregar…</div></div>
     </div>
 
     <div class="panel full">
@@ -506,11 +518,6 @@
       <div class="kpi"><div class="value" id="finCusto">—</div><div class="label">Custo dos produtos vendidos</div></div>
       <div class="kpi"><div class="value" id="finLucro">—</div><div class="label">Lucro bruto</div></div>
       <div class="kpi"><div class="value" id="finMargem">—</div><div class="label">Margem bruta</div></div>
-    </div>
-
-    <div class="panel full">
-      <h2>Lucro bruto por subfamília</h2>
-      <canvas id="chartLucroSubfamilia" height="180"></canvas>
     </div>
 
     <div class="panel full">
@@ -716,6 +723,7 @@
   }
 
   function subfamiliaLabel(nomeProduto) {
+    if (nomeProduto === 'Cafés') return 'Compostos';
     return NAME_TO_SUBFAMILIA[nomeProduto] || 'Outros';
   }
 
@@ -848,19 +856,13 @@
       return receitaAteAgora; // mês já fechado, é a soma real
     }
 
-    // mês em curso: projeta os dias que faltam com a média histórica por dia da semana
-    const mediasDow = mediasPorDiaSemana();
+    // mês em curso: projeta com base apenas no ritmo diário médio deste mês
     const [y, m] = mesKey.split('-').map(Number);
     const diasNoMes = new Date(y, m, 0).getDate();
-    const diasJaContados = new Set(dias);
-    let restante = 0;
-    for (let dia = 1; dia <= diasNoMes; dia++) {
-      const dataStr = `${mesKey}-${String(dia).padStart(2, '0')}`;
-      if (diasJaContados.has(dataStr)) continue;
-      const dow = new Date(y, m - 1, dia).getDay();
-      restante += mediasDow[dow];
-    }
-    return receitaAteAgora + restante;
+    const diaAtual = dias.length ? Math.max(...dias.map(d => parseInt(d.slice(8, 10), 10))) : 0;
+    if (!diaAtual) return receitaAteAgora;
+    const mediaDiaria = receitaAteAgora / diaAtual;
+    return receitaAteAgora + mediaDiaria * Math.max(diasNoMes - diaAtual, 0);
   }
 
   function renderCrescimentoMensal() {
@@ -874,33 +876,66 @@
 
     const totais = new Map(meses.map(m => [m, totalMensalProjetado(m)]));
 
-    const crescimentos = [];
-    const labels = [];
-    for (let i = 1; i < meses.length; i++) {
+    const labels = meses.map(m => monthName(m) + (m === mesAtual ? ' (projetado)' : ''));
+    const faturacao = meses.map(m => Math.round(totais.get(m) * 100) / 100);
+    const crescimentos = meses.map((m, i) => {
+      if (i === 0) return null;
       const anterior = totais.get(meses[i - 1]);
-      const atual = totais.get(meses[i]);
-      const pct = anterior ? ((atual - anterior) / anterior) * 100 : 0;
-      const projetado = meses[i] === mesAtual;
-      labels.push(monthName(meses[i]) + (projetado ? ' (projetado)' : ''));
-      crescimentos.push(Math.round(pct * 10) / 10);
-    }
+      const atual = totais.get(m);
+      if (!anterior) return null;
+      return Math.round(((atual - anterior) / anterior) * 1000) / 10;
+    });
 
     new Chart(document.getElementById('chartCrescimentoMensal'), {
-      type: 'bar',
       data: {
         labels,
-        datasets: [{
-          label: 'Crescimento (%)',
-          data: crescimentos,
-          backgroundColor: crescimentos.map(v => v >= 0 ? '#2F9E44' : '#E03131'),
-        }],
+        datasets: [
+          {
+            type: 'bar',
+            label: 'Faturação (€)',
+            data: faturacao,
+            backgroundColor: '#FF9F1C',
+            yAxisID: 'y',
+            order: 2,
+          },
+          {
+            type: 'line',
+            label: 'Crescimento vs. mês anterior (%)',
+            data: crescimentos,
+            borderColor: '#1B1F27',
+            backgroundColor: '#1B1F27',
+            yAxisID: 'y1',
+            spanGaps: true,
+            tension: 0.2,
+            pointRadius: 4,
+            pointBackgroundColor: (ctx) => (ctx.raw == null ? 'transparent' : (ctx.raw >= 0 ? '#2F9E44' : '#E03131')),
+            order: 1,
+          },
+        ],
       },
       options: {
         plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { label: (ctx) => `${ctx.parsed.y >= 0 ? '+' : ''}${ctx.parsed.y}% vs. mês anterior` } },
+          legend: { display: true, position: 'top' },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                if (ctx.dataset.type === 'line') {
+                  return ctx.raw == null ? 'Crescimento: sem mês anterior comparável' : `Crescimento: ${ctx.raw >= 0 ? '+' : ''}${ctx.raw}%`;
+                }
+                return `Faturação: ${fmtEUR(ctx.raw)}`;
+              },
+            },
+          },
         },
-        scales: { y: { ticks: { callback: (v) => v + '%' } } },
+        scales: {
+          y: { position: 'left', beginAtZero: true, title: { display: true, text: 'Faturação (€)' } },
+          y1: {
+            position: 'right',
+            grid: { drawOnChartArea: false },
+            ticks: { callback: (v) => v + '%' },
+            title: { display: true, text: 'Crescimento (%)' },
+          },
+        },
       },
     });
   }
@@ -1074,7 +1109,6 @@
 
     let receitaTotal = 0, custoTotal = 0;
     const porProduto = new Map();
-    const porSubfamilia = new Map();
 
     for (const r of rows) {
       const nome = r.NOME_PRODUTO;
@@ -1088,10 +1122,6 @@
       const p = porProduto.get(nome) || { receita: 0, custo: 0, qtd: 0 };
       p.receita += valor; p.custo += custo; p.qtd += qtd;
       porProduto.set(nome, p);
-
-      const sub = subfamiliaLabel(nome);
-      const s = porSubfamilia.get(sub) || 0;
-      porSubfamilia.set(sub, s + (valor - custo));
     }
 
     const lucroTotal = receitaTotal - custoTotal;
@@ -1101,17 +1131,6 @@
     document.getElementById('finCusto').textContent = fmtEUR(custoTotal);
     document.getElementById('finLucro').textContent = fmtEUR(lucroTotal);
     document.getElementById('finMargem').textContent = margemTotal.toFixed(1) + '%';
-
-    // Gráfico: lucro por subfamília
-    const subEntries = Array.from(porSubfamilia.entries()).sort((a, b) => b[1] - a[1]);
-    new Chart(document.getElementById('chartLucroSubfamilia'), {
-      type: 'bar',
-      data: {
-        labels: subEntries.map(s => s[0]),
-        datasets: [{ label: 'Lucro bruto (€)', data: subEntries.map(s => s[1]), backgroundColor: '#2F9E44' }],
-      },
-      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
-    });
 
     // Tabela por produto
     const linhas = Array.from(porProduto.entries())
@@ -1217,21 +1236,15 @@
     }
 
     const receitaAteAgora = diasDoMesRegistados.reduce((s, d) => s + (HISTORICO[d].receitaTotal || 0), 0);
-    const mediasDow = mediasPorDiaSemana();
-
+    const diaAtual = Math.max(...diasDoMesRegistados.map(d => parseInt(d.slice(8, 10), 10)));
     const diasNoMes = new Date(anoAtual, mesAtual + 1, 0).getDate();
-    const diasJaContados = new Set(diasDoMesRegistados);
-    let receitaProjetadaRestante = 0;
-    let diasEmFalta = 0;
-    for (let dia = 1; dia <= diasNoMes; dia++) {
-      const dataStr = `${mesKey}-${String(dia).padStart(2, '0')}`;
-      if (diasJaContados.has(dataStr)) continue;
-      const dow = new Date(anoAtual, mesAtual, dia).getDay();
-      receitaProjetadaRestante += mediasDow[dow];
-      diasEmFalta++;
-    }
+    const diasEmFalta = Math.max(diasNoMes - diaAtual, 0);
 
+    // projeção baseada apenas no ritmo diário médio deste mês (receita até agora / dias já decorridos)
+    const mediaDiariaMesCorrente = diaAtual ? receitaAteAgora / diaAtual : 0;
+    const receitaProjetadaRestante = mediaDiariaMesCorrente * diasEmFalta;
     const totalProjetado = receitaAteAgora + receitaProjetadaRestante;
+
     const diasUteis = diasUteisNoMes(mesKey);
     const feriadosDoMes = [];
     for (let dia = 1; dia <= diasNoMes; dia++) {
@@ -1245,12 +1258,12 @@
     panel.innerHTML = `
       <h2>Projeção para ${monthName(mesKey)} <span style="font-weight:400;color:var(--muted);font-size:13px;">— ${diasUteis} dias úteis no mês</span></h2>
       <div class="kpis" style="margin-bottom:0;">
-        <div class="kpi"><div class="value">${fmtEUR(receitaAteAgora)}</div><div class="label">Já faturado (${diasDoMesRegistados.length} dias)</div></div>
+        <div class="kpi"><div class="value">${fmtEUR(receitaAteAgora)}</div><div class="label">Já faturado (dia ${diaAtual})</div></div>
         <div class="kpi"><div class="value">${fmtEUR(receitaProjetadaRestante)}</div><div class="label">Estimado p/ ${diasEmFalta} dias em falta</div></div>
         <div class="kpi"><div class="value" style="color:var(--positive);">${fmtEUR(totalProjetado)}</div><div class="label">Total projetado do mês</div></div>
       </div>
       <p style="font-size:12px;color:var(--muted);margin-top:10px;">
-        Estimativa baseada na média histórica de receita para cada dia da semana (excluindo agosto, mês atípico), não numa simples média diária — para refletir o padrão de dias úteis vs. fim de semana. ${feriadosTexto}
+        Estimativa baseada apenas no ritmo diário médio deste mês (${fmtEUR(mediaDiariaMesCorrente)}/dia) — não usa outros meses como referência. ${feriadosTexto}
       </p>
     `;
   }
@@ -1370,7 +1383,7 @@
   }
 
   function renderPagamentos(canvasId, tableId, labelId) {
-    const rows = lastVendasRows.filter(r => r.id !== undefined && r.id !== null && r.id !== '');
+    const rows = lastVendasRows.filter(r => r.id !== undefined && r.id !== null && r.id !== '' && String(r.id) !== '4');
     const porTipo = groupSum(rows, r => String(r.id), r => Number(r.value) || 0);
     const tipos = Array.from(porTipo.entries()).sort((a, b) => b[1] - a[1]);
     const canvas = document.getElementById(canvasId);
@@ -1719,15 +1732,20 @@
     }
   }
 
-  function renderStockAlerts(rows) {
+  let stockAlertRows = [];
+
+  function paintStockAlerts() {
     const wrap = document.getElementById('stockAlertsWrap');
-    const baixos = rows
-      .filter(r => subfamiliaLabel(r.NOME_PRODUTO) !== 'Compostos')
-      .filter(r => Number(r.STOCK_MIN_CONF) > 0 && Number(r.sum) < Number(r.STOCK_MIN_CONF))
+    const maquinaFiltro = document.getElementById('alertaMaquinaFiltro').value;
+    const termo = document.getElementById('alertaProdutoPesquisa').value.trim().toLowerCase();
+
+    const baixos = stockAlertRows
+      .filter(r => !maquinaFiltro || r.MATRICULA_MAQUINA === maquinaFiltro)
+      .filter(r => !termo || (r.NOME_PRODUTO || '').toLowerCase().includes(termo))
       .sort((a, b) => (Number(a.sum) - Number(a.STOCK_MIN_CONF)) - (Number(b.sum) - Number(b.STOCK_MIN_CONF)));
 
     if (!baixos.length) {
-      wrap.innerHTML = '<div class="state small">Sem produtos abaixo do stock mínimo neste momento.</div>';
+      wrap.innerHTML = '<div class="state small">Sem produtos abaixo do stock mínimo para este filtro.</div>';
       return;
     }
     const linhas = baixos.map(r => `
@@ -1746,6 +1764,21 @@
         <tbody>${linhas}</tbody>
       </table>
     `;
+  }
+
+  function renderStockAlerts(rows) {
+    stockAlertRows = rows
+      .filter(r => subfamiliaLabel(r.NOME_PRODUTO) !== 'Compostos')
+      .filter(r => Number(r.STOCK_MIN_CONF) > 0 && Number(r.sum) < Number(r.STOCK_MIN_CONF));
+
+    const selectMaquina = document.getElementById('alertaMaquinaFiltro');
+    const maquinas = Array.from(new Set(stockAlertRows.map(r => r.MATRICULA_MAQUINA))).sort();
+    selectMaquina.innerHTML = '<option value="">Todas</option>' +
+      maquinas.map(m => `<option value="${m}">${machineLabel(m)}</option>`).join('');
+    selectMaquina.onchange = paintStockAlerts;
+    document.getElementById('alertaProdutoPesquisa').oninput = paintStockAlerts;
+
+    paintStockAlerts();
   }
 
   let snackStockRows = [];
@@ -1810,17 +1843,24 @@
     const canvas = document.getElementById('chartTop7');
     try {
       const res = await fetch('/admin/produtos_recentes.json');
-      const data = res.ok ? await res.json() : {};
-      const dias = Object.keys(data).sort().slice(-7);
+      const estatico = res.ok ? await res.json() : {};
+
       const totais = new Map();
       const qtds = new Map();
-      for (const dia of dias) {
-        for (const [nomeOriginal, v] of Object.entries(data[dia])) {
+      const hoje = new Date();
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(hoje);
+        d.setDate(d.getDate() - i);
+        const dataStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        // dados ao vivo (capturados na KV) têm prioridade; caem para o ficheiro estático nos dias mais antigos
+        const fonte = (HISTORICO[dataStr] && HISTORICO[dataStr].porProduto) || estatico[dataStr] || {};
+        for (const [nomeOriginal, v] of Object.entries(fonte)) {
           const nome = displayProductName(nomeOriginal);
-          totais.set(nome, (totais.get(nome) || 0) + v.valor);
-          qtds.set(nome, (qtds.get(nome) || 0) + v.qtd);
+          totais.set(nome, (totais.get(nome) || 0) + (v.valor || 0));
+          qtds.set(nome, (qtds.get(nome) || 0) + (v.qtd || 0));
         }
       }
+
       const top = Array.from(totais.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
       new Chart(canvas, {
         type: 'bar',
@@ -1851,16 +1891,28 @@
   }
 
   let stocksLoaded = false;
-  function loadStocksView() {
+  async function loadStocksView() {
     if (stocksLoaded) return;
     stocksLoaded = true;
     loadLayoutAndRender();
+    await garantirMensalCompletoData();
     renderTop7Dias();
     renderPrevisaoCompra();
     renderVendasPorProduto();
   }
 
   let mensalCompletoData = null;
+
+  async function garantirMensalCompletoData() {
+    if (mensalCompletoData) return mensalCompletoData;
+    try {
+      const res = await fetch('/admin/produtos_mensal_completo.json');
+      mensalCompletoData = res.ok ? await res.json() : {};
+    } catch {
+      mensalCompletoData = {};
+    }
+    return mensalCompletoData;
+  }
 
   // O ficheiro estático cobre até este dia (inclusive); dias a seguir vêm da captura automática na KV
   const CORTE_DADOS_ESTATICOS = '2026-09-15';
@@ -1875,20 +1927,67 @@
       if (data <= CORTE_DADOS_ESTATICOS) continue; // já contabilizado no ficheiro estático acima
       if (!data.startsWith(prefixoData)) continue;
       if (!resumo.porProduto) continue;
-      total += resumo.porProduto[nome] || 0;
+      total += (resumo.porProduto[nome] && resumo.porProduto[nome].qtd) || 0;
+    }
+    return total;
+  }
+
+  // Mesma limpeza aplicada na "Previsão de compra" — produtos raros/irrelevantes
+  const PRODUTOS_EXCLUIDOS_STOCK = new Set([
+    'Fatia Bolo Cenoura com Chocolate', 'Desconhecido', 'ND', 'Bolo de Laranja',
+    'Fatia de Bolo iogurte', 'Trik - Salty Sticks', 'Trik - Crackers Original 110gr',
+    'Limonada 500 ml - Enjoy', 'Kas Limão', 'Ice Tea Pessego Continente 20cl',
+    'SUMO AMANH 100% LAR TET 20CL', 'Pastilhas Elásticas Chiclets Spearmint 16,5 G',
+    'Cerveja sem álcool super bock 00% lata', 'Leite Uht Achocolatado Agros 200 Ml',
+    'Sande Mista Mistura Cacetinho', 'Barras Cereais Linha Nacional Chocolate 23 G',
+    'ICE TEA AMANH PES TET 20CL', 'Bolachas Marinheiras Cem Porcento Chia Mini 50 G',
+    'Empada de Frango', 'Bolacha Maria sem Açúcar Doses', 'Pão com Chouriço',
+    'Salame de Chocolate Ecobol', 'Croissant Simples', 'Batata Frita Barrosã 45g',
+    'NAPOLITANA SCHOCO CHOC', 'Croissant Aurora Simples 240gr',
+    'Amendoins Mel e Mostarda 70gr - Zigi', '7UP - Refrigerante com Gás Zero Mint 330ml',
+  ]);
+
+  // Nome final para esta tabela: junta variantes SDR/duplicadas E agrupa os cafés
+  function combinedCanonical(nome) {
+    return displayProductName(canonicalProduto(nome));
+  }
+
+  function totalProdutoPeriodoCombinado(nomeCombinado, prefixoData) {
+    let total = 0;
+    for (const [origNome, meses] of Object.entries(mensalCompletoData || {})) {
+      if (PRODUTOS_EXCLUIDOS_STOCK.has(origNome)) continue;
+      if (combinedCanonical(origNome) !== nomeCombinado) continue;
+      for (const [mes, qtd] of Object.entries(meses)) {
+        if (mes.startsWith(prefixoData)) total += qtd;
+      }
+    }
+    for (const [data, resumo] of Object.entries(HISTORICO)) {
+      if (data <= CORTE_DADOS_ESTATICOS) continue;
+      if (!data.startsWith(prefixoData)) continue;
+      if (!resumo.porProduto) continue;
+      for (const [origNome, v] of Object.entries(resumo.porProduto)) {
+        if (PRODUTOS_EXCLUIDOS_STOCK.has(origNome)) continue;
+        if (combinedCanonical(origNome) !== nomeCombinado) continue;
+        total += (v && v.qtd) || 0;
+      }
     }
     return total;
   }
 
   function todosOsProdutosConhecidos() {
-    const nomes = new Set(Object.keys(mensalCompletoData || {}));
+    const brutos = new Set(Object.keys(mensalCompletoData || {}));
     for (const resumo of Object.values(HISTORICO)) {
-      if (resumo.porProduto) Object.keys(resumo.porProduto).forEach(n => nomes.add(n));
+      if (resumo.porProduto) Object.keys(resumo.porProduto).forEach(n => brutos.add(n));
     }
     for (const r of lastVendasRows) {
-      if (r.NOME_PRODUTO) nomes.add(canonicalProduto(r.NOME_PRODUTO));
+      if (r.NOME_PRODUTO) brutos.add(canonicalProduto(r.NOME_PRODUTO));
     }
-    return Array.from(nomes);
+    const finais = new Set();
+    for (const nome of brutos) {
+      if (PRODUTOS_EXCLUIDOS_STOCK.has(nome)) continue;
+      finais.add(combinedCanonical(nome));
+    }
+    return Array.from(finais);
   }
 
   function paintVendasPorProduto(categoriaFiltro, termoPesquisa) {
@@ -1899,10 +1998,10 @@
     const mesAtual = todayStr().slice(0, 7);
     const anoAtual = todayStr().slice(0, 4);
 
-    // "hoje" a partir dos dados ao vivo, agrupado com o mesmo critério canónico
+    // "hoje" a partir dos dados ao vivo, com o mesmo critério combinado (cafés juntos, sem os excluídos)
     const hojePorProduto = groupSum(
-      lastVendasRows.filter(r => r.NOME_PRODUTO),
-      r => canonicalProduto(r.NOME_PRODUTO),
+      lastVendasRows.filter(r => r.NOME_PRODUTO && !PRODUTOS_EXCLUIDOS_STOCK.has(canonicalProduto(r.NOME_PRODUTO))),
+      r => combinedCanonical(r.NOME_PRODUTO),
       r => Number(r.count) || 1
     );
 
@@ -1912,8 +2011,8 @@
       .map(nome => ({
         nome,
         hoje: hojePorProduto.get(nome) || 0,
-        esteMs: totalProdutoPeriodo(nome, mesAtual),
-        esteAno: totalProdutoPeriodo(nome, anoAtual),
+        esteMs: totalProdutoPeriodoCombinado(nome, mesAtual),
+        esteAno: totalProdutoPeriodoCombinado(nome, anoAtual),
       }))
       .filter(l => l.hoje > 0 || l.esteMs > 0 || l.esteAno > 0)
       .sort((a, b) => b.esteAno - a.esteAno);
@@ -1945,8 +2044,7 @@
   async function renderVendasPorProduto() {
     const wrap = document.getElementById('vendasProdutoWrap');
     try {
-      const res = await fetch('/admin/produtos_mensal_completo.json');
-      mensalCompletoData = res.ok ? await res.json() : {};
+      await garantirMensalCompletoData();
 
       const categorias = Array.from(new Set(todosOsProdutosConhecidos().map(subfamiliaLabel))).sort();
       const selectCat = document.getElementById('vendasProdutoCategoria');
@@ -1969,18 +2067,26 @@
     if (!previsaoCompraData) return;
     const wrap = document.getElementById('previsaoCompraWrap');
     const termo = (termoPesquisa || '').trim().toLowerCase();
+    const mesAtual = todayStr().slice(0, 7);
+    const diaAtual = new Date().getDate();
+    const [anoN, mesN] = mesAtual.split('-').map(Number);
+    const diasNoMes = new Date(anoN, mesN, 0).getDate();
 
     let linhas = Object.entries(previsaoCompraData)
       .filter(([nome]) => subfamiliaLabel(nome) !== 'Compostos')
       .filter(([nome]) => !termo || nome.toLowerCase().includes(termo))
-      .map(([nome, d]) => ({
-        nome,
-        media: d.mediaMensal, // pode ser null (produto novo)
-        esteMs: d.esteMs,
-        projecao: d.projecao,
-        novo: !!d.novo,
-        ritmo: (d.mediaMensal && d.mediaMensal > 0) ? (d.projecao / d.mediaMensal) * 100 : null,
-      }));
+      .map(([nome, d]) => {
+        const esteMs = totalProdutoPeriodo(nome, mesAtual);
+        const projecao = diaAtual ? Math.round((esteMs / diaAtual) * diasNoMes * 10) / 10 : 0;
+        return {
+          nome,
+          media: d.mediaMensal, // pode ser null (produto novo) — média histórica, atualizada periodicamente
+          esteMs,
+          projecao,
+          novo: !!d.novo,
+          ritmo: (d.mediaMensal && d.mediaMensal > 0) ? (projecao / d.mediaMensal) * 100 : null,
+        };
+      });
 
     if (ordenarPor === 'ritmo_alto') linhas.sort((a, b) => (b.ritmo ?? -1) - (a.ritmo ?? -1));
     else if (ordenarPor === 'ritmo_baixo') linhas.sort((a, b) => (a.ritmo ?? 9999) - (b.ritmo ?? 9999));
@@ -2223,9 +2329,10 @@
       const groups = data.groups || [];
 
       if (!groups.length) {
+        const dbg = data.debug ? ` (consultado ${data.debug.dateRange?.s} → ${data.debug.dateRange?.e}, account_tag ${data.debug.accountTagSet ? 'ok' : 'EM FALTA'}, site_tag ${data.debug.siteTagSet ? 'ok' : 'EM FALTA'})` : '';
         document.querySelector('#view-site').insertAdjacentHTML(
           'afterbegin',
-          '<div class="state small">Ainda não há dados suficientes (pode demorar algumas horas a aparecer tráfego novo).</div>'
+          `<div class="state small">Ainda não há dados suficientes (pode demorar algumas horas a aparecer tráfego novo).${dbg}</div>`
         );
         return;
       }
@@ -2327,13 +2434,18 @@
         const porPDV = groupSum(rowsPDV, r => pdvLabel(r.MATRICULA_MAQUINA), r => Number(r.value) || 0);
         lastSummary.porPontoVenda = Object.fromEntries(porPDV);
 
-        const rowsPagamento = lastVendasRows.filter(r => r.id !== undefined && r.id !== null && r.id !== '');
+        const rowsPagamento = lastVendasRows.filter(r => r.id !== undefined && r.id !== null && r.id !== '' && String(r.id) !== '4');
         const porTipo = groupSum(rowsPagamento, r => String(r.id), r => Number(r.value) || 0);
         lastSummary.porTipoPagamento = Object.fromEntries(porTipo);
 
         const rowsProduto = lastVendasRows.filter(r => r.NOME_PRODUTO);
-        const porProduto = groupSum(rowsProduto, r => canonicalProduto(r.NOME_PRODUTO), r => Number(r.count) || 1);
-        lastSummary.porProduto = Object.fromEntries(porProduto);
+        const porProdutoQtd = groupSum(rowsProduto, r => canonicalProduto(r.NOME_PRODUTO), r => Number(r.count) || 1);
+        const porProdutoValor = groupSum(rowsProduto, r => canonicalProduto(r.NOME_PRODUTO), r => Number(r.value) || 0);
+        const nomesProduto = new Set([...porProdutoQtd.keys(), ...porProdutoValor.keys()]);
+        lastSummary.porProduto = {};
+        for (const nome of nomesProduto) {
+          lastSummary.porProduto[nome] = { qtd: porProdutoQtd.get(nome) || 0, valor: porProdutoValor.get(nome) || 0 };
+        }
 
         HISTORICO[lastSummary.date] = { ...HISTORICO[lastSummary.date], ...lastSummary };
       }
