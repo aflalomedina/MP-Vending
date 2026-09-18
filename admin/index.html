@@ -523,15 +523,22 @@
     <div class="panel full">
       <h2>Vendas por dia do mês</h2>
       <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-        <div>
-          <label for="monthFilter" style="font-size:13px;color:var(--muted);margin-right:8px;">Mês:</label>
-          <select id="monthFilter" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;"></select>
-          <span id="diasUteisInfo" style="font-size:12px;color:var(--muted);margin-left:10px;"></span>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div>
+            <label for="monthFilter" style="font-size:13px;color:var(--muted);margin-right:8px;">Mês:</label>
+            <select id="monthFilter" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;"></select>
+          </div>
+          <div>
+            <label for="vendasMesMaquina" style="font-size:13px;color:var(--muted);margin-right:8px;">Máquina:</label>
+            <select id="vendasMesMaquina" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;">
+              <option value="">Todas (Bebidas Quentes + Snacks)</option>
+            </select>
+          </div>
+          <span id="diasUteisInfo" style="font-size:12px;color:var(--muted);"></span>
         </div>
-        <div style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;">
-          <span style="display:inline-block;width:10px;height:10px;background:#FF9F1C;border-radius:2px;"></span> Dias úteis
-          <span style="display:inline-block;width:10px;height:10px;background:#D1CCC0;border-radius:2px;margin-left:8px;"></span> Fim de semana
-          <span style="display:inline-block;width:10px;height:10px;background:#E03131;border-radius:2px;margin-left:8px;"></span> Feriado
+        <div id="vendasMesLegenda" style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;">
+          <span style="display:inline-block;width:10px;height:10px;background:#C7710A;border-radius:2px;"></span> Bebidas Quentes
+          <span style="display:inline-block;width:10px;height:10px;background:#FF9F1C;border-radius:2px;margin-left:8px;"></span> Snacks
         </div>
       </div>
       <canvas id="chartVendasMes" height="200"></canvas>
@@ -1278,6 +1285,13 @@
       select.value = meses[meses.length - 1];
       select.onchange = drawVendasMes;
     }
+    const selectMaquina = document.getElementById('vendasMesMaquina');
+    if (selectMaquina.options.length <= 1) {
+      const maquinas = Object.keys(MACHINES).filter(m => !MAQUINAS_EXCLUIDAS.has(m)).sort();
+      selectMaquina.innerHTML = '<option value="">Todas (Bebidas Quentes + Snacks)</option>' +
+        maquinas.map(m => `<option value="${m}">${machineLabel(m)}</option>`).join('');
+      selectMaquina.onchange = drawVendasMes;
+    }
     drawVendasMes();
   }
 
@@ -1299,18 +1313,40 @@
 
   function drawVendasMes() {
     const mes = document.getElementById('monthFilter').value;
+    const maquina = document.getElementById('vendasMesMaquina').value;
     const dias = Object.keys(HISTORICO).filter(d => d.startsWith(mes)).sort();
     const labels = dias.map(d => [String(parseInt(d.slice(8, 10), 10)), diaSemanaAbrev(d)]);
-    const valores = dias.map(d => HISTORICO[d].receitaTotal || 0);
-    const cores = dias.map(d => isFeriado(d) ? '#E03131' : isFimDeSemana(d) ? '#D1CCC0' : '#FF9F1C');
 
     document.getElementById('diasUteisInfo').textContent =
       `${diasUteisNoMes(mes)} dias úteis neste mês`;
 
     if (chartVendasMesInstance) chartVendasMesInstance.destroy();
+
+    const legenda = document.getElementById('vendasMesLegenda');
+    let datasets;
+
+    if (maquina) {
+      // uma só máquina selecionada: uma série, sem faz sentido empilhar categorias
+      legenda.style.visibility = 'hidden';
+      const valores = dias.map(d => (HISTORICO[d].porMaquina && HISTORICO[d].porMaquina[maquina]) || 0);
+      const cor = isSnackMachine(maquina) ? '#FF9F1C' : '#C7710A';
+      datasets = [{ label: machineLabel(maquina), data: valores, backgroundColor: cor }];
+    } else {
+      legenda.style.visibility = 'visible';
+      const quentes = dias.map(d => (HISTORICO[d].porCategoria && HISTORICO[d].porCategoria['Bebidas Quentes']) || 0);
+      const snacks = dias.map(d => (HISTORICO[d].porCategoria && HISTORICO[d].porCategoria['Snacks']) || 0);
+      // dias sem detalhe por categoria (histórico antigo): mostra o total numa cor neutra
+      const semDetalhe = dias.map((d, i) => !HISTORICO[d].porCategoria ? (HISTORICO[d].receitaTotal || 0) : 0);
+      datasets = [
+        { label: 'Bebidas Quentes', data: quentes, backgroundColor: '#C7710A', stack: 'vendas' },
+        { label: 'Snacks', data: snacks, backgroundColor: '#FF9F1C', stack: 'vendas' },
+        { label: 'Sem detalhe por categoria', data: semDetalhe, backgroundColor: '#D1CCC0', stack: 'vendas' },
+      ];
+    }
+
     chartVendasMesInstance = new Chart(document.getElementById('chartVendasMes'), {
       type: 'bar',
-      data: { labels, datasets: [{ label: 'Receita (€)', data: valores, backgroundColor: cores }] },
+      data: { labels, datasets },
       options: {
         plugins: {
           legend: { display: false },
@@ -1324,7 +1360,10 @@
             },
           },
         },
-        scales: { y: { beginAtZero: true } },
+        scales: {
+          x: { stacked: !maquina },
+          y: { stacked: !maquina, beginAtZero: true },
+        },
       },
     });
   }
@@ -2433,6 +2472,12 @@
         const rowsPDV = lastVendasRows.filter(r => r.MATRICULA_MAQUINA && !MAQUINAS_EXCLUIDAS.has(r.MATRICULA_MAQUINA));
         const porPDV = groupSum(rowsPDV, r => pdvLabel(r.MATRICULA_MAQUINA), r => Number(r.value) || 0);
         lastSummary.porPontoVenda = Object.fromEntries(porPDV);
+
+        const porMaquina = groupSum(rowsPDV, r => r.MATRICULA_MAQUINA, r => Number(r.value) || 0);
+        lastSummary.porMaquina = Object.fromEntries(porMaquina);
+
+        const porCategoria = groupSum(rowsPDV, r => tipoMaquinaLabel(r.MATRICULA_MAQUINA), r => Number(r.value) || 0);
+        lastSummary.porCategoria = Object.fromEntries(porCategoria);
 
         const rowsPagamento = lastVendasRows.filter(r => r.id !== undefined && r.id !== null && r.id !== '' && String(r.id) !== '4');
         const porTipo = groupSum(rowsPagamento, r => String(r.id), r => Number(r.value) || 0);
