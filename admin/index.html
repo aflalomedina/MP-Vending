@@ -363,6 +363,7 @@
   <button class="tab-btn" data-view="stocks">Stocks</button>
   <button class="tab-btn" data-view="financeiro">Financeiro</button>
   <button class="tab-btn" data-view="site">Site</button>
+  <button class="tab-btn" data-view="resultados">Resultados</button>
 </div>
 
 <main>
@@ -582,6 +583,68 @@
     <div class="panel full" style="max-width:340px;">
       <h2>Dispositivos</h2>
       <canvas id="chartSiteDevices" height="140"></canvas>
+    </div>
+  </div>
+
+  <div id="view-resultados" class="view">
+    <div class="panel full">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
+        <h2 style="margin:0;">Resultado líquido mensal</h2>
+        <div>
+          <label for="resultadosMes" style="font-size:13px;color:var(--muted);margin-right:8px;">Mês:</label>
+          <select id="resultadosMes" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;"></select>
+        </div>
+      </div>
+      <div class="kpis" style="margin-bottom:0;">
+        <div class="kpi"><div class="value" id="resReceita">—</div><div class="label">Receita</div></div>
+        <div class="kpi"><div class="value" id="resDespesas">—</div><div class="label">Despesas totais</div></div>
+        <div class="kpi"><div class="value" id="resLiquido">—</div><div class="label">Resultado líquido</div></div>
+        <div class="kpi"><div class="value" id="resMargem">—</div><div class="label">Margem líquida</div></div>
+      </div>
+    </div>
+
+    <div class="panel full">
+      <h2>Despesas por categoria</h2>
+      <canvas id="chartDespesasCategoria" height="180"></canvas>
+    </div>
+
+    <div class="panel full">
+      <h2>Adicionar despesa</h2>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Categoria</label>
+          <select id="despesaCategoria" style="border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-family:inherit;font-size:13px;">
+            <option value="Pessoal">Pessoal</option>
+            <option value="Sistemas">Sistemas</option>
+            <option value="Mercadoria">Mercadoria</option>
+            <option value="Armazenamento">Armazenamento</option>
+            <option value="Combustível">Combustível</option>
+            <option value="Taxas Unicre">Taxas Unicre</option>
+            <option value="Manutenção">Manutenção</option>
+            <option value="Amortização máquinas">Amortização máquinas</option>
+            <option value="Outros">Outros</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Descrição</label>
+          <input type="text" id="despesaDescricao" placeholder="ex: fatura fornecedor X" style="border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-family:inherit;font-size:13px;width:220px;" />
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Valor (€)</label>
+          <input type="number" id="despesaValor" step="0.01" min="0" placeholder="0,00" style="border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-family:inherit;font-size:13px;width:110px;" />
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Data</label>
+          <input type="date" id="despesaData" style="border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-family:inherit;font-size:13px;" />
+        </div>
+        <button type="button" id="despesaAdicionarBtn" style="background:var(--ink);color:#fff;border:none;border-radius:4px;padding:8px 16px;font-size:13px;cursor:pointer;">Adicionar</button>
+      </div>
+      <div id="despesaFormMsg" style="font-size:12px;margin-top:8px;"></div>
+    </div>
+
+    <div class="panel full">
+      <h2>Despesas do mês</h2>
+      <div class="table-wrap" id="despesasTableWrap"><div class="state small">a carregar…</div></div>
     </div>
   </div>
 
@@ -1830,6 +1893,155 @@
     renderFinanceiro();
   }
 
+  // ===== Resultados (receita - despesas) =====
+  let todasDespesas = [];
+  let chartDespesasCategoriaInstance = null;
+
+  function mesesComDados() {
+    const meses = new Set(monthsAvailable());
+    for (const d of todasDespesas) meses.add(String(d.data).slice(0, 7));
+    return Array.from(meses).sort();
+  }
+
+  async function carregarDespesas() {
+    const res = await fetch('/api/despesas');
+    const data = res.ok ? await res.json() : { despesas: [] };
+    todasDespesas = data.despesas || [];
+  }
+
+  function renderResultadosMes() {
+    const mes = document.getElementById('resultadosMes').value;
+    if (!mes) return;
+
+    let receitaMes = 0;
+    for (const [data, resumo] of Object.entries(HISTORICO)) {
+      if (data.startsWith(mes)) receitaMes += resumo.receitaTotal || 0;
+    }
+
+    const despesasMes = todasDespesas.filter(d => String(d.data).slice(0, 7) === mes);
+    const totalDespesas = despesasMes.reduce((s, d) => s + Number(d.valor || 0), 0);
+    const liquido = receitaMes - totalDespesas;
+    const margem = receitaMes ? (liquido / receitaMes) * 100 : 0;
+
+    document.getElementById('resReceita').textContent = fmtEUR(receitaMes);
+    document.getElementById('resDespesas').textContent = fmtEUR(totalDespesas);
+    document.getElementById('resLiquido').textContent = fmtEUR(liquido);
+    document.getElementById('resLiquido').style.color = liquido >= 0 ? 'var(--positive)' : 'var(--negative)';
+    document.getElementById('resMargem').textContent = margem.toFixed(1) + '%';
+
+    // gráfico por categoria
+    const porCategoria = new Map();
+    for (const d of despesasMes) {
+      porCategoria.set(d.categoria, (porCategoria.get(d.categoria) || 0) + Number(d.valor || 0));
+    }
+    const entradas = Array.from(porCategoria.entries()).sort((a, b) => b[1] - a[1]);
+    if (chartDespesasCategoriaInstance) chartDespesasCategoriaInstance.destroy();
+    if (entradas.length) {
+      chartDespesasCategoriaInstance = new Chart(document.getElementById('chartDespesasCategoria'), {
+        type: 'bar',
+        data: {
+          labels: entradas.map(e => e[0]),
+          datasets: [{ label: 'Despesa (€)', data: entradas.map(e => e[1]), backgroundColor: '#E03131' }],
+        },
+        options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+      });
+    }
+
+    // tabela de despesas do mês
+    const wrap = document.getElementById('despesasTableWrap');
+    if (!despesasMes.length) {
+      wrap.innerHTML = '<div class="state small">Sem despesas registadas para este mês.</div>';
+      return;
+    }
+    const linhas = [...despesasMes].sort((a, b) => (b.data || '').localeCompare(a.data || '')).map(d => `
+      <tr>
+        <td>${d.data}</td>
+        <td>${d.categoria}</td>
+        <td>${d.descricao || '—'}</td>
+        <td class="num">${fmtEUR(d.valor)}</td>
+        <td><button type="button" class="despesa-apagar" data-id="${d.id}" style="border:none;background:none;color:var(--negative);cursor:pointer;font-size:12px;">Apagar</button></td>
+      </tr>
+    `).join('');
+    wrap.innerHTML = `
+      <table>
+        <thead><tr><th>Data</th><th>Categoria</th><th>Descrição</th><th class="num">Valor</th><th></th></tr></thead>
+        <tbody>${linhas}</tbody>
+      </table>
+    `;
+    wrap.querySelectorAll('.despesa-apagar').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.textContent = '...';
+        try {
+          await fetch(`/api/despesas?id=${btn.dataset.id}`, { method: 'DELETE' });
+          await carregarDespesas();
+          renderResultadosMes();
+        } catch {
+          btn.textContent = 'Erro';
+        }
+      });
+    });
+  }
+
+  function popularSelectMeses() {
+    const select = document.getElementById('resultadosMes');
+    const meses = mesesComDados();
+    if (!meses.length) return;
+    const valorAnterior = select.value;
+    select.innerHTML = meses.map(m => `<option value="${m}">${monthName(m)}</option>`).join('');
+    select.value = meses.includes(valorAnterior) ? valorAnterior : meses[meses.length - 1];
+    select.onchange = renderResultadosMes;
+  }
+
+  let resultadosLoaded = false;
+  async function loadResultadosView() {
+    if (resultadosLoaded) return;
+    resultadosLoaded = true;
+    await carregarDespesas();
+    popularSelectMeses();
+    renderResultadosMes();
+
+    const btn = document.getElementById('despesaAdicionarBtn');
+    btn.addEventListener('click', async () => {
+      const categoria = document.getElementById('despesaCategoria').value;
+      const descricao = document.getElementById('despesaDescricao').value;
+      const valorStr = document.getElementById('despesaValor').value;
+      const data = document.getElementById('despesaData').value;
+      const msg = document.getElementById('despesaFormMsg');
+
+      const valor = parseFloat(valorStr);
+      if (!data || isNaN(valor) || valor <= 0) {
+        msg.style.color = 'var(--negative)';
+        msg.textContent = 'Preenche a data e um valor válido.';
+        return;
+      }
+
+      btn.disabled = true;
+      msg.style.color = 'var(--muted)';
+      msg.textContent = 'a guardar…';
+      try {
+        const res = await fetch('/api/despesas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ categoria, descricao, valor, data }),
+        });
+        if (!res.ok) throw new Error('falha ao guardar');
+        document.getElementById('despesaDescricao').value = '';
+        document.getElementById('despesaValor').value = '';
+        msg.style.color = 'var(--positive)';
+        msg.textContent = 'Despesa adicionada.';
+        await carregarDespesas();
+        popularSelectMeses();
+        renderResultadosMes();
+      } catch (err) {
+        msg.style.color = 'var(--negative)';
+        msg.textContent = 'Erro ao guardar: ' + err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+
   let siteLoaded = false;
   function loadSiteView() {
     if (siteLoaded) return;
@@ -1928,6 +2140,7 @@
       if (btn.dataset.view === 'stocks') loadStocksView();
       if (btn.dataset.view === 'financeiro') loadFinanceiroView();
       if (btn.dataset.view === 'site') loadSiteView();
+      if (btn.dataset.view === 'resultados') loadResultadosView();
     });
   });
 
