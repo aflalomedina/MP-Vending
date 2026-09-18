@@ -1862,6 +1862,35 @@
 
   let mensalCompletoData = null;
 
+  // O ficheiro estático cobre até este dia (inclusive); dias a seguir vêm da captura automática na KV
+  const CORTE_DADOS_ESTATICOS = '2026-09-15';
+
+  function totalProdutoPeriodo(nome, prefixoData) {
+    let total = 0;
+    const meses = (mensalCompletoData && mensalCompletoData[nome]) || {};
+    for (const [mes, qtd] of Object.entries(meses)) {
+      if (mes.startsWith(prefixoData)) total += qtd;
+    }
+    for (const [data, resumo] of Object.entries(HISTORICO)) {
+      if (data <= CORTE_DADOS_ESTATICOS) continue; // já contabilizado no ficheiro estático acima
+      if (!data.startsWith(prefixoData)) continue;
+      if (!resumo.porProduto) continue;
+      total += resumo.porProduto[nome] || 0;
+    }
+    return total;
+  }
+
+  function todosOsProdutosConhecidos() {
+    const nomes = new Set(Object.keys(mensalCompletoData || {}));
+    for (const resumo of Object.values(HISTORICO)) {
+      if (resumo.porProduto) Object.keys(resumo.porProduto).forEach(n => nomes.add(n));
+    }
+    for (const r of lastVendasRows) {
+      if (r.NOME_PRODUTO) nomes.add(canonicalProduto(r.NOME_PRODUTO));
+    }
+    return Array.from(nomes);
+  }
+
   function paintVendasPorProduto(categoriaFiltro, termoPesquisa) {
     const wrap = document.getElementById('vendasProdutoWrap');
     if (!mensalCompletoData) return;
@@ -1877,24 +1906,15 @@
       r => Number(r.count) || 1
     );
 
-    let produtos = Object.keys(mensalCompletoData);
-    // inclui também produtos que só vendem hoje e ainda não estão no histórico
-    for (const nome of hojePorProduto.keys()) {
-      if (!produtos.includes(nome)) produtos.push(nome);
-    }
-
-    let linhas = produtos
+    let linhas = todosOsProdutosConhecidos()
       .filter(nome => !categoriaFiltro || subfamiliaLabel(nome) === categoriaFiltro)
       .filter(nome => !termo || nome.toLowerCase().includes(termo))
-      .map(nome => {
-        const meses = mensalCompletoData[nome] || {};
-        const hoje = hojePorProduto.get(nome) || 0;
-        const esteMs = meses[mesAtual] || 0;
-        const esteAno = Object.entries(meses)
-          .filter(([mes]) => mes.startsWith(anoAtual))
-          .reduce((s, [, qtd]) => s + qtd, 0);
-        return { nome, hoje, esteMs, esteAno };
-      })
+      .map(nome => ({
+        nome,
+        hoje: hojePorProduto.get(nome) || 0,
+        esteMs: totalProdutoPeriodo(nome, mesAtual),
+        esteAno: totalProdutoPeriodo(nome, anoAtual),
+      }))
       .filter(l => l.hoje > 0 || l.esteMs > 0 || l.esteAno > 0)
       .sort((a, b) => b.esteAno - a.esteAno);
 
@@ -1928,7 +1948,7 @@
       const res = await fetch('/admin/produtos_mensal_completo.json');
       mensalCompletoData = res.ok ? await res.json() : {};
 
-      const categorias = Array.from(new Set(Object.keys(mensalCompletoData).map(subfamiliaLabel))).sort();
+      const categorias = Array.from(new Set(todosOsProdutosConhecidos().map(subfamiliaLabel))).sort();
       const selectCat = document.getElementById('vendasProdutoCategoria');
       selectCat.innerHTML = '<option value="">Todas</option>' +
         categorias.map(c => `<option value="${c}">${c}</option>`).join('');
@@ -2310,6 +2330,10 @@
         const rowsPagamento = lastVendasRows.filter(r => r.id !== undefined && r.id !== null && r.id !== '');
         const porTipo = groupSum(rowsPagamento, r => String(r.id), r => Number(r.value) || 0);
         lastSummary.porTipoPagamento = Object.fromEntries(porTipo);
+
+        const rowsProduto = lastVendasRows.filter(r => r.NOME_PRODUTO);
+        const porProduto = groupSum(rowsProduto, r => canonicalProduto(r.NOME_PRODUTO), r => Number(r.count) || 1);
+        lastSummary.porProduto = Object.fromEntries(porProduto);
 
         HISTORICO[lastSummary.date] = { ...HISTORICO[lastSummary.date], ...lastSummary };
       }
