@@ -375,6 +375,7 @@
       <div class="kpi"><div class="value" id="kpiTransacoes">—</div><div class="label">Transações</div></div>
       <div class="kpi"><div class="value" id="kpiTicket">—</div><div class="label">Ticket médio</div></div>
       <div class="kpi"><div class="value" id="kpiProdutos">—</div><div class="label">Produtos distintos vendidos</div></div>
+      <div class="kpi"><div class="value" id="kpiTotalMes">—</div><div class="label">Total vendido este mês</div></div>
     </div>
 
     <div class="grid-2">
@@ -2466,7 +2467,11 @@
       ]);
       // funde o histórico estático (25 fev → export) com os snapshots capturados dia a dia na KV
       // (a KV tem prioridade em datas repetidas, por serem mais recentes)
-      HISTORICO = { ...(historicoRaw || {}), ...(liveSnapshots || {}) };
+      HISTORICO = {};
+      const todasAsDatas = new Set([...Object.keys(historicoRaw || {}), ...Object.keys(liveSnapshots || {})]);
+      for (const d of todasAsDatas) {
+        HISTORICO[d] = { ...((historicoRaw && historicoRaw[d]) || {}), ...((liveSnapshots && liveSnapshots[d]) || {}) };
+      }
       renderVendas(toObjects(vendasRaw));
       if (lastSummary) {
         const rowsPDV = lastVendasRows.filter(r => r.MATRICULA_MAQUINA && !MAQUINAS_EXCLUIDAS.has(r.MATRICULA_MAQUINA));
@@ -2497,6 +2502,13 @@
       renderStock(toObjects(stockRaw));
       renderPagamentos('chartPagamentosDiarias', 'pagamentosTableWrapDiarias', 'pagamentosDataLabelDiarias');
       drawPDVTipoChart();
+
+      const mesAtualTotal = todayStr().slice(0, 7);
+      const totalMes = Object.entries(HISTORICO)
+        .filter(([d]) => d.startsWith(mesAtualTotal))
+        .reduce((s, [, resumo]) => s + (resumo.receitaTotal || 0), 0);
+      document.getElementById('kpiTotalMes').textContent = fmtEUR(totalMes);
+
       document.getElementById('updatedAt').textContent =
         'atualizado às ' + new Date().toLocaleTimeString('pt-PT');
       saveSnapshot();
