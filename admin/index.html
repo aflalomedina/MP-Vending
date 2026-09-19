@@ -590,6 +590,20 @@
   </div>
 
   <div id="view-site" class="view">
+    <div class="panel full">
+      <h2>Estatísticas próprias (visitas + pedidos de proposta)</h2>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
+        Registado diretamente pelo nosso código, sem depender da API (Beta) da Cloudflare.
+      </div>
+      <div class="kpis" style="margin-bottom:14px;">
+        <div class="kpi"><div class="value" id="ownPageviews">—</div><div class="label">Visitas (últimos 30 dias)</div></div>
+        <div class="kpi"><div class="value" id="ownLeads">—</div><div class="label">Pedidos de proposta (leads)</div></div>
+        <div class="kpi"><div class="value" id="ownConversao">—</div><div class="label">Taxa de conversão</div></div>
+      </div>
+      <canvas id="chartOwnTracking" height="180"></canvas>
+    </div>
+
+    <h2 style="margin:20px 0 4px;">Cloudflare Web Analytics (complementar)</h2>
     <div class="kpis">
       <div class="kpi"><div class="value" id="siteVisitas">—</div><div class="label">Visitas (últimos 30 dias)</div></div>
       <div class="kpi"><div class="value" id="sitePageviews">—</div><div class="label">Pageviews</div></div>
@@ -2358,7 +2372,55 @@
   function loadSiteView() {
     if (siteLoaded) return;
     siteLoaded = true;
+    renderOwnTracking();
     renderSiteAnalytics();
+  }
+
+  async function renderOwnTracking() {
+    try {
+      const res = await fetch('/api/track-stats');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      const eventos = data.eventos || [];
+
+      const trintaDiasAtras = new Date();
+      trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
+      const corte = trintaDiasAtras.toISOString().slice(0, 10);
+
+      const recentes = eventos.filter(e => e.ts && e.ts.slice(0, 10) >= corte);
+      const pageviews = recentes.filter(e => e.event === 'pageview');
+      const leads = recentes.filter(e => e.event === 'lead');
+      const conversao = pageviews.length ? (leads.length / pageviews.length) * 100 : 0;
+
+      document.getElementById('ownPageviews').textContent = fmtInt(pageviews.length);
+      document.getElementById('ownLeads').textContent = fmtInt(leads.length);
+      document.getElementById('ownConversao').textContent = conversao.toFixed(1) + '%';
+
+      const porDiaViews = groupSum(pageviews, e => e.ts.slice(0, 10), () => 1);
+      const porDiaLeads = groupSum(leads, e => e.ts.slice(0, 10), () => 1);
+      const dias = Array.from(new Set([...porDiaViews.keys(), ...porDiaLeads.keys()])).sort();
+
+      new Chart(document.getElementById('chartOwnTracking'), {
+        data: {
+          labels: dias,
+          datasets: [
+            { type: 'bar', label: 'Visitas', data: dias.map(d => porDiaViews.get(d) || 0), backgroundColor: '#FF9F1C', yAxisID: 'y' },
+            { type: 'line', label: 'Leads', data: dias.map(d => porDiaLeads.get(d) || 0), borderColor: '#2F9E44', backgroundColor: '#2F9E44', yAxisID: 'y1', tension: 0.2, pointRadius: 3 },
+          ],
+        },
+        options: {
+          plugins: { legend: { display: true, position: 'top' } },
+          scales: {
+            y: { position: 'left', beginAtZero: true, title: { display: true, text: 'Visitas' } },
+            y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, title: { display: true, text: 'Leads' }, ticks: { stepSize: 1 } },
+          },
+        },
+      });
+    } catch (err) {
+      document.getElementById('chartOwnTracking').insertAdjacentHTML(
+        'afterend', `<div class="state small error">Erro: ${err.message}</div>`
+      );
+    }
   }
 
   async function renderSiteAnalytics() {
