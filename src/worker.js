@@ -238,6 +238,61 @@ async function handleSiteAnalytics(env) {
 }
 
 // ===== Despesas mensais (Cloudflare KV) =====
+// ===== Tracking próprio (visitas + leads do formulário) via KV =====
+async function handleTrack(request, env) {
+  let payload;
+  try {
+    payload = await request.json();
+  } catch {
+    return new Response(JSON.stringify({ error: "JSON inválido" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  const evento = payload && payload.event;
+  if (evento !== "pageview" && evento !== "lead") {
+    return new Response(JSON.stringify({ error: "event inválido" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  const data = new Date().toISOString().slice(0, 10);
+  const id = crypto.randomUUID();
+  const registo = {
+    event: evento,
+    page: (payload.page || "").slice(0, 200),
+    referrer: (payload.referrer || "").slice(0, 200),
+    ts: new Date().toISOString(),
+  };
+  await env.HISTORY_KV.put(`track:${evento}:${data}:${id}`, JSON.stringify(registo));
+  return new Response(JSON.stringify({ ok: true }), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+async function handleTrackStats(env) {
+  const eventos = [];
+  let cursor;
+  do {
+    const listed = await env.HISTORY_KV.list({ prefix: "track:", cursor });
+    for (const key of listed.keys) {
+      const value = await env.HISTORY_KV.get(key.name);
+      if (value) {
+        try {
+          eventos.push(JSON.parse(value));
+        } catch {
+          // ignora entradas corrompidas
+        }
+      }
+    }
+    cursor = listed.list_complete ? undefined : listed.cursor;
+  } while (cursor);
+  return eventos;
+}
+
 async function handleDespesas(request, env) {
   const url = new URL(request.url);
 
@@ -311,10 +366,45 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    // /api/track fica público (chamado por visitantes anónimos do site) — sem password
+    if (url.pathname === "/api/track") {
+      if (request.method === "OPTIONS") {
+        return new Response(null, {
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+          },
+        });
+      }
+      try {
+        return await handleTrack(request, env);
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        });
+      }
+    }
+
     // Protege /admin e /api — ninguém vê dados sem password
     if (url.pathname.startsWith("/admin") || url.pathname.startsWith("/api/")) {
       if (!checkAuth(request, env)) {
         return unauthorizedResponse();
+      }
+    }
+
+    if (url.pathname === "/api/track-stats") {
+      try {
+        const eventos = await handleTrackStats(env);
+        return new Response(JSON.stringify({ eventos }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
       }
     }
 
