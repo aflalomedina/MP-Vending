@@ -430,9 +430,15 @@
             Gera um PDF com os produtos a repor por localização, com a quantidade a levar já limitada pelo stock do Armazém 7.
           </div>
         </div>
-        <button type="button" id="gerarPdfBtn" style="background:var(--ink);color:#fff;border:none;border-radius:4px;padding:10px 18px;font-size:13px;cursor:pointer;white-space:nowrap;">
-          Gerar PDF de Reposição
-        </button>
+        <div style="display:flex;align-items:end;gap:10px;flex-wrap:wrap;">
+          <div>
+            <label for="gerarPdfNrMaquinas" style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Nº de locais a visitar</label>
+            <input type="number" id="gerarPdfNrMaquinas" min="1" placeholder="Todos" style="border:1px solid var(--line);border-radius:4px;padding:8px;font-family:inherit;font-size:13px;width:90px;" />
+          </div>
+          <button type="button" id="gerarPdfBtn" style="background:var(--ink);color:#fff;border:none;border-radius:4px;padding:10px 18px;font-size:13px;cursor:pointer;white-space:nowrap;">
+            Gerar PDF de Reposição
+          </button>
+        </div>
       </div>
       <div id="gerarPdfMsg" style="font-size:12px;margin-top:8px;"></div>
     </div>
@@ -2015,7 +2021,7 @@
       let itens = Array.from(porMaquinaProduto.values())
         .filter(it => it.capacidade > 0 && it.stock < it.capacidade)
         .map(it => ({ ...it, pct: it.capacidade ? Math.round((it.stock / it.capacidade) * 100) : 0 }))
-        .filter(it => subfamiliaLabel(it.produto) === 'Bebidas' || it.pct < 70)
+        .filter(it => !['Snacks', 'Chocolates'].includes(subfamiliaLabel(it.produto)) || it.pct < 70)
         .map(it => ({ ...it, aLevar: it.capacidade - it.stock }));
 
       // limita ao stock do Armazém 7, dando prioridade às máquinas com % mais baixa
@@ -2050,9 +2056,16 @@
         if (!porLocal.has(local)) porLocal.set(local, []);
         porLocal.get(local).push(it);
       }
-      const locaisOrdenados = Array.from(porLocal.entries())
+      let locaisOrdenados = Array.from(porLocal.entries())
         .map(([local, lista]) => ({ local, lista, mediaPct: lista.reduce((s, x) => s + x.pct, 0) / lista.length }))
         .sort((a, b) => a.mediaPct - b.mediaPct);
+
+      const nrMaquinasInput = document.getElementById('gerarPdfNrMaquinas').value;
+      const nrMaquinas = parseInt(nrMaquinasInput, 10);
+      const totalLocaisComNecessidade = locaisOrdenados.length;
+      if (nrMaquinas > 0) {
+        locaisOrdenados = locaisOrdenados.slice(0, nrMaquinas);
+      }
 
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
@@ -2064,7 +2077,11 @@
       doc.text('Lista de Reposição', 14, 16);
       doc.setFontSize(10);
       doc.setTextColor(120);
-      doc.text(`Para visita de amanhã (${dataStr})`, 14, 22);
+      let subtitulo = `Para visita de amanhã (${dataStr})`;
+      if (nrMaquinas > 0 && nrMaquinas < totalLocaisComNecessidade) {
+        subtitulo += ` — top ${nrMaquinas} de ${totalLocaisComNecessidade} locais com necessidade, por urgência`;
+      }
+      doc.text(subtitulo, 14, 22);
       doc.setTextColor(0);
 
       let y = 30;
@@ -2094,6 +2111,8 @@
         y = doc.lastAutoTable.finalY + 8;
       }
 
+      const itensIncluidos = locaisOrdenados.flatMap(l => l.lista);
+
       if (y > 235) { doc.addPage(); y = 20; }
       doc.setFontSize(12);
       doc.setFont(undefined, 'bold');
@@ -2101,7 +2120,7 @@
       doc.setFont(undefined, 'normal');
       y += 4;
       const totalPorProduto = new Map();
-      for (const it of itens) {
+      for (const it of itensIncluidos) {
         totalPorProduto.set(it.produto, (totalPorProduto.get(it.produto) || 0) + it.aLevar);
       }
       const resumoOrdenado = Array.from(totalPorProduto.entries()).sort((a, b) => b[1] - a[1]);
