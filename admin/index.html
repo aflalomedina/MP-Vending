@@ -724,14 +724,14 @@
 
   // Matrícula da máquina -> Ponto de Venda (fonte: Lista de Máquinas)
   const MACHINES = {
-    "001": "Recepção (Crossfit Foz)", "002": "Central Park", "002-S": "Central Park",
-    "003": "Gondomar Premium", "003-S": "Gondomar Premium", "004": "Guifões",
-    "005": "Studio up Yoga", "006": "Bosque - Adopthouse", "006-S": "Bosque - Adopthouse",
-    "007": "House Factory", "007-S": "House Factory",
+    "001": "Recepção", "002": "Central Park", "002-S": "Central Park",
+    "003": "Gondomar Premium", "003-S": "Gondomar Premium", "004": "Guifões - Green Park",
+    "005": "Recepção", "006": "Bosque - Adopthouse", "006-S": "Bosque - Adopthouse",
+    "007": "House Factory (Refeitório)", "007-S": "House Factory (Refeitório)",
     "008": "Oasis - Edinorte", "008-S": "Oasis - Edinorte",
-    "009": "D'Casa Gondomar", "009-S": "D'Casa Gondomar", "010": "Bluesky Gondomar",
-    "011": "Jardins do Oriente - Garcia Garcia", "012": "Águas Santas (só café)", "013": "Jardins do Oriente - Garcia Garcia",
-    "014": "Bluesky Gondomar", "015": "Nogueira - Perafita", "016": "Nogueira - Perafita",
+    "009": "D'Casa Gondomar", "009-S": "D'Casa Gondomar", "010": "Blue Sky Gondomar",
+    "011": "Jardins do Oriente", "012": "Águas Santas (só café)", "013": "Jardins do Oriente",
+    "014": "Blue Sky Gondomar", "015": "Nogueira - Perafita", "016": "Nogueira - Perafita",
   };
 
   // Nome do ponto de venda, sem a matrícula (para agregar várias máquinas do mesmo local)
@@ -1979,6 +1979,15 @@
     document.getElementById('gerarPdfBtn').addEventListener('click', gerarPDFReposicao);
   }
 
+  // Score de urgência (receita perdida + em risco) por slot, usando velocidade real (15 dias) e preço médio
+  function scoreSlot(velocidadeDia, preco, stock, capacidade) {
+    if (!velocidadeDia || !preco) return 0;
+    if (stock <= 0) return velocidadeDia * preco; // esgotado: receita perdida agora
+    const diasAteEsgotar = velocidadeDia > 0 ? stock / velocidadeDia : Infinity;
+    if (diasAteEsgotar <= 2) return velocidadeDia * preco * 0.5; // em risco nas próximas 48h
+    return 0;
+  }
+
   async function gerarPDFReposicao() {
     const btn = document.getElementById('gerarPdfBtn');
     const msg = document.getElementById('gerarPdfMsg');
@@ -1987,23 +1996,26 @@
     msg.style.color = 'var(--muted)';
     msg.textContent = '';
     try {
-      const [layoutRaw, stockRaw] = await Promise.all([
+      const [layoutRaw, stockRaw, velocidadeRes, precoRes] = await Promise.all([
         fetchJSON('/api/layout-maquinas'),
         fetchJSON('/api/stock-armazens'),
+        fetch('/admin/velocidade_maquina_produto.json').then(r => r.ok ? r.json() : {}),
+        fetch('/admin/preco_medio_produto.json').then(r => r.ok ? r.json() : {}),
       ]);
       const layout = toObjects(layoutRaw);
       const stockRows = toObjects(stockRaw);
 
-      // stock disponível no Armazém 7, por nome de produto
+      // stock disponível por armazém, por nome de produto (7 = usado para repor; 3 = só para saber se existe noutro lado)
       const armazem7 = {};
+      const armazem3 = {};
       for (const r of stockRows) {
-        if (String(r.CODIGO_ARMAZEM) === '7') {
-          const nome = productLabel(r.CODIGO_PRODUTO);
-          armazem7[nome] = (armazem7[nome] || 0) + (Number(r.sum) || 0);
-        }
+        const nome = productLabel(r.CODIGO_PRODUTO);
+        const destino = String(r.CODIGO_ARMAZEM) === '7' ? armazem7 : String(r.CODIGO_ARMAZEM) === '3' ? armazem3 : null;
+        if (destino) destino[nome] = (destino[nome] || 0) + (Number(r.sum) || 0);
       }
 
-      // agrega por máquina+produto (soma todos os canais), calcula capacidade total e stock atual
+      // agrega por máquina+produto (soma todos os canais), capacidade total, stock atual (negativo tratado como 0)
+      // e guarda os canais individuais, para anotar no PDF quando um produto ocupa mais do que um
       const porMaquinaProduto = new Map();
       for (const r of layout) {
         if (!r.NOME_PRODUTO || !r.MATRICULA_MAQUINA) continue;
@@ -2011,30 +2023,48 @@
         if (subfamiliaLabel(r.NOME_PRODUTO) === 'Compostos') continue;
         const produto = canonicalProduto(r.NOME_PRODUTO);
         const key = r.MATRICULA_MAQUINA + '|' + produto;
-        const atual = porMaquinaProduto.get(key) || { maquina: r.MATRICULA_MAQUINA, produto, stock: 0, capacidade: 0 };
-        atual.stock += Number(r.sum) || 0;
+        const atual = porMaquinaProduto.get(key) || { maquina: r.MATRICULA_MAQUINA, produto, stock: 0, capacidade: 0, canais: [] };
+        const stockCanal = Math.max(0, Number(r.sum) || 0); // negativo (esgotado) tratado como 0
+        atual.stock += stockCanal;
         atual.capacidade += Number(r.CAPACIDADE_SELETOR) || 0;
+        if (r.CANAL_CONF) atual.canais.push(String(r.CANAL_CONF));
         porMaquinaProduto.set(key, atual);
       }
 
-      // filtra o que precisa de reposição: bebidas sempre que não estejam cheias; outros só abaixo de 70%
-      let itens = Array.from(porMaquinaProduto.values())
-        .filter(it => it.capacidade > 0 && it.stock < it.capacidade)
-        .map(it => ({ ...it, pct: it.capacidade ? Math.round((it.stock / it.capacidade) * 100) : 0 }))
-        .filter(it => !['Snacks', 'Chocolates'].includes(subfamiliaLabel(it.produto)) || it.pct < 70)
-        .map(it => ({ ...it, aLevar: it.capacidade - it.stock }));
+      // produtos sem qualquer stock nos dois armazéns: fora da lista principal, reportados à parte
+      const semStockTotal = new Set();
+      let itens = Array.from(porMaquinaProduto.values()).filter(it => {
+        if (it.capacidade <= 0 || it.stock >= it.capacidade) return false;
+        const temNoArmazem = (armazem7[it.produto] || 0) > 0 || (armazem3[it.produto] || 0) > 0;
+        if (!temNoArmazem) { semStockTotal.add(it.produto); return false; }
+        return true;
+      });
 
-      // limita ao stock do Armazém 7, dando prioridade às máquinas com % mais baixa
+      // regra dos 70%: só se aplica a produtos não-bebida (bebidas entram sempre que não estejam cheias)
+      itens = itens
+        .map(it => ({ ...it, pct: it.capacidade ? Math.round((it.stock / it.capacidade) * 100) : 0 }))
+        .filter(it => subfamiliaLabel(it.produto) === 'Bebidas' || it.pct < 70)
+        .map(it => {
+          const velocidadeDia = (velocidadeRes[it.maquina] && velocidadeRes[it.maquina][it.produto]) || 0;
+          const preco = precoRes[it.produto] || 0;
+          return {
+            ...it,
+            aLevar: it.capacidade - it.stock,
+            velocidadeDia,
+            score: scoreSlot(velocidadeDia, preco, it.stock, it.capacidade),
+            semVendaRecente: velocidadeDia === 0,
+          };
+        });
+
+      // limita ao stock do Armazém 7, dando prioridade aos slots com score mais alto (mais urgentes)
       const porProduto = new Map();
       for (const it of itens) {
         if (!porProduto.has(it.produto)) porProduto.set(it.produto, []);
         porProduto.get(it.produto).push(it);
       }
-      const semStock = new Set();
       for (const [produto, lista] of porProduto.entries()) {
-        lista.sort((a, b) => a.pct - b.pct);
-        let disponivel = armazem7[produto];
-        if (disponivel === undefined) { semStock.add(produto); disponivel = 0; }
+        lista.sort((a, b) => b.score - a.score);
+        let disponivel = armazem7[produto] || 0;
         for (const it of lista) {
           const dar = Math.max(0, Math.min(it.aLevar, disponivel));
           disponivel -= dar;
@@ -2049,22 +2079,29 @@
         return;
       }
 
-      // agrupa por localização, ordenado pela % média mais baixa (mais urgente primeiro)
+      // agrupa por LOCAL (ponto de venda, juntando os pares bebida+snack da mesma localização)
       const porLocal = new Map();
       for (const it of itens) {
-        const local = machineLabel(it.maquina);
+        const local = pdvLabel(it.maquina);
         if (!porLocal.has(local)) porLocal.set(local, []);
         porLocal.get(local).push(it);
       }
       let locaisOrdenados = Array.from(porLocal.entries())
-        .map(([local, lista]) => ({ local, lista, mediaPct: lista.reduce((s, x) => s + x.pct, 0) / lista.length }))
-        .sort((a, b) => a.mediaPct - b.mediaPct);
+        .map(([local, lista]) => ({
+          local,
+          lista,
+          score: lista.reduce((s, x) => s + x.score, 0),
+          mediaPct: lista.reduce((s, x) => s + x.pct, 0) / lista.length,
+        }))
+        .sort((a, b) => b.score - a.score); // mais urgente (maior receita perdida/em risco) primeiro
 
+      const totalLocaisComNecessidade = locaisOrdenados.length;
       const nrMaquinasInput = document.getElementById('gerarPdfNrMaquinas').value;
       const nrMaquinas = parseInt(nrMaquinasInput, 10);
-      const totalLocaisComNecessidade = locaisOrdenados.length;
+      let usarNiveis = true;
       if (nrMaquinas > 0) {
         locaisOrdenados = locaisOrdenados.slice(0, nrMaquinas);
+        usarNiveis = false; // limite manual: mostra só esses, sem etiquetas de nível
       }
 
       const { jsPDF } = window.jspdf;
@@ -2078,38 +2115,64 @@
       doc.setFontSize(10);
       doc.setTextColor(120);
       let subtitulo = `Para visita de amanhã (${dataStr})`;
-      if (nrMaquinas > 0 && nrMaquinas < totalLocaisComNecessidade) {
+      if (!usarNiveis && nrMaquinas < totalLocaisComNecessidade) {
         subtitulo += ` — top ${nrMaquinas} de ${totalLocaisComNecessidade} locais com necessidade, por urgência`;
       }
       doc.text(subtitulo, 14, 22);
       doc.setTextColor(0);
 
+      // função para decidir se um produto é "pesado" (bebida) e deve vir primeiro: por subfamília OU por padrão de volume (cl/ml/l)
+      const VOLUME_RE = /\b\d+([.,]\d+)?\s*(cl|ml|litro|l)\b/i;
+      function ehPesado(produto) {
+        return subfamiliaLabel(produto) === 'Bebidas' || VOLUME_RE.test(produto);
+      }
+
       let y = 30;
-      for (const { local, lista, mediaPct } of locaisOrdenados) {
+      let nivelAtual = null;
+      locaisOrdenados.forEach(({ local, lista, mediaPct, score }, idx) => {
+        if (usarNiveis) {
+          const novoNivel = idx < 4 ? 'VISITAR AMANHÃ' : idx < 7 ? 'VISITAR EM BREVE' : 'SEM URGÊNCIA POR AGORA';
+          if (novoNivel !== nivelAtual) {
+            nivelAtual = novoNivel;
+            if (y > 250) { doc.addPage(); y = 20; }
+            doc.setFontSize(11);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(nivelAtual === 'SEM URGÊNCIA POR AGORA' ? 150 : 200, nivelAtual === 'VISITAR AMANHÃ' ? 40 : 120, 40);
+            doc.text(nivelAtual, 14, y);
+            doc.setTextColor(0);
+            doc.setFont(undefined, 'normal');
+            y += 8;
+          }
+        }
+
         if (y > 255) { doc.addPage(); y = 20; }
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
-        doc.text(`${local} — stock médio ${Math.round(mediaPct)}%`, 14, y);
+        doc.text(`${local} — stock médio ${Math.round(mediaPct)}% · valor em risco/perdido: ${fmtEUR(score)}`, 14, y);
         doc.setFont(undefined, 'normal');
         y += 4;
 
-        const linhasOrdenadas = [...lista].sort((a, b) => {
-          const ab = subfamiliaLabel(a.produto) === 'Bebidas' ? 0 : 1;
-          const bb = subfamiliaLabel(b.produto) === 'Bebidas' ? 0 : 1;
-          return ab - bb;
-        });
+        const linhasOrdenadas = [...lista].sort((a, b) => (ehPesado(b.produto) ? 1 : 0) - (ehPesado(a.produto) ? 1 : 0));
 
         doc.autoTable({
           startY: y,
-          head: [['Produto', 'Stock', 'Capacidade', '%', 'A levar']],
-          body: linhasOrdenadas.map(it => [it.produto, fmtInt(it.stock), fmtInt(it.capacidade), it.pct + '%', fmtInt(it.aLevar)]),
+          head: [['Produto', 'Stock', 'Cap.', '%', 'A levar', 'Canais', 'Nota']],
+          body: linhasOrdenadas.map(it => [
+            it.produto,
+            fmtInt(it.stock),
+            fmtInt(it.capacidade),
+            it.pct + '%',
+            fmtInt(it.aLevar),
+            it.canais.length > 1 ? it.canais.join(', ') : (it.canais[0] || '—'),
+            it.semVendaRecente ? '>15 dias sem venda' : '',
+          ]),
           theme: 'grid',
-          styles: { fontSize: 9 },
+          styles: { fontSize: 8 },
           headStyles: { fillColor: [199, 113, 10] },
           margin: { left: 14, right: 14 },
         });
         y = doc.lastAutoTable.finalY + 8;
-      }
+      });
 
       const itensIncluidos = locaisOrdenados.flatMap(l => l.lista);
 
@@ -2134,12 +2197,12 @@
         margin: { left: 14, right: 14 },
       });
 
-      if (semStock.size) {
+      if (semStockTotal.size) {
         let y2 = doc.lastAutoTable.finalY + 8;
         if (y2 > 270) { doc.addPage(); y2 = 20; }
         doc.setFontSize(9);
         doc.setTextColor(200, 40, 40);
-        doc.text('Sem stock localizado no Armazém 7 (verificar manualmente): ' + Array.from(semStock).join(', '), 14, y2, { maxWidth: 180 });
+        doc.text('Sem stock em NENHUM armazém (7 e 3) — verificar manualmente: ' + Array.from(semStockTotal).join(', '), 14, y2, { maxWidth: 180 });
         doc.setTextColor(0);
       }
 
@@ -2154,6 +2217,7 @@
       btn.textContent = 'Gerar PDF de Reposição';
     }
   }
+
 
   let mensalCompletoData = null;
 
