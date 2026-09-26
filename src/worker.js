@@ -109,6 +109,7 @@ const CARDS = {
   "layout-maquinas": 56,
   "metodos-pagamento": 52,
   "resumo-vendas-dia": 61,
+  "maquinas-mudancas": 62,
 };
 
 // ===== Histórico diário (Cloudflare KV) =====
