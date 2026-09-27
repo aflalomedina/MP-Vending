@@ -2185,12 +2185,13 @@
           theme: 'grid',
           styles: { fontSize: 8 },
           headStyles: { fillColor: [199, 113, 10] },
+          columnStyles: {
+            4: { fillColor: [255, 228, 181], fontStyle: 'bold', fontSize: 10, halign: 'center' },
+          },
           margin: { left: 14, right: 14 },
         });
         y = doc.lastAutoTable.finalY + 8;
       });
-
-      const itensIncluidos = locaisOrdenados.flatMap(l => l.lista);
 
       if (y > 235) { doc.addPage(); y = 20; }
       doc.setFontSize(12);
@@ -2199,14 +2200,22 @@
       doc.setFont(undefined, 'normal');
       y += 4;
       const totalPorProduto = new Map();
-      for (const it of itensIncluidos) {
-        totalPorProduto.set(it.produto, (totalPorProduto.get(it.produto) || 0) + it.aLevar);
+      const locaisPorProduto = new Map();
+      for (const { local, lista } of locaisOrdenados) {
+        const produtosDoLocal = new Set();
+        for (const it of lista) {
+          totalPorProduto.set(it.produto, (totalPorProduto.get(it.produto) || 0) + it.aLevar);
+          produtosDoLocal.add(it.produto);
+        }
+        for (const produto of produtosDoLocal) {
+          locaisPorProduto.set(produto, (locaisPorProduto.get(produto) || 0) + 1);
+        }
       }
       const resumoOrdenado = Array.from(totalPorProduto.entries()).sort((a, b) => b[1] - a[1]);
       doc.autoTable({
         startY: y,
-        head: [['Produto', 'Total a levar']],
-        body: resumoOrdenado.map(([p, q]) => [p, fmtInt(q)]),
+        head: [['Produto', 'Total a levar', 'Nº locais']],
+        body: resumoOrdenado.map(([p, q]) => [p, fmtInt(q), fmtInt(locaisPorProduto.get(p) || 0)]),
         theme: 'grid',
         styles: { fontSize: 9 },
         headStyles: { fillColor: [27, 31, 39] },
