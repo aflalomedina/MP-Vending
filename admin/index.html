@@ -545,6 +545,12 @@
     </div>
 
     <div class="panel full">
+      <h2>Valor em cofre por máquina</h2>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Dados ao vivo — atualizado a cada visita ao painel.</div>
+      <div class="table-wrap" id="valorCofreWrap"><div class="state small">a carregar…</div></div>
+    </div>
+
+    <div class="panel full">
       <h2>Vendas por dia do mês</h2>
       <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -1143,11 +1149,48 @@
     });
   }
 
+  async function renderValorCofre() {
+    const wrap = document.getElementById('valorCofreWrap');
+    try {
+      const raw = await fetchJSON('/api/valor-cofre');
+      const rows = toObjects(raw);
+      const linhas = rows
+        .filter(r => r.MATRICULA_MAQUINA && !MAQUINAS_EXCLUIDAS.has(r.MATRICULA_MAQUINA))
+        .filter(r => r.sum !== null && r.sum !== undefined)
+        .map(r => ({ maquina: r.MATRICULA_MAQUINA, valor: Number(r.sum) || 0 }))
+        .sort((a, b) => b.valor - a.valor);
+
+      if (!linhas.length) {
+        wrap.innerHTML = '<div class="state small">Sem valores em cofre neste momento.</div>';
+        return;
+      }
+      const total = linhas.reduce((s, l) => s + l.valor, 0);
+      wrap.innerHTML = `
+        <table>
+          <thead><tr><th>Localização</th><th>Máquina</th><th class="num">Valor em cofre</th></tr></thead>
+          <tbody>
+            ${linhas.map(l => `
+              <tr>
+                <td>${pdvLabel(l.maquina)}</td>
+                <td>${l.maquina}</td>
+                <td class="num">${fmtEUR(l.valor)}</td>
+              </tr>
+            `).join('')}
+            <tr style="font-weight:600;"><td colspan="2">Total</td><td class="num">${fmtEUR(total)}</td></tr>
+          </tbody>
+        </table>
+      `;
+    } catch (err) {
+      wrap.innerHTML = `<div class="state small error">Erro: ${err.message}</div>`;
+    }
+  }
+
   function renderFinanceiro() {
     renderTicketETransacoes();
     renderCrescimentoMensal();
     renderReceitaPDVHoje();
     renderReceitaPDVMes();
+    renderValorCofre();
 
     const rows = lastVendasRows.filter(r => r.NOME_PRODUTO);
     if (!rows.length) return;
