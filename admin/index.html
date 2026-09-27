@@ -1988,6 +1988,22 @@
     return 0;
   }
 
+  // Velocidade real: usa a média dos últimos dias capturados automaticamente (até 7) para esta máquina+produto;
+  // só recorre ao ficheiro estático (calibração inicial) enquanto ainda não há nenhum dia real acumulado
+  function velocidadeReal(maquina, produto, velocidadeEstatica) {
+    const dias = Object.keys(HISTORICO)
+      .filter(d => HISTORICO[d].porMaquinaProduto && HISTORICO[d].porMaquinaProduto[maquina])
+      .sort()
+      .slice(-7);
+    const valores = dias
+      .map(d => HISTORICO[d].porMaquinaProduto[maquina][produto])
+      .filter(v => v !== undefined);
+    if (valores.length) {
+      return valores.reduce((s, v) => s + v, 0) / valores.length;
+    }
+    return (velocidadeEstatica[maquina] && velocidadeEstatica[maquina][produto]) || 0;
+  }
+
   async function gerarPDFReposicao() {
     const btn = document.getElementById('gerarPdfBtn');
     const msg = document.getElementById('gerarPdfMsg');
@@ -2009,7 +2025,7 @@
       const armazem7 = {};
       const armazem3 = {};
       for (const r of stockRows) {
-        const nome = productLabel(r.CODIGO_PRODUTO);
+        const nome = canonicalProduto(productLabel(r.CODIGO_PRODUTO));
         const destino = String(r.CODIGO_ARMAZEM) === '7' ? armazem7 : String(r.CODIGO_ARMAZEM) === '3' ? armazem3 : null;
         if (destino) destino[nome] = (destino[nome] || 0) + (Number(r.sum) || 0);
       }
@@ -2045,7 +2061,7 @@
         .map(it => ({ ...it, pct: it.capacidade ? Math.round((it.stock / it.capacidade) * 100) : 0 }))
         .filter(it => subfamiliaLabel(it.produto) === 'Bebidas' || it.pct < 70)
         .map(it => {
-          const velocidadeDia = (velocidadeRes[it.maquina] && velocidadeRes[it.maquina][it.produto]) || 0;
+          const velocidadeDia = velocidadeReal(it.maquina, it.produto, velocidadeRes);
           const preco = precoRes[it.produto] || 0;
           return {
             ...it,
@@ -2822,6 +2838,16 @@
         for (const nome of nomesProduto) {
           lastSummary.porProduto[nome] = { qtd: porProdutoQtd.get(nome) || 0, valor: porProdutoValor.get(nome) || 0 };
         }
+
+        const rowsMaqProduto = lastVendasRows.filter(r => r.NOME_PRODUTO && r.MATRICULA_MAQUINA && !MAQUINAS_EXCLUIDAS.has(r.MATRICULA_MAQUINA));
+        const porMaquinaProduto = {};
+        for (const r of rowsMaqProduto) {
+          const maq = r.MATRICULA_MAQUINA;
+          const produto = canonicalProduto(r.NOME_PRODUTO);
+          if (!porMaquinaProduto[maq]) porMaquinaProduto[maq] = {};
+          porMaquinaProduto[maq][produto] = (porMaquinaProduto[maq][produto] || 0) + (Number(r.count) || 1);
+        }
+        lastSummary.porMaquinaProduto = porMaquinaProduto;
 
         HISTORICO[lastSummary.date] = { ...HISTORICO[lastSummary.date], ...lastSummary };
       }
