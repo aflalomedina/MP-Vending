@@ -436,11 +436,25 @@
             <input type="number" id="gerarPdfNrMaquinas" min="1" placeholder="Todos" style="border:1px solid var(--line);border-radius:4px;padding:8px;font-family:inherit;font-size:13px;width:90px;" />
           </div>
           <button type="button" id="gerarPdfBtn" style="background:var(--ink);color:#fff;border:none;border-radius:4px;padding:10px 18px;font-size:13px;cursor:pointer;white-space:nowrap;">
-            Gerar PDF de Reposição
+            Calcular necessidades
           </button>
         </div>
       </div>
       <div id="gerarPdfMsg" style="font-size:12px;margin-top:8px;"></div>
+
+      <div id="checklistLocaisWrap" style="display:none;margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px;">
+          <div style="font-size:12px;color:var(--muted);">Desmarca os locais que não queres incluir desta vez:</div>
+          <div style="display:flex;gap:10px;">
+            <button type="button" id="checklistMarcarTodos" style="background:none;border:1px solid var(--line);border-radius:4px;padding:5px 10px;font-size:12px;cursor:pointer;">Marcar todos</button>
+            <button type="button" id="checklistDesmarcarTodos" style="background:none;border:1px solid var(--line);border-radius:4px;padding:5px 10px;font-size:12px;cursor:pointer;">Desmarcar todos</button>
+          </div>
+        </div>
+        <div id="checklistLocais" style="max-height:260px;overflow-y:auto;border:1px solid var(--line);border-radius:4px;padding:10px;"></div>
+        <button type="button" id="gerarPdfFinalBtn" style="margin-top:12px;background:var(--ink);color:#fff;border:none;border-radius:4px;padding:10px 18px;font-size:13px;cursor:pointer;">
+          Gerar PDF com os locais selecionados
+        </button>
+      </div>
     </div>
 
     <div class="panel full">
@@ -2019,7 +2033,14 @@
     renderTop7Dias();
     renderPrevisaoCompra();
     renderVendasPorProduto();
-    document.getElementById('gerarPdfBtn').addEventListener('click', gerarPDFReposicao);
+    document.getElementById('gerarPdfBtn').addEventListener('click', calcularNecessidadesReposicao);
+    document.getElementById('gerarPdfFinalBtn').addEventListener('click', construirEGerarPDF);
+    document.getElementById('checklistMarcarTodos').addEventListener('click', () => {
+      document.querySelectorAll('.checklist-local').forEach(el => { el.checked = true; });
+    });
+    document.getElementById('checklistDesmarcarTodos').addEventListener('click', () => {
+      document.querySelectorAll('.checklist-local').forEach(el => { el.checked = false; });
+    });
   }
 
   // Score de urgência (receita perdida + em risco) por slot, usando velocidade real (15 dias) e preço médio
@@ -2047,13 +2068,18 @@
     return (velocidadeEstatica[maquina] && velocidadeEstatica[maquina][produto]) || 0;
   }
 
-  async function gerarPDFReposicao() {
+  // Guarda o último cálculo (locais + itens), para o botão "Gerar PDF" usar o que estiver marcado nos checkboxes
+  let ultimoCalculoReposicao = null;
+
+  async function calcularNecessidadesReposicao() {
     const btn = document.getElementById('gerarPdfBtn');
     const msg = document.getElementById('gerarPdfMsg');
+    const checklistWrap = document.getElementById('checklistLocaisWrap');
     btn.disabled = true;
-    btn.textContent = 'A gerar…';
+    btn.textContent = 'A calcular…';
     msg.style.color = 'var(--muted)';
     msg.textContent = '';
+    checklistWrap.style.display = 'none';
     try {
       const [layoutRaw, stockRaw, velocidadeRes, precoRes] = await Promise.all([
         fetchJSON('/api/layout-maquinas'),
@@ -2145,146 +2171,174 @@
         if (!porLocal.has(local)) porLocal.set(local, []);
         porLocal.get(local).push(it);
       }
-      let locaisOrdenados = Array.from(porLocal.entries())
+      const locaisOrdenados = Array.from(porLocal.entries())
         .map(([local, lista]) => ({
           local,
           lista,
           score: lista.reduce((s, x) => s + x.score, 0),
           mediaPct: lista.reduce((s, x) => s + x.pct, 0) / lista.length,
         }))
-        .sort((a, b) => b.score - a.score); // mais urgente (maior receita perdida/em risco) primeiro
+        .sort((a, b) => b.score - a.score) // mais urgente (maior receita perdida/em risco) primeiro
+        .map((l, idx) => ({
+          ...l,
+          nivel: idx < 4 ? 'VISITAR AMANHÃ' : idx < 7 ? 'VISITAR EM BREVE' : 'SEM URGÊNCIA POR AGORA',
+        }));
 
-      const totalLocaisComNecessidade = locaisOrdenados.length;
+      ultimoCalculoReposicao = { locaisOrdenados, semStockTotal };
+
+      // pré-marca conforme o "Nº de locais" (se preenchido); senão marca todos
       const nrMaquinasInput = document.getElementById('gerarPdfNrMaquinas').value;
       const nrMaquinas = parseInt(nrMaquinasInput, 10);
-      let usarNiveis = true;
-      if (nrMaquinas > 0) {
-        locaisOrdenados = locaisOrdenados.slice(0, nrMaquinas);
-        usarNiveis = false; // limite manual: mostra só esses, sem etiquetas de nível
-      }
 
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      const amanha = new Date();
-      amanha.setDate(amanha.getDate() + 1);
-      const dataStr = amanha.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' });
-
-      doc.setFontSize(16);
-      doc.text('Lista de Reposição', 14, 16);
-      doc.setFontSize(10);
-      doc.setTextColor(120);
-      let subtitulo = `Para visita de amanhã (${dataStr})`;
-      if (!usarNiveis && nrMaquinas < totalLocaisComNecessidade) {
-        subtitulo += ` — top ${nrMaquinas} de ${totalLocaisComNecessidade} locais com necessidade, por urgência`;
-      }
-      doc.text(subtitulo, 14, 22);
-      doc.setTextColor(0);
-
-      // função para decidir se um produto é "pesado" (bebida) e deve vir primeiro: por subfamília OU por padrão de volume (cl/ml/l)
-      const VOLUME_RE = /\b\d+([.,]\d+)?\s*(cl|ml|litro|l)\b/i;
-      function ehPesado(produto) {
-        return subfamiliaLabel(produto) === 'Bebidas' || VOLUME_RE.test(produto);
-      }
-
-      let y = 30;
-      let nivelAtual = null;
-      locaisOrdenados.forEach(({ local, lista, mediaPct, score }, idx) => {
-        if (usarNiveis) {
-          const novoNivel = idx < 4 ? 'VISITAR AMANHÃ' : idx < 7 ? 'VISITAR EM BREVE' : 'SEM URGÊNCIA POR AGORA';
-          if (novoNivel !== nivelAtual) {
-            nivelAtual = novoNivel;
-            if (y > 250) { doc.addPage(); y = 20; }
-            doc.setFontSize(11);
-            doc.setFont(undefined, 'bold');
-            doc.setTextColor(nivelAtual === 'SEM URGÊNCIA POR AGORA' ? 150 : 200, nivelAtual === 'VISITAR AMANHÃ' ? 40 : 120, 40);
-            doc.text(nivelAtual, 14, y);
-            doc.setTextColor(0);
-            doc.setFont(undefined, 'normal');
-            y += 8;
-          }
-        }
-
-        if (y > 255) { doc.addPage(); y = 20; }
-        doc.setFontSize(12);
-        doc.setFont(undefined, 'bold');
-        doc.text(`${local} — stock médio ${Math.round(mediaPct)}% · valor em risco/perdido: ${fmtEUR(score)}`, 14, y);
-        doc.setFont(undefined, 'normal');
-        y += 4;
-
-        const linhasOrdenadas = [...lista].sort((a, b) => (ehPesado(b.produto) ? 1 : 0) - (ehPesado(a.produto) ? 1 : 0));
-
-        doc.autoTable({
-          startY: y,
-          head: [['Produto', 'Stock', 'Cap.', '%', 'A levar', 'Canais', 'Nota']],
-          body: linhasOrdenadas.map(it => [
-            it.produto,
-            fmtInt(it.stock),
-            fmtInt(it.capacidade),
-            it.pct + '%',
-            fmtInt(it.aLevar),
-            it.canais.length > 1 ? it.canais.join(', ') : (it.canais[0] || '—'),
-            it.semVendaRecente ? '>15 dias sem venda' : '',
-          ]),
-          theme: 'grid',
-          styles: { fontSize: 8 },
-          headStyles: { fillColor: [199, 113, 10] },
-          columnStyles: {
-            4: { fillColor: [255, 228, 181], fontStyle: 'bold', fontSize: 10, halign: 'center' },
-          },
-          margin: { left: 14, right: 14 },
-        });
-        y = doc.lastAutoTable.finalY + 8;
-      });
-
-      if (y > 235) { doc.addPage(); y = 20; }
-      doc.setFontSize(12);
-      doc.setFont(undefined, 'bold');
-      doc.text('Resumo — total a levar por produto', 14, y);
-      doc.setFont(undefined, 'normal');
-      y += 4;
-      const totalPorProduto = new Map();
-      const locaisPorProduto = new Map();
-      for (const { local, lista } of locaisOrdenados) {
-        const produtosDoLocal = new Set();
-        for (const it of lista) {
-          totalPorProduto.set(it.produto, (totalPorProduto.get(it.produto) || 0) + it.aLevar);
-          produtosDoLocal.add(it.produto);
-        }
-        for (const produto of produtosDoLocal) {
-          locaisPorProduto.set(produto, (locaisPorProduto.get(produto) || 0) + 1);
-        }
-      }
-      const resumoOrdenado = Array.from(totalPorProduto.entries()).sort((a, b) => b[1] - a[1]);
-      doc.autoTable({
-        startY: y,
-        head: [['Produto', 'Total a levar', 'Nº locais']],
-        body: resumoOrdenado.map(([p, q]) => [p, fmtInt(q), fmtInt(locaisPorProduto.get(p) || 0)]),
-        theme: 'grid',
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [27, 31, 39] },
-        margin: { left: 14, right: 14 },
-      });
-
-      if (semStockTotal.size) {
-        let y2 = doc.lastAutoTable.finalY + 8;
-        if (y2 > 270) { doc.addPage(); y2 = 20; }
-        doc.setFontSize(9);
-        doc.setTextColor(200, 40, 40);
-        doc.text('Sem stock em NENHUM armazém (7 e 3) — verificar manualmente: ' + Array.from(semStockTotal).join(', '), 14, y2, { maxWidth: 180 });
-        doc.setTextColor(0);
-      }
-
-      doc.save(`reposicao_${amanha.toISOString().slice(0, 10)}.pdf`);
-      msg.style.color = 'var(--positive)';
-      msg.textContent = 'PDF gerado.';
+      const checklist = document.getElementById('checklistLocais');
+      checklist.innerHTML = locaisOrdenados.map((l, idx) => {
+        const marcado = nrMaquinas > 0 ? idx < nrMaquinas : true;
+        const corNivel = l.nivel === 'VISITAR AMANHÃ' ? 'var(--negative)' : l.nivel === 'VISITAR EM BREVE' ? '#C7710A' : 'var(--muted)';
+        return `
+          <label style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--line);cursor:pointer;">
+            <input type="checkbox" class="checklist-local" value="${idx}" ${marcado ? 'checked' : ''} />
+            <span style="flex:1;">${l.local}</span>
+            <span style="font-size:11px;color:${corNivel};font-weight:600;">${l.nivel}</span>
+            <span style="font-size:11px;color:var(--muted);">${fmtEUR(l.score)}</span>
+          </label>
+        `;
+      }).join('');
+      checklistWrap.style.display = 'block';
+      msg.style.color = 'var(--muted)';
+      msg.textContent = `${locaisOrdenados.length} locais com necessidade de reposição. Confirma a seleção abaixo.`;
     } catch (err) {
       msg.style.color = 'var(--negative)';
-      msg.textContent = 'Erro ao gerar PDF: ' + err.message;
+      msg.textContent = 'Erro ao calcular: ' + err.message;
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Gerar PDF de Reposição';
+      btn.textContent = 'Calcular necessidades';
     }
   }
+
+  function construirEGerarPDF() {
+    const msg = document.getElementById('gerarPdfMsg');
+    if (!ultimoCalculoReposicao) return;
+    const { semStockTotal } = ultimoCalculoReposicao;
+
+    const marcados = Array.from(document.querySelectorAll('.checklist-local:checked')).map(el => Number(el.value));
+    const locaisOrdenados = marcados.map(i => ultimoCalculoReposicao.locaisOrdenados[i]);
+
+    if (!locaisOrdenados.length) {
+      msg.style.color = 'var(--negative)';
+      msg.textContent = 'Seleciona pelo menos um local.';
+      return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const amanha = new Date();
+    amanha.setDate(amanha.getDate() + 1);
+    const dataStr = amanha.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' });
+
+    doc.setFontSize(16);
+    doc.text('Lista de Reposição', 14, 16);
+    doc.setFontSize(10);
+    doc.setTextColor(120);
+    doc.text(`Para visita de amanhã (${dataStr}) — ${locaisOrdenados.length} locais selecionados`, 14, 22);
+    doc.setTextColor(0);
+
+    // função para decidir se um produto é "pesado" (bebida) e deve vir primeiro: por subfamília OU por padrão de volume (cl/ml/l)
+    const VOLUME_RE = /\b\d+([.,]\d+)?\s*(cl|ml|litro|l)\b/i;
+    function ehPesado(produto) {
+      return subfamiliaLabel(produto) === 'Bebidas' || VOLUME_RE.test(produto);
+    }
+
+    let y = 30;
+    let nivelAtual = null;
+    locaisOrdenados.forEach(({ local, lista, mediaPct, score, nivel }) => {
+      if (nivel !== nivelAtual) {
+        nivelAtual = nivel;
+        if (y > 250) { doc.addPage(); y = 20; }
+        doc.setFontSize(11);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(nivelAtual === 'SEM URGÊNCIA POR AGORA' ? 150 : 200, nivelAtual === 'VISITAR AMANHÃ' ? 40 : 120, 40);
+        doc.text(nivelAtual, 14, y);
+        doc.setTextColor(0);
+        doc.setFont(undefined, 'normal');
+        y += 8;
+      }
+
+      if (y > 255) { doc.addPage(); y = 20; }
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text(`${local} — stock médio ${Math.round(mediaPct)}% · valor em risco/perdido: ${fmtEUR(score)}`, 14, y);
+      doc.setFont(undefined, 'normal');
+      y += 4;
+
+      const linhasOrdenadas = [...lista].sort((a, b) => (ehPesado(b.produto) ? 1 : 0) - (ehPesado(a.produto) ? 1 : 0));
+
+      doc.autoTable({
+        startY: y,
+        head: [['Produto', 'Stock', 'Cap.', '%', 'A levar', 'Canais', 'Nota']],
+        body: linhasOrdenadas.map(it => [
+          it.produto,
+          fmtInt(it.stock),
+          fmtInt(it.capacidade),
+          it.pct + '%',
+          fmtInt(it.aLevar),
+          it.canais.length > 1 ? it.canais.join(', ') : (it.canais[0] || '—'),
+          it.semVendaRecente ? '>15 dias sem venda' : '',
+        ]),
+        theme: 'grid',
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [199, 113, 10] },
+        columnStyles: {
+          4: { fillColor: [255, 228, 181], fontStyle: 'bold', fontSize: 10, halign: 'center' },
+        },
+        margin: { left: 14, right: 14 },
+      });
+      y = doc.lastAutoTable.finalY + 8;
+    });
+
+    if (y > 235) { doc.addPage(); y = 20; }
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text('Resumo — total a levar por produto', 14, y);
+    doc.setFont(undefined, 'normal');
+    y += 4;
+    const totalPorProduto = new Map();
+    const locaisPorProduto = new Map();
+    for (const { lista } of locaisOrdenados) {
+      const produtosDoLocal = new Set();
+      for (const it of lista) {
+        totalPorProduto.set(it.produto, (totalPorProduto.get(it.produto) || 0) + it.aLevar);
+        produtosDoLocal.add(it.produto);
+      }
+      for (const produto of produtosDoLocal) {
+        locaisPorProduto.set(produto, (locaisPorProduto.get(produto) || 0) + 1);
+      }
+    }
+    const resumoOrdenado = Array.from(totalPorProduto.entries()).sort((a, b) => b[1] - a[1]);
+    doc.autoTable({
+      startY: y,
+      head: [['Produto', 'Total a levar', 'Nº locais']],
+      body: resumoOrdenado.map(([p, q]) => [p, fmtInt(q), fmtInt(locaisPorProduto.get(p) || 0)]),
+      theme: 'grid',
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [27, 31, 39] },
+      margin: { left: 14, right: 14 },
+    });
+
+    if (semStockTotal.size) {
+      let y2 = doc.lastAutoTable.finalY + 8;
+      if (y2 > 270) { doc.addPage(); y2 = 20; }
+      doc.setFontSize(9);
+      doc.setTextColor(200, 40, 40);
+      doc.text('Sem stock em NENHUM armazém (7 e 3) — verificar manualmente: ' + Array.from(semStockTotal).join(', '), 14, y2, { maxWidth: 180 });
+      doc.setTextColor(0);
+    }
+
+    doc.save(`reposicao_${amanha.toISOString().slice(0, 10)}.pdf`);
+    msg.style.color = 'var(--positive)';
+    msg.textContent = 'PDF gerado.';
+  }
+
+
 
 
   let mensalCompletoData = null;
