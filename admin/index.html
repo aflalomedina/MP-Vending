@@ -752,7 +752,11 @@
     "009": "D'Casa Gondomar", "009-S": "D'Casa Gondomar", "010": "Blue Sky Gondomar",
     "011": "Jardins do Oriente", "012": "Águas Santas (só café)", "013": "Jardins do Oriente",
     "014": "Blue Sky Gondomar", "015": "Nogueira - Perafita", "016": "Nogueira - Perafita",
+    "017": "Divmac Refeitório", "018": "Divmac Corredor",
   };
+
+  // Máquinas ainda por instalar: só entram na lista de reposição quando a data da visita for igual ou posterior
+  const MAQUINAS_DATA_INSTALACAO = { "017": "2026-10-01", "018": "2026-10-01" };
 
   // Nome do ponto de venda, sem a matrícula (para agregar várias máquinas do mesmo local)
   // Máquinas a excluir de todos os reports de vendas (ex: ponto de venda encerrado)
@@ -763,7 +767,7 @@
   }
 
   // Matrículas de máquinas de snacks (todas as "-S" mais estas três sem sufixo)
-  const SNACK_EXTRA = new Set(["013", "014", "016"]);
+  const SNACK_EXTRA = new Set(["013", "014", "016", "017", "018"]);
   function isSnackMachine(matricula) {
     return (matricula || '').endsWith('-S') || SNACK_EXTRA.has(matricula);
   }
@@ -2052,13 +2056,13 @@
     return 0;
   }
 
-  // Velocidade real: média diária dos últimos 7 dias completos já capturados (exclui hoje, que está a meio).
+  // Velocidade real: média diária dos últimos 7 dias ÚTEIS completos já capturados (exclui fins de semana, feriados e hoje, que está a meio).
   // Se um produto não vendeu num dia com captura, conta como 0. Só recorre ao ficheiro estático (calibração)
   // enquanto ainda não existe nenhum dia real capturado.
   function velocidadeReal(maquina, produto, velocidadeEstatica) {
     const hoje = todayStr();
     const dias = Object.keys(HISTORICO)
-      .filter(d => d < hoje && HISTORICO[d].porMaquinaProduto)
+      .filter(d => d < hoje && HISTORICO[d].porMaquinaProduto && !isFimDeSemana(d) && !isFeriado(d))
       .sort()
       .slice(-7);
     if (dias.length) {
@@ -2105,9 +2109,16 @@
       // agrega por máquina+produto (soma todos os canais), capacidade total, stock atual (negativo tratado como 0)
       // e guarda os canais individuais, para anotar no PDF quando um produto ocupa mais do que um
       const porMaquinaProduto = new Map();
+      const maquinasIgnoradas = new Set();
+      const amanhaLocal = new Date();
+      amanhaLocal.setDate(amanhaLocal.getDate() + 1);
+      const dataVisita = `${amanhaLocal.getFullYear()}-${String(amanhaLocal.getMonth() + 1).padStart(2, '0')}-${String(amanhaLocal.getDate()).padStart(2, '0')}`;
       for (const r of layout) {
         if (!r.NOME_PRODUTO || !r.MATRICULA_MAQUINA) continue;
         if (MAQUINAS_EXCLUIDAS.has(r.MATRICULA_MAQUINA)) continue;
+        if (!MACHINES[r.MATRICULA_MAQUINA]) { maquinasIgnoradas.add(r.MATRICULA_MAQUINA); continue; } // não pertence à frota
+        const instalacao = MAQUINAS_DATA_INSTALACAO[r.MATRICULA_MAQUINA];
+        if (instalacao && dataVisita < instalacao) { maquinasIgnoradas.add(r.MATRICULA_MAQUINA + ' (instala a ' + instalacao.split('-').reverse().join('/') + ')'); continue; }
         if (subfamiliaLabel(r.NOME_PRODUTO) === 'Compostos') continue;
         const produto = canonicalProduto(r.NOME_PRODUTO);
         const key = r.MATRICULA_MAQUINA + '|' + produto;
@@ -2151,7 +2162,7 @@
         porProduto.get(it.produto).push(it);
       }
       for (const [produto, lista] of porProduto.entries()) {
-        lista.sort((a, b) => b.score - a.score);
+        lista.sort((a, b) => (b.score - a.score) || (a.pct - b.pct)); // mais urgente primeiro; em empate, o mais vazio
         let disponivel = armazem7[produto] || 0;
         for (const it of lista) {
           const dar = Math.max(0, Math.min(it.aLevar, disponivel));
@@ -2208,7 +2219,8 @@
       }).join('');
       checklistWrap.style.display = 'block';
       msg.style.color = 'var(--muted)';
-      msg.textContent = `${locaisOrdenados.length} locais com necessidade de reposição. Confirma a seleção abaixo.`;
+      msg.textContent = `${locaisOrdenados.length} locais com necessidade de reposição. Confirma a seleção abaixo.` +
+        (maquinasIgnoradas.size ? ` Máquinas ignoradas: ${Array.from(maquinasIgnoradas).sort().join(', ')}.` : '');
     } catch (err) {
       msg.style.color = 'var(--negative)';
       msg.textContent = 'Erro ao calcular: ' + err.message;
