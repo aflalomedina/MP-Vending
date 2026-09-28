@@ -2149,6 +2149,7 @@
           return {
             ...it,
             aLevar: it.capacidade - it.stock,
+            precisava: it.capacidade - it.stock,
             velocidadeDia,
             score: scoreSlot(velocidadeDia, preco, it.stock, it.capacidade),
             semVendaRecente: velocidadeDia === 0,
@@ -2170,7 +2171,10 @@
           it.aLevar = dar;
         }
       }
-      itens = itens.filter(it => it.aLevar > 0);
+      // NOTA: não filtramos por aLevar > 0 aqui — um item que precisa de reposição mas ficou sem stock
+      // alocado no armazém continua a aparecer (com aviso), tal como no script de referência. Esconder
+      // estes itens faz um local parecer que só precisa de 1-2 produtos quando na verdade precisa de mais,
+      // só que o armazém já não tinha (ex: por outros locais mais urgentes terem levado tudo primeiro).
 
       if (!itens.length) {
         msg.style.color = 'var(--positive)';
@@ -2297,7 +2301,10 @@
           it.pct + '%',
           fmtInt(it.aLevar),
           it.canais.length > 1 ? it.canais.join(', ') : (it.canais[0] || '—'),
-          it.semVendaRecente ? 'sem vendas recentes' : '',
+          [
+            it.semVendaRecente ? 'sem vendas recentes' : '',
+            it.aLevar < it.precisava ? `só ${fmtInt(it.aLevar)} de ${fmtInt(it.precisava)} — armazém insuficiente` : '',
+          ].filter(Boolean).join(' · '),
         ]),
         theme: 'grid',
         styles: { fontSize: 8 },
