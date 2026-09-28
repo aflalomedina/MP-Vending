@@ -2052,18 +2052,21 @@
     return 0;
   }
 
-  // Velocidade real: usa a média dos últimos dias capturados automaticamente (até 7) para esta máquina+produto;
-  // só recorre ao ficheiro estático (calibração inicial) enquanto ainda não há nenhum dia real acumulado
+  // Velocidade real: média diária dos últimos 7 dias completos já capturados (exclui hoje, que está a meio).
+  // Se um produto não vendeu num dia com captura, conta como 0. Só recorre ao ficheiro estático (calibração)
+  // enquanto ainda não existe nenhum dia real capturado.
   function velocidadeReal(maquina, produto, velocidadeEstatica) {
+    const hoje = todayStr();
     const dias = Object.keys(HISTORICO)
-      .filter(d => HISTORICO[d].porMaquinaProduto && HISTORICO[d].porMaquinaProduto[maquina])
+      .filter(d => d < hoje && HISTORICO[d].porMaquinaProduto)
       .sort()
       .slice(-7);
-    const valores = dias
-      .map(d => HISTORICO[d].porMaquinaProduto[maquina][produto])
-      .filter(v => v !== undefined);
-    if (valores.length) {
-      return valores.reduce((s, v) => s + v, 0) / valores.length;
+    if (dias.length) {
+      const total = dias.reduce((s, d) => {
+        const m = HISTORICO[d].porMaquinaProduto[maquina];
+        return s + ((m && m[produto]) || 0);
+      }, 0);
+      return total / dias.length;
     }
     return (velocidadeEstatica[maquina] && velocidadeEstatica[maquina][produto]) || 0;
   }
@@ -2282,7 +2285,7 @@
           it.pct + '%',
           fmtInt(it.aLevar),
           it.canais.length > 1 ? it.canais.join(', ') : (it.canais[0] || '—'),
-          it.semVendaRecente ? '>15 dias sem venda' : '',
+          it.semVendaRecente ? 'sem vendas recentes' : '',
         ]),
         theme: 'grid',
         styles: { fontSize: 8 },
