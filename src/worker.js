@@ -253,7 +253,7 @@ async function handleTrack(request, env) {
     });
   }
   const evento = payload && payload.event;
-  if (evento !== "pageview" && evento !== "lead") {
+  if (evento !== "pageview" && evento !== "lead" && evento !== "session_end") {
     return new Response(JSON.stringify({ error: "event inválido" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
@@ -265,6 +265,9 @@ async function handleTrack(request, env) {
     event: evento,
     page: (payload.page || "").slice(0, 200),
     referrer: (payload.referrer || "").slice(0, 200),
+    device: (payload.device || "").slice(0, 30),
+    duracaoSeg: typeof payload.duracaoSeg === "number" ? Math.round(payload.duracaoSeg) : undefined,
+    pais: (request.cf && request.cf.country) || "Desconhecido",
     ts: new Date().toISOString(),
   };
   await env.HISTORY_KV.put(`track:${evento}:${data}:${id}`, JSON.stringify(registo));
