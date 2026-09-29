@@ -383,6 +383,7 @@
     <div class="grid-2">
       <div class="panel">
         <h2>Vendas por hora</h2>
+        <div id="semaforoVendas" style="font-size:13px;margin-bottom:8px;"></div>
         <canvas id="chartTrend" height="220"></canvas>
       </div>
       <div class="panel">
@@ -573,10 +574,8 @@
             <select id="monthFilter" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;"></select>
           </div>
           <div>
-            <label for="vendasMesMaquina" style="font-size:13px;color:var(--muted);margin-right:8px;">Máquina:</label>
-            <select id="vendasMesMaquina" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;">
-              <option value="">Todas (Bebidas Quentes + Snacks)</option>
-            </select>
+            <label for="vendasMesMaquina" style="font-size:13px;color:var(--muted);margin-right:8px;">Comparar máquinas (Ctrl/Cmd+clique p/ várias):</label>
+            <select id="vendasMesMaquina" multiple size="5" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;min-width:220px;"></select>
           </div>
           <span id="diasUteisInfo" style="font-size:12px;color:var(--muted);"></span>
         </div>
@@ -585,7 +584,14 @@
           <span style="display:inline-block;width:10px;height:10px;background:#FF9F1C;border-radius:2px;margin-left:8px;"></span> Snacks
         </div>
       </div>
+      <div id="vendasMesMedias" style="font-size:12px;color:var(--muted);margin-bottom:8px;"></div>
       <canvas id="chartVendasMes" height="200"></canvas>
+    </div>
+
+    <div class="panel full">
+      <h2>Tendência de vendas por categoria</h2>
+      <div id="tendenciaCategoriaResumo" style="font-size:13px;margin-bottom:10px;"></div>
+      <canvas id="chartTendenciaCategoria" height="180"></canvas>
     </div>
 
     <div class="panel full" id="projecaoPanel"></div>
@@ -635,27 +641,24 @@
   <div id="view-site" class="view">
     <div class="panel full">
       <h2>Estatísticas próprias (visitas + pedidos de proposta)</h2>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
-        Registado diretamente pelo nosso código, sem depender da API (Beta) da Cloudflare.
-      </div>
       <div class="kpis" style="margin-bottom:14px;">
         <div class="kpi"><div class="value" id="ownPageviews">—</div><div class="label">Visitas (últimos 30 dias)</div></div>
         <div class="kpi"><div class="value" id="ownLeads">—</div><div class="label">Pedidos de proposta (leads)</div></div>
         <div class="kpi"><div class="value" id="ownConversao">—</div><div class="label">Taxa de conversão</div></div>
+        <div class="kpi"><div class="value" id="ownTempoSessao">—</div><div class="label">Tempo médio de sessão</div></div>
       </div>
       <canvas id="chartOwnTracking" height="180"></canvas>
     </div>
 
-    <h2 style="margin:20px 0 4px;">Cloudflare Web Analytics (complementar)</h2>
-    <div class="kpis">
-      <div class="kpi"><div class="value" id="siteVisitas">—</div><div class="label">Visitas (últimos 30 dias)</div></div>
-      <div class="kpi"><div class="value" id="sitePageviews">—</div><div class="label">Pageviews</div></div>
-      <div class="kpi"><div class="value" id="sitePaginas">—</div><div class="label">Páginas distintas visitadas</div></div>
-    </div>
-
-    <div class="panel full">
-      <h2>Visitas por dia</h2>
-      <canvas id="chartSiteTrend" height="180"></canvas>
+    <div class="grid-2">
+      <div class="panel">
+        <h2>Dispositivos</h2>
+        <canvas id="chartSiteDevices" height="180"></canvas>
+      </div>
+      <div class="panel">
+        <h2>Localização dos visitantes</h2>
+        <div class="table-wrap" id="siteLocalizacaoWrap"><div class="state small">a carregar…</div></div>
+      </div>
     </div>
 
     <div class="grid-2">
@@ -667,11 +670,6 @@
         <h2>Origem do tráfego</h2>
         <div class="table-wrap" id="siteReferrersWrap"><div class="state small">a carregar…</div></div>
       </div>
-    </div>
-
-    <div class="panel full" style="max-width:340px;">
-      <h2>Dispositivos</h2>
-      <canvas id="chartSiteDevices" height="140"></canvas>
     </div>
   </div>
 
@@ -1161,19 +1159,26 @@
       canvas.insertAdjacentHTML('afterend', '<div class="state small">Ainda sem dias suficientes capturados este mês com esta informação.</div>');
       return;
     }
+    // altura dinâmica: cada local precisa de espaço suficiente para o nome não ficar cortado/apertado
+    canvas.parentElement.style.height = `${Math.max(220, entradas.length * 32 + 40)}px`;
+    canvas.style.height = '100%';
     chartPDVMesInstance = new Chart(canvas, {
       type: 'bar',
       data: {
-        labels: entradas.map(e => truncar(e[0], 26)),
+        labels: entradas.map(e => truncar(e[0], 40)),
         datasets: [{ label: 'Receita (€)', data: entradas.map(e => e[1]), backgroundColor: '#1B1F27' }],
       },
       options: {
         indexAxis: 'y',
+        maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
           tooltip: { callbacks: { title: (items) => entradas[items[0].dataIndex][0] } },
         },
-        scales: { x: { beginAtZero: true } },
+        scales: {
+          x: { beginAtZero: true },
+          y: { ticks: { autoSkip: false, font: { size: 12 } } },
+        },
       },
     });
   }
@@ -1214,12 +1219,72 @@
     }
   }
 
+  let chartTendenciaCategoriaInstance = null;
+
+  function renderTendenciaCategoria() {
+    const dias = Object.keys(HISTORICO)
+      .filter(d => HISTORICO[d].porCategoria)
+      .sort()
+      .slice(-14); // últimos 14 dias com detalhe por categoria
+
+    const resumo = document.getElementById('tendenciaCategoriaResumo');
+    if (dias.length < 4) {
+      resumo.innerHTML = '<span class="state small">Ainda não há dias suficientes com detalhe por categoria para ver uma tendência.</span>';
+      if (chartTendenciaCategoriaInstance) { chartTendenciaCategoriaInstance.destroy(); chartTendenciaCategoriaInstance = null; }
+      return;
+    }
+
+    const quentes = dias.map(d => HISTORICO[d].porCategoria['Bebidas Quentes'] || 0);
+    const snacks = dias.map(d => HISTORICO[d].porCategoria['Snacks'] || 0);
+
+    // compara a 2ª metade da janela com a 1ª metade, para ver se está a subir ou a descer
+    const metade = Math.floor(dias.length / 2);
+    function tendenciaPct(valores) {
+      const primeira = valores.slice(0, metade);
+      const segunda = valores.slice(metade);
+      const mediaPrimeira = primeira.reduce((s, v) => s + v, 0) / primeira.length;
+      const mediaSegunda = segunda.reduce((s, v) => s + v, 0) / segunda.length;
+      if (!mediaPrimeira) return 0;
+      return ((mediaSegunda - mediaPrimeira) / mediaPrimeira) * 100;
+    }
+    const tendQuentes = tendenciaPct(quentes);
+    const tendSnacks = tendenciaPct(snacks);
+
+    function setaTexto(pct) {
+      const seta = pct > 3 ? '▲' : pct < -3 ? '▼' : '▬';
+      const cor = pct > 3 ? 'var(--positive)' : pct < -3 ? 'var(--negative)' : 'var(--muted)';
+      return `<span style="color:${cor};font-weight:600;">${seta} ${pct >= 0 ? '+' : ''}${pct.toFixed(0)}%</span>`;
+    }
+
+    resumo.innerHTML = `
+      Bebidas Quentes: ${setaTexto(tendQuentes)} nos últimos ${dias.length} dias (2ª metade vs 1ª metade da janela)
+      &nbsp;·&nbsp; Snacks: ${setaTexto(tendSnacks)}
+    `;
+
+    if (chartTendenciaCategoriaInstance) chartTendenciaCategoriaInstance.destroy();
+    chartTendenciaCategoriaInstance = new Chart(document.getElementById('chartTendenciaCategoria'), {
+      type: 'line',
+      data: {
+        labels: dias.map(d => `${parseInt(d.slice(8, 10), 10)} ${diaSemanaAbrev(d)}`),
+        datasets: [
+          { label: 'Bebidas Quentes', data: quentes, borderColor: '#C7710A', backgroundColor: '#C7710A', tension: 0.25, pointRadius: 3 },
+          { label: 'Snacks', data: snacks, borderColor: '#FF9F1C', backgroundColor: '#FF9F1C', tension: 0.25, pointRadius: 3 },
+        ],
+      },
+      options: {
+        plugins: { legend: { display: true, position: 'top' } },
+        scales: { y: { beginAtZero: true, title: { display: true, text: 'Receita (€)' } } },
+      },
+    });
+  }
+
   function renderFinanceiro() {
     renderTicketETransacoes();
     renderCrescimentoMensal();
     renderReceitaPDVHoje();
     renderReceitaPDVMes();
     renderValorCofre();
+    renderTendenciaCategoria();
 
     const rows = lastVendasRows.filter(r => r.NOME_PRODUTO);
     if (!rows.length) return;
@@ -1396,10 +1461,9 @@
       select.onchange = drawVendasMes;
     }
     const selectMaquina = document.getElementById('vendasMesMaquina');
-    if (selectMaquina.options.length <= 1) {
+    if (!selectMaquina.options.length) {
       const maquinas = Object.keys(MACHINES).filter(m => !MAQUINAS_EXCLUIDAS.has(m)).sort();
-      selectMaquina.innerHTML = '<option value="">Todas (Bebidas Quentes + Snacks)</option>' +
-        maquinas.map(m => `<option value="${m}">${machineLabel(m)}</option>`).join('');
+      selectMaquina.innerHTML = maquinas.map(m => `<option value="${m}">${machineLabel(m)}</option>`).join('');
       selectMaquina.onchange = drawVendasMes;
     }
     drawVendasMes();
@@ -1421,9 +1485,11 @@
     return dow === 0 || dow === 6;
   }
 
+  const CORES_MAQUINAS_COMPARACAO = ['#1B1F27', '#0EA5E9', '#A855F7', '#2F9E44', '#E03131', '#DB2777'];
+
   function drawVendasMes() {
     const mes = document.getElementById('monthFilter').value;
-    const maquina = document.getElementById('vendasMesMaquina').value;
+    const maquinasSelecionadas = Array.from(document.getElementById('vendasMesMaquina').selectedOptions).map(o => o.value);
     const dias = Object.keys(HISTORICO).filter(d => d.startsWith(mes)).sort();
     const labels = dias.map(d => [String(parseInt(d.slice(8, 10), 10)), diaSemanaAbrev(d)]);
 
@@ -1433,14 +1499,22 @@
     if (chartVendasMesInstance) chartVendasMesInstance.destroy();
 
     const legenda = document.getElementById('vendasMesLegenda');
+    const mediasEl = document.getElementById('vendasMesMedias');
     let datasets;
 
-    if (maquina) {
-      // uma só máquina selecionada: uma série, sem faz sentido empilhar categorias
+    if (maquinasSelecionadas.length) {
+      // uma ou mais máquinas selecionadas: uma linha por máquina, para comparar
       legenda.style.visibility = 'hidden';
-      const valores = dias.map(d => (HISTORICO[d].porMaquina && HISTORICO[d].porMaquina[maquina]) || 0);
-      const cor = isSnackMachine(maquina) ? '#FF9F1C' : '#C7710A';
-      datasets = [{ label: machineLabel(maquina), data: valores, backgroundColor: cor }];
+      mediasEl.textContent = '';
+      datasets = maquinasSelecionadas.map((maquina, i) => ({
+        type: 'line',
+        label: machineLabel(maquina),
+        data: dias.map(d => (HISTORICO[d].porMaquina && HISTORICO[d].porMaquina[maquina]) || 0),
+        borderColor: CORES_MAQUINAS_COMPARACAO[i % CORES_MAQUINAS_COMPARACAO.length],
+        backgroundColor: CORES_MAQUINAS_COMPARACAO[i % CORES_MAQUINAS_COMPARACAO.length],
+        tension: 0.2,
+        pointRadius: 3,
+      }));
     } else {
       legenda.style.visibility = 'visible';
       const quentes = dias.map(d => (HISTORICO[d].porCategoria && HISTORICO[d].porCategoria['Bebidas Quentes']) || 0);
@@ -1448,18 +1522,29 @@
       // dias sem detalhe por categoria (histórico antigo): mostra o total numa cor neutra
       const semDetalhe = dias.map((d, i) => !HISTORICO[d].porCategoria ? (HISTORICO[d].receitaTotal || 0) : 0);
       datasets = [
-        { label: 'Bebidas Quentes', data: quentes, backgroundColor: '#C7710A', stack: 'vendas' },
-        { label: 'Snacks', data: snacks, backgroundColor: '#FF9F1C', stack: 'vendas' },
-        { label: 'Sem detalhe por categoria', data: semDetalhe, backgroundColor: '#D1CCC0', stack: 'vendas' },
+        { type: 'bar', label: 'Bebidas Quentes', data: quentes, backgroundColor: '#C7710A', stack: 'vendas' },
+        { type: 'bar', label: 'Snacks', data: snacks, backgroundColor: '#FF9F1C', stack: 'vendas' },
+        { type: 'bar', label: 'Sem detalhe por categoria', data: semDetalhe, backgroundColor: '#D1CCC0', stack: 'vendas' },
       ];
+
+      // médias mensais por categoria (só nos dias com detalhe disponível)
+      const diasComDetalhe = dias.filter(d => HISTORICO[d].porCategoria);
+      const mediaQuentes = diasComDetalhe.length
+        ? diasComDetalhe.reduce((s, d) => s + (HISTORICO[d].porCategoria['Bebidas Quentes'] || 0), 0) / diasComDetalhe.length
+        : 0;
+      const mediaSnacks = diasComDetalhe.length
+        ? diasComDetalhe.reduce((s, d) => s + (HISTORICO[d].porCategoria['Snacks'] || 0), 0) / diasComDetalhe.length
+        : 0;
+      mediasEl.innerHTML = diasComDetalhe.length
+        ? `Média diária este mês — Bebidas Quentes: <strong>${fmtEUR(mediaQuentes)}</strong> · Snacks: <strong>${fmtEUR(mediaSnacks)}</strong>`
+        : '';
     }
 
     chartVendasMesInstance = new Chart(document.getElementById('chartVendasMes'), {
-      type: 'bar',
       data: { labels, datasets },
       options: {
         plugins: {
-          legend: { display: false },
+          legend: { display: maquinasSelecionadas.length > 0, position: 'top' },
           tooltip: {
             callbacks: {
               title: (items) => {
@@ -1471,8 +1556,8 @@
           },
         },
         scales: {
-          x: { stacked: !maquina },
-          y: { stacked: !maquina, beginAtZero: true },
+          x: { stacked: !maquinasSelecionadas.length },
+          y: { stacked: !maquinasSelecionadas.length, beginAtZero: true },
         },
       },
     });
@@ -1591,6 +1676,61 @@
   }
   let HISTORICO = {}; // resumo diário 2026-02-25 → hoje, carregado de admin/historico.json
 
+  function renderSemaforoVendas(receitaHojeAteAgora) {
+    const el = document.getElementById('semaforoVendas');
+    const hoje = new Date();
+    const horaAtual = hoje.getHours();
+    const diaSemana = hoje.getDay(); // 0=domingo, 6=sábado
+    const hojeStr = todayStr();
+
+    // escolhe os dias comparáveis: fins de semana comparam só com o mesmo dia da semana; dias úteis com os últimos dias úteis
+    const candidatos = Object.keys(HISTORICO)
+      .filter(d => d < hojeStr && HISTORICO[d].porHora)
+      .sort()
+      .reverse();
+
+    const comparaveis = [];
+    for (const d of candidatos) {
+      if (comparaveis.length >= 5) break;
+      const dow = parseDataLocal(d).getDay();
+      if (diaSemana === 0 && dow !== 0) continue; // hoje é domingo: só compara com domingos
+      if (diaSemana === 6 && dow !== 6) continue; // hoje é sábado: só compara com sábados
+      if (diaSemana >= 1 && diaSemana <= 5 && (dow === 0 || dow === 6)) continue; // hoje é dia útil: ignora fins de semana
+      comparaveis.push(d);
+    }
+
+    if (!comparaveis.length) {
+      el.innerHTML = '<span class="state small">A acumular histórico por hora — o semáforo aparece assim que houver dias comparáveis suficientes.</span>';
+      return;
+    }
+
+    const mediasAteAgora = comparaveis.map(d => {
+      const ph = HISTORICO[d].porHora;
+      let soma = 0;
+      for (let h = 0; h < horaAtual; h++) soma += ph[h] || 0;
+      return soma;
+    });
+    const mediaComparavel = mediasAteAgora.reduce((s, v) => s + v, 0) / mediasAteAgora.length;
+
+    const pct = mediaComparavel ? (receitaHojeAteAgora / mediaComparavel) * 100 : 0;
+    const tipoDia = diaSemana === 0 ? 'domingos' : diaSemana === 6 ? 'sábados' : 'dias úteis';
+    let cor, texto, emoji;
+    if (!mediaComparavel) {
+      cor = 'var(--muted)'; emoji = '⚪'; texto = 'sem referência';
+    } else if (pct >= 110) {
+      cor = 'var(--positive)'; emoji = '🟢'; texto = 'acima da média';
+    } else if (pct >= 90) {
+      cor = '#C7710A'; emoji = '🟡'; texto = 'dentro da média';
+    } else {
+      cor = 'var(--negative)'; emoji = '🔴'; texto = 'abaixo da média';
+    }
+
+    el.innerHTML = `${emoji} <span style="color:${cor};font-weight:600;">${texto}</span>
+      — ${fmtEUR(receitaHojeAteAgora)} até às ${String(horaAtual).padStart(2, '0')}h,
+      vs. média de ${fmtEUR(mediaComparavel)} nos últimos ${comparaveis.length} ${tipoDia} à mesma hora
+      ${mediaComparavel ? `(${pct.toFixed(0)}%)` : ''}`;
+  }
+
   function renderVendas(rows) {
     lastVendasRows = rows;
     const receitaTotal = rows.reduce((sum, r) => sum + (Number(r.value) || 0), 0);
@@ -1632,6 +1772,8 @@
         scales: { y: { beginAtZero: true } },
       },
     });
+
+    renderSemaforoVendas(receitaTotal);
 
     // Top produtos: receita + quantidade (cafés agrupados; nomes longos truncados)
     const rowsComProduto = rows.filter(r => r.NOME_PRODUTO);
@@ -1996,25 +2138,56 @@
 
       const totais = new Map();
       const qtds = new Map();
+      const porDiaProduto = new Map(); // nome -> [qtd dia mais antigo, ..., qtd hoje]
       const hoje = new Date();
-      for (let i = 0; i < 7; i++) {
+      const diasOrdem = [];
+      for (let i = 6; i >= 0; i--) {
         const d = new Date(hoje);
         d.setDate(d.getDate() - i);
-        const dataStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        diasOrdem.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+      }
+      for (const dataStr of diasOrdem) {
         // dados ao vivo (capturados na KV) têm prioridade; caem para o ficheiro estático nos dias mais antigos
         const fonte = (HISTORICO[dataStr] && HISTORICO[dataStr].porProduto) || estatico[dataStr] || {};
         for (const [nomeOriginal, v] of Object.entries(fonte)) {
           const nome = displayProductName(nomeOriginal);
           totais.set(nome, (totais.get(nome) || 0) + (v.valor || 0));
           qtds.set(nome, (qtds.get(nome) || 0) + (v.qtd || 0));
+          if (!porDiaProduto.has(nome)) porDiaProduto.set(nome, new Array(7).fill(0));
         }
+      }
+      // preenche a série diária de cada produto (já sabemos quais existem, agora alinhamos por dia)
+      diasOrdem.forEach((dataStr, i) => {
+        const fonte = (HISTORICO[dataStr] && HISTORICO[dataStr].porProduto) || estatico[dataStr] || {};
+        for (const [nomeOriginal, v] of Object.entries(fonte)) {
+          const nome = displayProductName(nomeOriginal);
+          porDiaProduto.get(nome)[i] += (v.qtd || 0);
+        }
+      });
+
+      function tendenciaIcone(nome) {
+        const serie = porDiaProduto.get(nome) || [];
+        const primeira = serie.slice(0, 4).reduce((s, v) => s + v, 0) / 4;
+        const segunda = serie.slice(4).reduce((s, v) => s + v, 0) / 3;
+        if (!primeira && !segunda) return '';
+        if (!primeira) return '▲';
+        const variacao = (segunda - primeira) / primeira;
+        if (variacao > 0.15) return '▲';
+        if (variacao < -0.15) return '▼';
+        return '▬';
+      }
+      function tendenciaCor(icone) {
+        return icone === '▲' ? 'var(--positive)' : icone === '▼' ? 'var(--negative)' : 'var(--muted)';
       }
 
       const top = Array.from(totais.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
       new Chart(canvas, {
         type: 'bar',
         data: {
-          labels: top.map(t => `${truncar(t[0])} (${fmtInt(qtds.get(t[0]))} un.)`),
+          labels: top.map(t => {
+            const icone = tendenciaIcone(t[0]);
+            return `${truncar(t[0])} (${fmtInt(qtds.get(t[0]))} un.) ${icone}`;
+          }),
           datasets: [{ label: 'Receita (€)', data: top.map(t => t[1]), backgroundColor: '#FF9F1C' }],
         },
         options: {
@@ -2026,7 +2199,9 @@
                 title: (items) => top[items[0].dataIndex][0],
                 label: (ctx) => {
                   const nome = top[ctx.dataIndex][0];
-                  return `${fmtEUR(ctx.parsed.x)} · ${fmtInt(qtds.get(nome))} unidades`;
+                  const icone = tendenciaIcone(nome);
+                  const tendTexto = icone === '▲' ? 'a subir' : icone === '▼' ? 'a descer' : 'estável';
+                  return [`${fmtEUR(ctx.parsed.x)} · ${fmtInt(qtds.get(nome))} unidades`, `Tendência: ${tendTexto} (últimos 7 dias)`];
                 },
               },
             },
@@ -2789,8 +2964,9 @@
     if (siteLoaded) return;
     siteLoaded = true;
     renderOwnTracking();
-    renderSiteAnalytics();
   }
+
+  let chartSiteDevicesInstance = null;
 
   async function renderOwnTracking() {
     try {
@@ -2806,11 +2982,16 @@
       const recentes = eventos.filter(e => e.ts && e.ts.slice(0, 10) >= corte);
       const pageviews = recentes.filter(e => e.event === 'pageview');
       const leads = recentes.filter(e => e.event === 'lead');
+      const sessoes = recentes.filter(e => e.event === 'session_end' && typeof e.duracaoSeg === 'number');
       const conversao = pageviews.length ? (leads.length / pageviews.length) * 100 : 0;
+      const duracaoMedia = sessoes.length ? sessoes.reduce((s, e) => s + e.duracaoSeg, 0) / sessoes.length : 0;
 
       document.getElementById('ownPageviews').textContent = fmtInt(pageviews.length);
       document.getElementById('ownLeads').textContent = fmtInt(leads.length);
       document.getElementById('ownConversao').textContent = conversao.toFixed(1) + '%';
+      document.getElementById('ownTempoSessao').textContent = sessoes.length
+        ? `${Math.floor(duracaoMedia / 60)}m ${Math.round(duracaoMedia % 60)}s`
+        : '—';
 
       const porDiaViews = groupSum(pageviews, e => e.ts.slice(0, 10), () => 1);
       const porDiaLeads = groupSum(leads, e => e.ts.slice(0, 10), () => 1);
@@ -2832,92 +3013,58 @@
           },
         },
       });
+
+      // Páginas mais vistas
+      const porPagina = groupSum(pageviews, e => e.page || '/', () => 1);
+      const topPaginas = Array.from(porPagina.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      document.getElementById('sitePaginasWrap').innerHTML = topPaginas.length ? `
+        <table>
+          <thead><tr><th>Página</th><th class="num">Visitas</th></tr></thead>
+          <tbody>${topPaginas.map(p => `<tr><td>${p[0]}</td><td class="num">${fmtInt(p[1])}</td></tr>`).join('')}</tbody>
+        </table>
+      ` : '<div class="state small">Sem dados ainda.</div>';
+
+      // Origem do tráfego
+      function origemLabel(ref) {
+        if (!ref) return 'Direto';
+        try { return new URL(ref).hostname.replace(/^www\./, ''); } catch { return 'Direto'; }
+      }
+      const porOrigem = groupSum(pageviews, e => origemLabel(e.referrer), () => 1);
+      const topOrigens = Array.from(porOrigem.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      document.getElementById('siteReferrersWrap').innerHTML = topOrigens.length ? `
+        <table>
+          <thead><tr><th>Origem</th><th class="num">Visitas</th></tr></thead>
+          <tbody>${topOrigens.map(r => `<tr><td>${r[0]}</td><td class="num">${fmtInt(r[1])}</td></tr>`).join('')}</tbody>
+        </table>
+      ` : '<div class="state small">Sem dados ainda.</div>';
+
+      // Dispositivos
+      const porDispositivo = groupSum(pageviews, e => e.device || 'Desconhecido', () => 1);
+      const dispositivos = Array.from(porDispositivo.entries()).sort((a, b) => b[1] - a[1]);
+      if (chartSiteDevicesInstance) chartSiteDevicesInstance.destroy();
+      if (dispositivos.length) {
+        chartSiteDevicesInstance = new Chart(document.getElementById('chartSiteDevices'), {
+          type: 'doughnut',
+          data: {
+            labels: dispositivos.map(d => d[0]),
+            datasets: [{ data: dispositivos.map(d => d[1]), backgroundColor: ['#FF9F1C', '#1B1F27', '#2F9E44', '#6B7280'] }],
+          },
+          options: { plugins: { legend: { position: 'right' } } },
+        });
+      }
+
+      // Localização
+      const porPais = groupSum(pageviews, e => e.pais || 'Desconhecido', () => 1);
+      const paises = Array.from(porPais.entries()).sort((a, b) => b[1] - a[1]);
+      document.getElementById('siteLocalizacaoWrap').innerHTML = paises.length ? `
+        <table>
+          <thead><tr><th>País</th><th class="num">Visitas</th></tr></thead>
+          <tbody>${paises.map(p => `<tr><td>${p[0]}</td><td class="num">${fmtInt(p[1])}</td></tr>`).join('')}</tbody>
+        </table>
+      ` : '<div class="state small">Sem dados ainda.</div>';
     } catch (err) {
       document.getElementById('chartOwnTracking').insertAdjacentHTML(
         'afterend', `<div class="state small error">Erro: ${err.message}</div>`
-      );
-    }
-  }
-
-  async function renderSiteAnalytics() {
-    try {
-      const res = await fetch('/api/site-analytics');
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      const groups = data.groups || [];
-
-      if (!groups.length) {
-        const dbg = data.debug ? ` (consultado ${data.debug.dateRange?.s} → ${data.debug.dateRange?.e}, account_tag ${data.debug.accountTagSet ? 'ok' : 'EM FALTA'}, site_tag ${data.debug.siteTagSet ? 'ok' : 'EM FALTA'})` : '';
-        document.querySelector('#view-site').insertAdjacentHTML(
-          'afterbegin',
-          `<div class="state small">Ainda não há dados suficientes (pode demorar algumas horas a aparecer tráfego novo).${dbg}</div>`
-        );
-        return;
-      }
-
-      const totalPageviews = groups.reduce((s, g) => s + (g.count || 0), 0);
-      const totalVisitas = groups.reduce((s, g) => s + (g.sum?.visits || 0), 0);
-      const paginasDistintas = new Set(groups.map(g => g.dimensions.requestPath)).size;
-
-      document.getElementById('sitePageviews').textContent = fmtInt(totalPageviews);
-      document.getElementById('siteVisitas').textContent = fmtInt(totalVisitas);
-      document.getElementById('sitePaginas').textContent = fmtInt(paginasDistintas);
-
-      // Visitas por dia
-      const porDia = groupSum(groups, g => g.dimensions.date, g => g.sum?.visits || 0);
-      const dias = Array.from(porDia.keys()).sort();
-      new Chart(document.getElementById('chartSiteTrend'), {
-        type: 'line',
-        data: {
-          labels: dias,
-          datasets: [{
-            label: 'Visitas',
-            data: dias.map(d => porDia.get(d)),
-            borderColor: '#FF9F1C',
-            backgroundColor: 'rgba(255,159,28,0.12)',
-            fill: true,
-            tension: 0.25,
-            pointRadius: 2,
-          }],
-        },
-        options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
-      });
-
-      // Páginas mais vistas
-      const porPagina = groupSum(groups, g => g.dimensions.requestPath || '/', g => g.count || 0);
-      const topPaginas = Array.from(porPagina.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
-      document.getElementById('sitePaginasWrap').innerHTML = `
-        <table>
-          <thead><tr><th>Página</th><th class="num">Pageviews</th></tr></thead>
-          <tbody>${topPaginas.map(p => `<tr><td>${p[0]}</td><td class="num">${fmtInt(p[1])}</td></tr>`).join('')}</tbody>
-        </table>
-      `;
-
-      // Origem do tráfego
-      const porReferrer = groupSum(groups, g => g.dimensions.refererHost || 'Direto', g => g.count || 0);
-      const topReferrers = Array.from(porReferrer.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
-      document.getElementById('siteReferrersWrap').innerHTML = `
-        <table>
-          <thead><tr><th>Origem</th><th class="num">Pageviews</th></tr></thead>
-          <tbody>${topReferrers.map(r => `<tr><td>${r[0]}</td><td class="num">${fmtInt(r[1])}</td></tr>`).join('')}</tbody>
-        </table>
-      `;
-
-      // Dispositivos
-      const porDispositivo = groupSum(groups, g => g.dimensions.deviceType || 'Desconhecido', g => g.count || 0);
-      const dispositivos = Array.from(porDispositivo.entries()).sort((a, b) => b[1] - a[1]);
-      new Chart(document.getElementById('chartSiteDevices'), {
-        type: 'doughnut',
-        data: {
-          labels: dispositivos.map(d => d[0]),
-          datasets: [{ data: dispositivos.map(d => d[1]), backgroundColor: ['#FF9F1C', '#1B1F27', '#2F9E44', '#6B7280'] }],
-        },
-        options: { plugins: { legend: { position: 'right' } } },
-      });
-    } catch (err) {
-      document.querySelector('#view-site').insertAdjacentHTML(
-        'afterbegin',
-        `<div class="state error">Não foi possível carregar os dados de analytics: ${err.message}</div>`
       );
     }
   }
@@ -2984,6 +3131,15 @@
           porMaquinaProduto[maq][produto] = (porMaquinaProduto[maq][produto] || 0) + (Number(r.count) || 1);
         }
         lastSummary.porMaquinaProduto = porMaquinaProduto;
+
+        const porHoraCaptura = {};
+        for (const r of lastVendasRows) {
+          const d = new Date(r.sale_at);
+          if (isNaN(d)) continue;
+          const h = d.getHours();
+          porHoraCaptura[h] = (porHoraCaptura[h] || 0) + (Number(r.value) || 0);
+        }
+        lastSummary.porHora = porHoraCaptura;
 
         HISTORICO[lastSummary.date] = { ...HISTORICO[lastSummary.date], ...lastSummary };
       }
