@@ -793,7 +793,18 @@
 
   function subfamiliaLabel(nomeProduto) {
     if (nomeProduto === 'Cafés') return 'Compostos';
-    return NAME_TO_SUBFAMILIA[nomeProduto] || 'Outros';
+    if (NAME_TO_SUBFAMILIA[nomeProduto]) return NAME_TO_SUBFAMILIA[nomeProduto];
+    // o mapa usa os nomes tal como vêm do catálogo (alguns com sufixo "(SDR)"/"- SDR"); se nos chegar
+    // já sem esse sufixo (nome canónico), procuramos na versão canónica de cada chave do mapa
+    return NAME_TO_SUBFAMILIA_CANON[nomeProduto] || 'Outros';
+  }
+
+  const NAME_TO_SUBFAMILIA_CANON = {};
+  for (const nomeCatalogo in NAME_TO_SUBFAMILIA) {
+    const canon = normalizarSDR(nomeCatalogo);
+    if (!(canon in NAME_TO_SUBFAMILIA_CANON)) {
+      NAME_TO_SUBFAMILIA_CANON[canon] = NAME_TO_SUBFAMILIA[nomeCatalogo];
+    }
   }
 
   // Produtos a agrupar sob um nome comum nos gráficos de "top produtos"
@@ -2171,10 +2182,7 @@
           it.aLevar = dar;
         }
       }
-      // NOTA: não filtramos por aLevar > 0 aqui — um item que precisa de reposição mas ficou sem stock
-      // alocado no armazém continua a aparecer (com aviso), tal como no script de referência. Esconder
-      // estes itens faz um local parecer que só precisa de 1-2 produtos quando na verdade precisa de mais,
-      // só que o armazém já não tinha (ex: por outros locais mais urgentes terem levado tudo primeiro).
+      itens = itens.filter(it => it.aLevar > 0);
 
       if (!itens.length) {
         msg.style.color = 'var(--positive)';
