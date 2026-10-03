@@ -819,20 +819,21 @@
     return NAME_TO_SUBFAMILIA_CANON[nomeProduto] || 'Outros';
   }
 
-  const NAME_TO_SUBFAMILIA_CANON = {};
-  for (const nomeCatalogo in NAME_TO_SUBFAMILIA) {
-    const canon = normalizarSDR(nomeCatalogo);
-    if (!(canon in NAME_TO_SUBFAMILIA_CANON)) {
-      NAME_TO_SUBFAMILIA_CANON[canon] = NAME_TO_SUBFAMILIA[nomeCatalogo];
-    }
-  }
-
   // Produtos a agrupar sob um nome comum nos gráficos de "top produtos"
   // Fusão de variantes do mesmo produto (SDR e nomes duplicados) — usado para juntar "hoje" (dados ao vivo) com "mês/ano" (histórico)
   const SDR_RE1 = /\s*\(sdr\)\s*$/i;
   const SDR_RE2 = /\s*-\s*sdr\s*$/i;
   function normalizarSDR(nome) {
     return (nome || '').replace(SDR_RE1, '').replace(SDR_RE2, '').trim();
+  }
+
+  // Precisa de normalizarSDR já definida acima — por isso este bloco vem depois, não logo a seguir a subfamiliaLabel
+  const NAME_TO_SUBFAMILIA_CANON = {};
+  for (const nomeCatalogo in NAME_TO_SUBFAMILIA) {
+    const canon = normalizarSDR(nomeCatalogo);
+    if (!(canon in NAME_TO_SUBFAMILIA_CANON)) {
+      NAME_TO_SUBFAMILIA_CANON[canon] = NAME_TO_SUBFAMILIA[nomeCatalogo];
+    }
   }
   const GRUPOS_PRODUTO = {
     'Guarana Antartica lata 33cl': 'Guaraná Brasil 33cl',
