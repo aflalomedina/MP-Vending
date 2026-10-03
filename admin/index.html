@@ -847,12 +847,51 @@
     return pdv ? `${pdv} · ${matricula}` : (matricula || '—');
   }
 
+  // Catálogo de produtos ao vivo (card 65) — substitui os mapas fixos PRODUCTS/NAME_TO_SUBFAMILIA
+  // assim que carrega, para produtos novos aparecerem automaticamente sem precisar de editar o código.
+  // CODIGO_FAMILIA/CODIGO_SUBFAMILIA confirmados pelo utilizador:
+  //   Família 1 (Cafetaria/Bebidas Quentes): subfamília 1=Compostos, 2=Solúveis / Recipientes
+  //   Família 2 (Snacks): subfamília 3=Snacks, 5=Bolachas, 6=Bebidas, 7=Chocolates, 8=Sandes, 9=Frescos
+  const SUBFAMILIA_CODE_LABEL = {
+    '1': 'Compostos', '2': 'Solúveis / Recipientes',
+    '3': 'Snacks', '5': 'Bolachas', '6': 'Bebidas', '7': 'Chocolates', '8': 'Sandes', '9': 'Frescos',
+  };
+  let PRODUCTS_LIVE = null;
+  let SUBFAMILIA_LIVE = null;
+  let catalogoProdutosPromise = null;
+
+  function carregarCatalogoProdutos() {
+    if (catalogoProdutosPromise) return catalogoProdutosPromise;
+    catalogoProdutosPromise = (async () => {
+      try {
+        const raw = await fetchJSON('/api/produtos-total');
+        const rows = toObjects(raw);
+        const produtos = {};
+        const subfamilias = {};
+        for (const r of rows) {
+          if (r.CODIGO_PRODUTO && r.NOME_PRODUTO) produtos[r.CODIGO_PRODUTO] = r.NOME_PRODUTO;
+          if (r.NOME_PRODUTO && r.CODIGO_SUBFAMILIA !== undefined && r.CODIGO_SUBFAMILIA !== null) {
+            const label = SUBFAMILIA_CODE_LABEL[String(r.CODIGO_SUBFAMILIA)];
+            if (label) subfamilias[r.NOME_PRODUTO] = label;
+          }
+        }
+        PRODUCTS_LIVE = produtos;
+        SUBFAMILIA_LIVE = subfamilias;
+      } catch (err) {
+        console.error('Não foi possível carregar o catálogo de produtos ao vivo, a usar o mapa fixo como reserva:', err);
+      }
+    })();
+    return catalogoProdutosPromise;
+  }
+
   function productLabel(codigo) {
+    if (PRODUCTS_LIVE && PRODUCTS_LIVE[codigo]) return PRODUCTS_LIVE[codigo];
     return PRODUCTS[codigo] || codigo || '—';
   }
 
   function subfamiliaLabel(nomeProduto) {
     if (nomeProduto === 'Cafés') return 'Compostos';
+    if (SUBFAMILIA_LIVE && SUBFAMILIA_LIVE[nomeProduto]) return SUBFAMILIA_LIVE[nomeProduto];
     if (NAME_TO_SUBFAMILIA[nomeProduto]) return NAME_TO_SUBFAMILIA[nomeProduto];
     // o mapa usa os nomes tal como vêm do catálogo (alguns com sufixo "(SDR)"/"- SDR"); se nos chegar
     // já sem esse sufixo (nome canónico), procuramos na versão canónica de cada chave do mapa
@@ -3439,6 +3478,7 @@
         fetchJSON('/api/stock-armazens'),
         fetch('/admin/historico.json').then(r => r.ok ? r.json() : {}).catch(() => ({})),
         fetch('/api/snapshot').then(r => r.ok ? r.json() : {}).catch(() => ({})),
+        carregarCatalogoProdutos(), // ao vivo — produtos novos ficam disponíveis automaticamente
       ]);
       // funde o histórico estático (25 fev → export) com os snapshots capturados dia a dia na KV
       // (a KV tem prioridade em datas repetidas, por serem mais recentes)
