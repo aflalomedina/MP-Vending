@@ -553,7 +553,7 @@
 
   <div id="view-financeiro" class="view">
     <div class="kpis">
-      <div class="kpi"><div class="value" id="finReceita">—</div><div class="label">Receita</div></div>
+      <div class="kpi"><div class="value" id="finReceita">—</div><div class="label">Receita (s/ IVA)</div></div>
       <div class="kpi"><div class="value" id="finCusto">—</div><div class="label">Custo dos produtos vendidos</div></div>
       <div class="kpi"><div class="value" id="finLucro">—</div><div class="label">Lucro bruto</div></div>
       <div class="kpi"><div class="value" id="finMargem">—</div><div class="label">Margem bruta</div></div>
@@ -634,7 +634,22 @@
 
     <div class="panel full">
       <h2>Margem por produto (vendas de hoje)</h2>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Valores já sem IVA (faturação a 13%).</div>
       <div class="table-wrap" id="financeiroTableWrap"><div class="state small">a carregar…</div></div>
+    </div>
+
+    <div class="panel full">
+      <h2>Margem por produto — acumulado do mês</h2>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
+        Valores já sem IVA. Só inclui dias já capturados automaticamente este mês (vai-se completando sozinho).
+      </div>
+      <div class="kpis" style="margin-bottom:14px;">
+        <div class="kpi"><div class="value" id="finReceitaMes">—</div><div class="label">Receita do mês (s/ IVA)</div></div>
+        <div class="kpi"><div class="value" id="finCustoMes">—</div><div class="label">Custo do mês</div></div>
+        <div class="kpi"><div class="value" id="finLucroMes">—</div><div class="label">Lucro bruto do mês</div></div>
+        <div class="kpi"><div class="value" id="finMargemMes">—</div><div class="label">Margem bruta do mês</div></div>
+      </div>
+      <div class="table-wrap" id="financeiroTableWrapMes"><div class="state small">a carregar…</div></div>
     </div>
   </div>
 
@@ -1290,12 +1305,13 @@
     const rows = lastVendasRows.filter(r => r.NOME_PRODUTO);
     if (!rows.length) return;
 
+    const IVA = 1.13; // faturação a 13% — margens calculadas sobre a receita sem IVA
     let receitaTotal = 0, custoTotal = 0;
     const porProduto = new Map();
 
     for (const r of rows) {
       const nome = r.NOME_PRODUTO;
-      const valor = Number(r.value) || 0;
+      const valor = (Number(r.value) || 0) / IVA;
       const qtd = Number(r.count) || 1;
       const custo = custoUnitario(nome) * qtd;
 
@@ -1315,7 +1331,7 @@
     document.getElementById('finLucro').textContent = fmtEUR(lucroTotal);
     document.getElementById('finMargem').textContent = margemTotal.toFixed(1) + '%';
 
-    // Tabela por produto
+    // Tabela por produto (hoje)
     const linhas = Array.from(porProduto.entries())
       .sort((a, b) => b[1].receita - a[1].receita)
       .map(([nome, p]) => {
@@ -1342,9 +1358,74 @@
       </table>
     `;
 
+    renderMargemAcumuladaMes(IVA);
     renderVendasPorDiaMes();
     renderProjecaoMensal();
     renderAcumuladoMensal();
+  }
+
+  function renderMargemAcumuladaMes(IVA) {
+    const mesAtual = todayStr().slice(0, 7);
+    const porProdutoMes = new Map();
+    for (const [data, resumo] of Object.entries(HISTORICO)) {
+      if (!data.startsWith(mesAtual)) continue;
+      if (!resumo.porProduto) continue;
+      for (const [nome, v] of Object.entries(resumo.porProduto)) {
+        const p = porProdutoMes.get(nome) || { receita: 0, custo: 0, qtd: 0 };
+        const receita = (v.valor || 0) / IVA;
+        const qtd = v.qtd || 0;
+        p.receita += receita;
+        p.custo += custoUnitario(nome) * qtd;
+        p.qtd += qtd;
+        porProdutoMes.set(nome, p);
+      }
+    }
+
+    const wrap = document.getElementById('financeiroTableWrapMes');
+    if (!porProdutoMes.size) {
+      document.getElementById('finReceitaMes').textContent = '—';
+      document.getElementById('finCustoMes').textContent = '—';
+      document.getElementById('finLucroMes').textContent = '—';
+      document.getElementById('finMargemMes').textContent = '—';
+      wrap.innerHTML = '<div class="state small">Ainda sem dias suficientes capturados este mês com detalhe por produto.</div>';
+      return;
+    }
+
+    let receitaMes = 0, custoMes = 0;
+    for (const p of porProdutoMes.values()) { receitaMes += p.receita; custoMes += p.custo; }
+    const lucroMes = receitaMes - custoMes;
+    const margemMes = receitaMes ? (lucroMes / receitaMes) * 100 : 0;
+
+    document.getElementById('finReceitaMes').textContent = fmtEUR(receitaMes);
+    document.getElementById('finCustoMes').textContent = fmtEUR(custoMes);
+    document.getElementById('finLucroMes').textContent = fmtEUR(lucroMes);
+    document.getElementById('finMargemMes').textContent = margemMes.toFixed(1) + '%';
+
+    const linhas = Array.from(porProdutoMes.entries())
+      .sort((a, b) => b[1].receita - a[1].receita)
+      .map(([nome, p]) => {
+        const lucro = p.receita - p.custo;
+        const margem = p.receita ? (lucro / p.receita) * 100 : 0;
+        return `
+          <tr>
+            <td>${nome}</td>
+            <td class="num">${fmtInt(p.qtd)}</td>
+            <td class="num">${fmtEUR(p.receita)}</td>
+            <td class="num">${fmtEUR(p.custo)}</td>
+            <td class="num">${fmtEUR(lucro)}</td>
+            <td class="num">${margem.toFixed(1)}%</td>
+          </tr>
+        `;
+      }).join('');
+
+    wrap.innerHTML = `
+      <table>
+        <thead>
+          <tr><th>Produto</th><th class="num">Qtd</th><th class="num">Receita</th><th class="num">Custo</th><th class="num">Lucro</th><th class="num">Margem</th></tr>
+        </thead>
+        <tbody>${linhas}</tbody>
+      </table>
+    `;
   }
 
   function monthsAvailable() {
