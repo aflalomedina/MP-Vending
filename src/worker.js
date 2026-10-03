@@ -112,6 +112,7 @@ const CARDS = {
   "maquinas-mudancas": 62,
   "valor-cofre": 60,
   "copos-maquinas": 64,
+  "produtos-total": 65,
 };
 
 // ===== Histórico diário (Cloudflare KV) =====
