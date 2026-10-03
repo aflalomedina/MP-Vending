@@ -459,6 +459,12 @@
     </div>
 
     <div class="panel full">
+      <h2>Stock de copos — máquinas de café</h2>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Dados ao vivo. Ordenado pelas máquinas com menos copos primeiro.</div>
+      <div class="table-wrap" id="coposMaquinasWrap"><div class="state small">a carregar…</div></div>
+    </div>
+
+    <div class="panel full">
       <h2>Alertas de stock baixo</h2>
       <div style="margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
         <div>
@@ -2139,6 +2145,55 @@
     `;
   }
 
+  async function renderCoposMaquinas() {
+    const wrap = document.getElementById('coposMaquinasWrap');
+    try {
+      const raw = await fetchJSON('/api/copos-maquinas');
+      const rows = toObjects(raw);
+      const linhas = rows
+        .filter(r => r.MATRICULA_MAQUINA && !MAQUINAS_EXCLUIDAS.has(r.MATRICULA_MAQUINA))
+        .map(r => {
+          const capacidade = Number(r.CAPACIDADE_DR) || 0;
+          const saldo = Number(r.SALDO_ATUAL) || 0;
+          const pct = capacidade ? Math.round((saldo / capacidade) * 100) : 0;
+          return { maquina: r.MATRICULA_MAQUINA, capacidade, saldo, pct, data: r.DATA_ALTERACAO };
+        })
+        .sort((a, b) => a.pct - b.pct);
+
+      if (!linhas.length) {
+        wrap.innerHTML = '<div class="state small">Sem dados de copos neste momento.</div>';
+        return;
+      }
+
+      wrap.innerHTML = `
+        <table>
+          <thead>
+            <tr><th>Localização</th><th>Máquina</th><th class="num">Capacidade</th><th class="num">Saldo atual</th><th class="num">%</th><th>Última atualização</th></tr>
+          </thead>
+          <tbody>
+            ${linhas.map(l => {
+              const negativo = l.saldo < 0;
+              const cor = negativo ? 'var(--negative)' : l.pct < 20 ? 'var(--negative)' : l.pct < 50 ? '#C7710A' : 'var(--positive)';
+              const dataFmt = l.data ? new Date(l.data).toLocaleDateString('pt-PT') : '—';
+              return `
+                <tr>
+                  <td>${pdvLabel(l.maquina)}</td>
+                  <td>${l.maquina}</td>
+                  <td class="num">${fmtInt(l.capacidade)}</td>
+                  <td class="num">${fmtInt(l.saldo)}</td>
+                  <td class="num" style="color:${cor};font-weight:600;">${negativo ? 'verificar' : l.pct + '%'}</td>
+                  <td>${dataFmt}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    } catch (err) {
+      wrap.innerHTML = `<div class="state small error">Erro: ${err.message}</div>`;
+    }
+  }
+
   function renderStockAlerts(rows) {
     stockAlertRows = rows
       .filter(r => subfamiliaLabel(r.NOME_PRODUTO) !== 'Compostos')
@@ -2305,6 +2360,7 @@
     renderTop7Dias();
     renderPrevisaoCompra();
     renderVendasPorProduto();
+    renderCoposMaquinas();
     document.getElementById('gerarPdfBtn').addEventListener('click', calcularNecessidadesReposicao);
     document.getElementById('gerarPdfFinalBtn').addEventListener('click', construirEGerarPDF);
     document.getElementById('checklistMarcarTodos').addEventListener('click', () => {
