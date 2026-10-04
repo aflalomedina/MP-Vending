@@ -950,6 +950,13 @@
               <option value="Outros">Outros</option>
             </select>
           </div>
+          <div>
+            <label for="tarefasOrdenar" style="font-size:13px;color:var(--muted);margin-right:6px;">Ordenar por:</label>
+            <select id="tarefasOrdenar" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;">
+              <option value="urgencia">Urgência</option>
+              <option value="data">Data de conclusão</option>
+            </select>
+          </div>
         </div>
       </div>
       <div class="table-wrap tarefas-mobile" id="tarefasListaWrap"><div class="state small">a carregar…</div></div>
@@ -3391,18 +3398,22 @@
       return true;
     });
 
+    const ordenarPorData = document.getElementById('tarefasOrdenar').value === 'data';
+    const compararUrgencia = (a, b) => (URGENCIA_ORDEM[b.urgencia] || 0) - (URGENCIA_ORDEM[a.urgencia] || 0);
+    const compararData = (a, b) => {
+      if (a.dataConclusao === b.dataConclusao) return 0;
+      if (!a.dataConclusao) return 1;   // sem data vai para o fim
+      if (!b.dataConclusao) return -1;
+      return a.dataConclusao.localeCompare(b.dataConclusao); // mais próxima (ou mais atrasada) primeiro
+    };
     lista.sort((a, b) => {
-      if (a.concluida !== b.concluida) return a.concluida ? 1 : -1;
-      if (a.concluida) return (b.concluidaEm || '').localeCompare(a.concluidaEm || '');
-      const ua = URGENCIA_ORDEM[a.urgencia] || 0;
-      const ub = URGENCIA_ORDEM[b.urgencia] || 0;
-      if (ua !== ub) return ub - ua;
-      if (a.dataConclusao !== b.dataConclusao) {
-        if (!a.dataConclusao) return 1;
-        if (!b.dataConclusao) return -1;
-        return a.dataConclusao.localeCompare(b.dataConclusao);
+      if (a.concluida !== b.concluida) return a.concluida ? 1 : -1; // pendentes antes das concluídas
+      if (ordenarPorData) {
+        // por data de conclusão; em empate, a mais urgente primeiro, depois a mais antiga
+        return compararData(a, b) || compararUrgencia(a, b) || (a.criadaEm || '').localeCompare(b.criadaEm || '');
       }
-      return (a.criadaEm || '').localeCompare(b.criadaEm || '');
+      if (a.concluida) return (b.concluidaEm || '').localeCompare(a.concluidaEm || '');
+      return compararUrgencia(a, b) || compararData(a, b) || (a.criadaEm || '').localeCompare(b.criadaEm || '');
     });
 
     const wrap = document.getElementById('tarefasListaWrap');
@@ -3515,6 +3526,7 @@
     document.getElementById('tarefaCancelarBtn').addEventListener('click', () => { limparFormTarefa(); tarefaMsg('', false); });
     document.getElementById('tarefasFiltroEstado').addEventListener('change', renderTarefas);
     document.getElementById('tarefasFiltroCategoria').addEventListener('change', renderTarefas);
+    document.getElementById('tarefasOrdenar').addEventListener('change', renderTarefas);
 
     document.getElementById('tarefasListaWrap').addEventListener('click', async (ev) => {
       const editar = ev.target.closest('.tarefa-editar');
