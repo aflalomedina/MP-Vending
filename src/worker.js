@@ -242,6 +242,109 @@ async function handleSiteAnalytics(env) {
   };
 }
 
+// ===== Tarefas pendentes (Cloudflare KV) =====
+const TAREFA_URGENCIAS = ["Baixa", "Média", "Alta", "Urgente"];
+
+function jsonResponse(obj, status = 200) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+async function handleTarefas(request, env) {
+  const url = new URL(request.url);
+
+  if (request.method === "GET") {
+    const tarefas = [];
+    let cursor;
+    do {
+      const listed = await env.HISTORY_KV.list({ prefix: "tarefa:", cursor });
+      for (const key of listed.keys) {
+        const value = await env.HISTORY_KV.get(key.name);
+        if (value) {
+          try {
+            tarefas.push(JSON.parse(value));
+          } catch {
+            // ignora entradas corrompidas
+          }
+        }
+      }
+      cursor = listed.list_complete ? undefined : listed.cursor;
+    } while (cursor);
+    return jsonResponse({ tarefas });
+  }
+
+  if (request.method === "POST") {
+    let payload;
+    try {
+      payload = await request.json();
+    } catch {
+      return jsonResponse({ error: "JSON inválido" }, 400);
+    }
+    const titulo = ((payload && payload.titulo) || "").trim();
+    if (!titulo) return jsonResponse({ error: "Falta o título da tarefa" }, 400);
+    const urgencia = TAREFA_URGENCIAS.includes(payload.urgencia) ? payload.urgencia : "Média";
+    const id = crypto.randomUUID();
+    const registo = {
+      id,
+      titulo: titulo.slice(0, 200),
+      categoria: String(payload.categoria || "").slice(0, 40),
+      urgencia,
+      dataConclusao: /^\d{4}-\d{2}-\d{2}$/.test(payload.dataConclusao || "") ? payload.dataConclusao : "",
+      observacoes: String(payload.observacoes || "").slice(0, 2000),
+      responsavel: String(payload.responsavel || "").slice(0, 60),
+      concluida: false,
+      criadaEm: new Date().toISOString(),
+      concluidaEm: null,
+    };
+    await env.HISTORY_KV.put(`tarefa:${id}`, JSON.stringify(registo));
+    return jsonResponse({ ok: true, tarefa: registo });
+  }
+
+  if (request.method === "PUT") {
+    const id = url.searchParams.get("id");
+    if (!id) return jsonResponse({ error: "Falta o parâmetro id" }, 400);
+    const existente = await env.HISTORY_KV.get(`tarefa:${id}`);
+    if (!existente) return jsonResponse({ error: "Tarefa não encontrada" }, 404);
+    let atual;
+    try {
+      atual = JSON.parse(existente);
+    } catch {
+      return jsonResponse({ error: "Tarefa corrompida" }, 500);
+    }
+    let payload;
+    try {
+      payload = await request.json();
+    } catch {
+      return jsonResponse({ error: "JSON inválido" }, 400);
+    }
+    if (typeof payload.titulo === "string" && payload.titulo.trim()) atual.titulo = payload.titulo.trim().slice(0, 200);
+    if (typeof payload.categoria === "string") atual.categoria = payload.categoria.slice(0, 40);
+    if (TAREFA_URGENCIAS.includes(payload.urgencia)) atual.urgencia = payload.urgencia;
+    if (typeof payload.dataConclusao === "string" && (payload.dataConclusao === "" || /^\d{4}-\d{2}-\d{2}$/.test(payload.dataConclusao))) {
+      atual.dataConclusao = payload.dataConclusao;
+    }
+    if (typeof payload.observacoes === "string") atual.observacoes = payload.observacoes.slice(0, 2000);
+    if (typeof payload.responsavel === "string") atual.responsavel = payload.responsavel.slice(0, 60);
+    if (typeof payload.concluida === "boolean") {
+      atual.concluida = payload.concluida;
+      atual.concluidaEm = payload.concluida ? new Date().toISOString() : null;
+    }
+    await env.HISTORY_KV.put(`tarefa:${id}`, JSON.stringify(atual));
+    return jsonResponse({ ok: true, tarefa: atual });
+  }
+
+  if (request.method === "DELETE") {
+    const id = url.searchParams.get("id");
+    if (!id) return jsonResponse({ error: "Falta o parâmetro id" }, 400);
+    await env.HISTORY_KV.delete(`tarefa:${id}`);
+    return jsonResponse({ ok: true });
+  }
+
+  return new Response("Método não suportado", { status: 405 });
+}
+
 // ===== Despesas mensais (Cloudflare KV) =====
 // ===== Tracking próprio (visitas + leads do formulário) via KV =====
 async function handleTrack(request, env) {
@@ -436,6 +539,17 @@ export default {
       } catch (err) {
         return new Response(JSON.stringify({ error: err.message }), {
           status: 502,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    if (url.pathname === "/api/tarefas") {
+      try {
+        return await handleTarefas(request, env);
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
           headers: { "Content-Type": "application/json" },
         });
       }
