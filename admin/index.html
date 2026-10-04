@@ -367,6 +367,7 @@
   <button class="tab-btn" data-view="site">Site</button>
   <button class="tab-btn" data-view="resultados">Resultados</button>
   <button class="tab-btn" data-view="smartcake">Smartcake</button>
+  <button class="tab-btn" data-view="tarefas">Tarefas Pendentes</button>
 </div>
 
 <main>
@@ -508,10 +509,9 @@
           </select>
         </div>
         <div>
-          <label for="productFilter" style="font-size:13px;color:var(--muted);margin-right:8px;">Filtrar por produto:</label>
-          <select id="productFilter" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;">
-            <option value="">Todos</option>
-          </select>
+          <label for="productFilter" style="font-size:13px;color:var(--muted);margin-right:8px;">Pesquisar produto:</label>
+          <input type="text" id="productFilter" list="productFilterList" autocomplete="off" placeholder="começa a escrever…" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;min-width:260px;" />
+          <datalist id="productFilterList"></datalist>
         </div>
       </div>
       <div class="table-wrap" id="stockTableWrap"><div class="state small">a carregar…</div></div>
@@ -793,6 +793,91 @@
         Ordenado por total vendido. A tendência compara a 2ª metade do período com a 1ª (▲ a crescer, ▼ a cair, ▬ estável) — ajuda a decidir em que produtos apostar mais ou menos.
       </div>
       <div class="table-wrap" id="smartcakeHistoricoWrap"><div class="state small">a carregar…</div></div>
+    </div>
+  </div>
+
+  <div id="view-tarefas" class="view">
+    <div class="kpis">
+      <div class="kpi"><div class="value" id="tarefasKpiPendentes">—</div><div class="label">Pendentes</div></div>
+      <div class="kpi"><div class="value" id="tarefasKpiUrgentes">—</div><div class="label">Urgentes / altas</div></div>
+      <div class="kpi"><div class="value" id="tarefasKpiAtraso">—</div><div class="label">Em atraso</div></div>
+      <div class="kpi"><div class="value" id="tarefasKpiConcluidas">—</div><div class="label">Concluídas</div></div>
+    </div>
+
+    <div class="panel full">
+      <h2 id="tarefaFormTitulo">Nova tarefa</h2>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
+        <div style="flex:1 1 280px;">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Tarefa</label>
+          <input type="text" id="tarefaTitulo" maxlength="200" placeholder="ex: ligar à lead da Worten para agendar reunião" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;" />
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Categoria</label>
+          <select id="tarefaCategoria" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;">
+            <option value="Leads">Leads</option>
+            <option value="Pagamentos">Pagamentos</option>
+            <option value="Manutenção">Manutenção</option>
+            <option value="Fornecedores">Fornecedores</option>
+            <option value="Clientes">Clientes</option>
+            <option value="Outros">Outros</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Urgência</label>
+          <select id="tarefaUrgencia" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;">
+            <option value="Baixa">Baixa</option>
+            <option value="Média" selected>Média</option>
+            <option value="Alta">Alta</option>
+            <option value="Urgente">Urgente</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Data de conclusão</label>
+          <input type="date" id="tarefaData" style="border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-family:inherit;font-size:13px;" />
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Responsável</label>
+          <input type="text" id="tarefaResponsavel" maxlength="60" placeholder="opcional" style="width:130px;border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;" />
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Observações</label>
+        <textarea id="tarefaObs" rows="2" maxlength="2000" placeholder="detalhes, contactos, o que já foi feito…" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;"></textarea>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:10px;align-items:center;">
+        <button type="button" id="tarefaGuardarBtn" style="background:var(--ink);color:#fff;border:none;border-radius:4px;padding:9px 18px;font-size:13px;cursor:pointer;">Adicionar tarefa</button>
+        <button type="button" id="tarefaCancelarBtn" style="display:none;background:none;border:1px solid var(--line);border-radius:4px;padding:8px 14px;font-size:13px;cursor:pointer;">Cancelar edição</button>
+        <span id="tarefaFormMsg" style="font-size:12px;"></span>
+      </div>
+    </div>
+
+    <div class="panel full">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
+        <h2 style="margin:0;">Lista de tarefas</h2>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+          <div>
+            <label for="tarefasFiltroEstado" style="font-size:13px;color:var(--muted);margin-right:6px;">Mostrar:</label>
+            <select id="tarefasFiltroEstado" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;">
+              <option value="pendentes">Pendentes</option>
+              <option value="concluidas">Concluídas</option>
+              <option value="todas">Todas</option>
+            </select>
+          </div>
+          <div>
+            <label for="tarefasFiltroCategoria" style="font-size:13px;color:var(--muted);margin-right:6px;">Categoria:</label>
+            <select id="tarefasFiltroCategoria" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;">
+              <option value="">Todas</option>
+              <option value="Leads">Leads</option>
+              <option value="Pagamentos">Pagamentos</option>
+              <option value="Manutenção">Manutenção</option>
+              <option value="Fornecedores">Fornecedores</option>
+              <option value="Clientes">Clientes</option>
+              <option value="Outros">Outros</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="table-wrap" id="tarefasListaWrap"><div class="state small">a carregar…</div></div>
     </div>
   </div>
 
@@ -2049,6 +2134,10 @@
     return WAREHOUSES[codigo] || codigo || '—';
   }
 
+  function semAcentos(texto) {
+    return String(texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  }
+
   let allStockRows = [];
 
   function paintStockTable(rows) {
@@ -2077,10 +2166,10 @@
 
   function applyStockFilters() {
     const wh = document.getElementById('warehouseFilter').value;
-    const prod = document.getElementById('productFilter').value;
+    const prod = semAcentos(document.getElementById('productFilter').value.trim());
     let rows = allStockRows;
     if (wh) rows = rows.filter(r => String(r.CODIGO_ARMAZEM) === wh);
-    if (prod) rows = rows.filter(r => String(r.CODIGO_PRODUTO) === prod);
+    if (prod) rows = rows.filter(r => semAcentos(productLabel(r.CODIGO_PRODUTO)).includes(prod));
     paintStockTable(rows);
   }
 
@@ -2093,12 +2182,13 @@
       armazens.map(a => `<option value="${a}">${warehouseLabel(a)}</option>`).join('');
     whSelect.onchange = applyStockFilters;
 
-    const prodSelect = document.getElementById('productFilter');
-    const produtos = Array.from(new Set(rows.map(r => String(r.CODIGO_PRODUTO))))
-      .sort((a, b) => productLabel(a).localeCompare(productLabel(b)));
-    prodSelect.innerHTML = '<option value="">Todos</option>' +
-      produtos.map(p => `<option value="${p}">${productLabel(p)}</option>`).join('');
-    prodSelect.onchange = applyStockFilters;
+    // pesquisa por produto com sugestões automáticas (datalist) — filtra enquanto se escreve
+    const prodInput = document.getElementById('productFilter');
+    const nomesProdutos = Array.from(new Set(rows.map(r => productLabel(r.CODIGO_PRODUTO))))
+      .sort((a, b) => a.localeCompare(b));
+    document.getElementById('productFilterList').innerHTML =
+      nomesProdutos.map(n => `<option value="${n.replace(/"/g, '&quot;')}"></option>`).join('');
+    prodInput.oninput = applyStockFilters;
 
     paintStockTable(rows);
   }
@@ -3132,6 +3222,230 @@
     return subfamiliaLabel(produto) === 'Frescos';
   }
 
+  // ===== Tarefas pendentes (partilhadas pelos sócios, guardadas na KV) =====
+  function escapeHtml(texto) {
+    return String(texto == null ? '' : texto)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  const URGENCIA_ORDEM = { 'Urgente': 4, 'Alta': 3, 'Média': 2, 'Baixa': 1 };
+  const URGENCIA_ESTILO = {
+    'Urgente': 'background:#FCE0E0;color:#B42318;',
+    'Alta': 'background:#FFE8CC;color:#B54708;',
+    'Média': 'background:#FFF3CD;color:#8A6D00;',
+    'Baixa': 'background:#E7F0E9;color:#2F6F3E;',
+  };
+
+  let tarefasLista = [];
+  let tarefaEmEdicao = null;
+  let tarefasEventosLigados = false;
+
+  function tarefaMsg(texto, erro) {
+    const el = document.getElementById('tarefaFormMsg');
+    el.style.color = erro ? 'var(--negative)' : 'var(--positive)';
+    el.textContent = texto;
+  }
+
+  function limparFormTarefa() {
+    tarefaEmEdicao = null;
+    document.getElementById('tarefaFormTitulo').textContent = 'Nova tarefa';
+    document.getElementById('tarefaTitulo').value = '';
+    document.getElementById('tarefaCategoria').value = 'Leads';
+    document.getElementById('tarefaUrgencia').value = 'Média';
+    document.getElementById('tarefaData').value = '';
+    document.getElementById('tarefaResponsavel').value = '';
+    document.getElementById('tarefaObs').value = '';
+    document.getElementById('tarefaGuardarBtn').textContent = 'Adicionar tarefa';
+    document.getElementById('tarefaCancelarBtn').style.display = 'none';
+  }
+
+  async function carregarTarefas() {
+    const res = await fetch('/api/tarefas');
+    const data = res.ok ? await res.json() : { tarefas: [] };
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    tarefasLista = data.tarefas || [];
+  }
+
+  function renderTarefas() {
+    const hoje = todayStr();
+    const pendentes = tarefasLista.filter(t => !t.concluida);
+    const atraso = pendentes.filter(t => t.dataConclusao && t.dataConclusao < hoje);
+    document.getElementById('tarefasKpiPendentes').textContent = fmtInt(pendentes.length);
+    document.getElementById('tarefasKpiUrgentes').textContent = fmtInt(pendentes.filter(t => t.urgencia === 'Urgente' || t.urgencia === 'Alta').length);
+    document.getElementById('tarefasKpiAtraso').textContent = fmtInt(atraso.length);
+    document.getElementById('tarefasKpiConcluidas').textContent = fmtInt(tarefasLista.length - pendentes.length);
+
+    const estado = document.getElementById('tarefasFiltroEstado').value;
+    const categoria = document.getElementById('tarefasFiltroCategoria').value;
+    let lista = tarefasLista.filter(t => {
+      if (estado === 'pendentes' && t.concluida) return false;
+      if (estado === 'concluidas' && !t.concluida) return false;
+      if (categoria && t.categoria !== categoria) return false;
+      return true;
+    });
+
+    lista.sort((a, b) => {
+      if (a.concluida !== b.concluida) return a.concluida ? 1 : -1;
+      if (a.concluida) return (b.concluidaEm || '').localeCompare(a.concluidaEm || '');
+      const ua = URGENCIA_ORDEM[a.urgencia] || 0;
+      const ub = URGENCIA_ORDEM[b.urgencia] || 0;
+      if (ua !== ub) return ub - ua;
+      if (a.dataConclusao !== b.dataConclusao) {
+        if (!a.dataConclusao) return 1;
+        if (!b.dataConclusao) return -1;
+        return a.dataConclusao.localeCompare(b.dataConclusao);
+      }
+      return (a.criadaEm || '').localeCompare(b.criadaEm || '');
+    });
+
+    const wrap = document.getElementById('tarefasListaWrap');
+    if (!lista.length) {
+      wrap.innerHTML = '<div class="state small">Sem tarefas para este filtro.</div>';
+      return;
+    }
+
+    wrap.innerHTML = `
+      <table>
+        <thead>
+          <tr><th style="width:34px;"></th><th>Tarefa</th><th>Categoria</th><th>Urgência</th><th>Conclusão</th><th>Responsável</th><th></th></tr>
+        </thead>
+        <tbody>
+          ${lista.map(t => {
+            const emAtraso = !t.concluida && t.dataConclusao && t.dataConclusao < hoje;
+            const paraHoje = !t.concluida && t.dataConclusao === hoje;
+            const dataTxt = t.dataConclusao ? t.dataConclusao.split('-').reverse().join('/') : '—';
+            const dataEstilo = emAtraso ? 'color:var(--negative);font-weight:600;' : paraHoje ? 'color:#B54708;font-weight:600;' : '';
+            const dataNota = emAtraso ? ' (em atraso)' : paraHoje ? ' (hoje)' : '';
+            return `
+              <tr style="${t.concluida ? 'opacity:0.55;' : ''}">
+                <td><input type="checkbox" class="tarefa-check" data-id="${escapeHtml(t.id)}" ${t.concluida ? 'checked' : ''} title="Marcar como ${t.concluida ? 'pendente' : 'concluída'}" /></td>
+                <td>
+                  <div style="${t.concluida ? 'text-decoration:line-through;' : 'font-weight:600;'}">${escapeHtml(t.titulo)}</div>
+                  ${t.observacoes ? `<div style="font-size:12px;color:var(--muted);white-space:pre-wrap;margin-top:2px;">${escapeHtml(t.observacoes)}</div>` : ''}
+                </td>
+                <td>${escapeHtml(t.categoria) || '—'}</td>
+                <td><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600;${URGENCIA_ESTILO[t.urgencia] || ''}">${escapeHtml(t.urgencia)}</span></td>
+                <td style="${dataEstilo}white-space:nowrap;">${dataTxt}${dataNota}</td>
+                <td>${escapeHtml(t.responsavel) || '—'}</td>
+                <td style="white-space:nowrap;">
+                  <button type="button" class="tarefa-editar" data-id="${escapeHtml(t.id)}" style="border:none;background:none;color:var(--ink);cursor:pointer;font-size:12px;text-decoration:underline;">Editar</button>
+                  <button type="button" class="tarefa-apagar" data-id="${escapeHtml(t.id)}" style="border:none;background:none;color:var(--negative);cursor:pointer;font-size:12px;">Apagar</button>
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  async function guardarTarefa() {
+    const btn = document.getElementById('tarefaGuardarBtn');
+    const titulo = document.getElementById('tarefaTitulo').value.trim();
+    if (!titulo) { tarefaMsg('Escreve o que é preciso fazer.', true); return; }
+    const corpo = {
+      titulo,
+      categoria: document.getElementById('tarefaCategoria').value,
+      urgencia: document.getElementById('tarefaUrgencia').value,
+      dataConclusao: document.getElementById('tarefaData').value,
+      responsavel: document.getElementById('tarefaResponsavel').value.trim(),
+      observacoes: document.getElementById('tarefaObs').value.trim(),
+    };
+    btn.disabled = true;
+    tarefaMsg('a guardar…', false);
+    try {
+      const url = tarefaEmEdicao ? `/api/tarefas?id=${encodeURIComponent(tarefaEmEdicao)}` : '/api/tarefas';
+      const res = await fetch(url, {
+        method: tarefaEmEdicao ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(corpo),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      const eraEdicao = !!tarefaEmEdicao;
+      limparFormTarefa();
+      await carregarTarefas();
+      renderTarefas();
+      tarefaMsg(eraEdicao ? 'Tarefa atualizada.' : 'Tarefa adicionada.', false);
+    } catch (err) {
+      tarefaMsg('Erro ao guardar: ' + err.message, true);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function loadTarefasView() {
+    // volta a ir buscar a lista de cada vez que se abre o separador, para ver o que o outro sócio acrescentou
+    try {
+      await carregarTarefas();
+      renderTarefas();
+    } catch (err) {
+      document.getElementById('tarefasListaWrap').innerHTML = `<div class="state small error">Erro: ${escapeHtml(err.message)}</div>`;
+    }
+
+    if (tarefasEventosLigados) return;
+    tarefasEventosLigados = true;
+
+    document.getElementById('tarefaGuardarBtn').addEventListener('click', guardarTarefa);
+    document.getElementById('tarefaCancelarBtn').addEventListener('click', () => { limparFormTarefa(); tarefaMsg('', false); });
+    document.getElementById('tarefasFiltroEstado').addEventListener('change', renderTarefas);
+    document.getElementById('tarefasFiltroCategoria').addEventListener('change', renderTarefas);
+
+    document.getElementById('tarefasListaWrap').addEventListener('click', async (ev) => {
+      const editar = ev.target.closest('.tarefa-editar');
+      const apagar = ev.target.closest('.tarefa-apagar');
+      if (editar) {
+        const t = tarefasLista.find(x => x.id === editar.dataset.id);
+        if (!t) return;
+        tarefaEmEdicao = t.id;
+        document.getElementById('tarefaFormTitulo').textContent = 'Editar tarefa';
+        document.getElementById('tarefaTitulo').value = t.titulo || '';
+        document.getElementById('tarefaCategoria').value = t.categoria || 'Outros';
+        document.getElementById('tarefaUrgencia').value = t.urgencia || 'Média';
+        document.getElementById('tarefaData').value = t.dataConclusao || '';
+        document.getElementById('tarefaResponsavel').value = t.responsavel || '';
+        document.getElementById('tarefaObs').value = t.observacoes || '';
+        document.getElementById('tarefaGuardarBtn').textContent = 'Guardar alterações';
+        document.getElementById('tarefaCancelarBtn').style.display = '';
+        tarefaMsg('', false);
+        document.getElementById('tarefaFormTitulo').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else if (apagar) {
+        const t = tarefasLista.find(x => x.id === apagar.dataset.id);
+        if (!t || !confirm(`Apagar a tarefa "${t.titulo}"?`)) return;
+        apagar.disabled = true;
+        try {
+          await fetch(`/api/tarefas?id=${encodeURIComponent(t.id)}`, { method: 'DELETE' });
+          if (tarefaEmEdicao === t.id) limparFormTarefa();
+          await carregarTarefas();
+          renderTarefas();
+        } catch (err) {
+          tarefaMsg('Erro ao apagar: ' + err.message, true);
+        }
+      }
+    });
+
+    document.getElementById('tarefasListaWrap').addEventListener('change', async (ev) => {
+      const check = ev.target.closest('.tarefa-check');
+      if (!check) return;
+      check.disabled = true;
+      try {
+        const res = await fetch(`/api/tarefas?id=${encodeURIComponent(check.dataset.id)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ concluida: check.checked }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        await carregarTarefas();
+        renderTarefas();
+      } catch (err) {
+        tarefaMsg('Erro ao atualizar: ' + err.message, true);
+        check.checked = !check.checked;
+        check.disabled = false;
+      }
+    });
+  }
+
   let smartcakeLoaded = false;
   async function loadSmartcakeView() {
     if (smartcakeLoaded) return;
@@ -3468,6 +3782,7 @@
       if (btn.dataset.view === 'site') loadSiteView();
       if (btn.dataset.view === 'resultados') loadResultadosView();
       if (btn.dataset.view === 'smartcake') loadSmartcakeView();
+      if (btn.dataset.view === 'tarefas') loadTarefasView();
     });
   });
 
