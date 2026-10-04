@@ -338,12 +338,77 @@
     canvas { max-width: 100%; }
   }
 
-  @media (max-width: 400px) {
+  @media (max-width: 340px) {
     .kpis { grid-template-columns: 1fr; }
+  }
+
+  .tarefa-toggle, .tarefa-toggle-msg { display: none; }
+
+  /* ===== Telemóvel: tudo aqui dentro só se aplica a ecrãs estreitos — o desktop fica igual ===== */
+  @media (max-width: 640px) {
+    /* formulário de tarefas: fechado por defeito (a lista aparece logo), abre ao tocar em "＋ Nova tarefa" */
+    .tarefa-toggle {
+      display: block; width: 100%; min-height: 44px; font-size: 14px; font-weight: 600;
+      background: var(--ink); color: #fff; border: none; border-radius: 6px; cursor: pointer;
+    }
+    .tarefa-toggle-msg { display: block; font-size: 12px; margin-top: 6px; min-height: 0; }
+    .tarefa-toggle-msg:empty { display: none; }
+    .tarefa-form-panel.aberto .tarefa-toggle-msg { display: none; }
+    .tarefa-form-panel:not(.aberto) #tarefaFormCorpo { display: none; }
+    .tarefa-form-panel.aberto #tarefaFormCorpo { margin-top: 14px; }
+    .tarefa-form-panel:not(.aberto) { background: none; border: none; box-shadow: none; padding: 0; }
+    .tarefa-form-panel.aberto .tarefa-toggle { background: none; color: var(--ink); border: 1px solid var(--line); }
+    #tarefaFormTitulo { scroll-margin-top: 64px; }
+
+    /* separadores sempre à mão, mesmo em páginas longas (ex: Financeiro) */
+    .tabs { position: sticky; top: 0; z-index: 30; }
+
+    /* a caixa "Comparar com" só serve as Vendas Diárias */
+    body:not([data-view="diarias"]) .compare-box { display: none; }
+
+    /* alvos de toque confortáveis */
+    .panel button, .compare-box button { min-height: 40px; }
+    select, input[type="text"], input[type="date"], input[type="number"] { min-height: 40px; }
+    input[type="checkbox"] { width: 22px; height: 22px; }
+    .tarefa-editar, .tarefa-apagar { min-height: 40px; min-width: 52px; font-size: 14px !important; }
+
+    /* tabelas largas passam a cartões (rótulos vêm de data-label, preenchido por JS a partir do cabeçalho) */
+    .cards-mobile { max-height: 70vh !important; }
+    .cards-mobile table { min-width: 0; width: 100%; }
+    .cards-mobile thead { display: none; }
+    .cards-mobile tbody, .cards-mobile tr, .cards-mobile td { display: block; }
+    .cards-mobile tbody tr {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 2px 14px;
+      padding: 10px 4px; border-bottom: 1px solid var(--line);
+    }
+    .cards-mobile td {
+      border: 0; padding: 2px 0; display: flex; justify-content: space-between;
+      gap: 8px; font-size: 12.5px; text-align: right;
+    }
+    .cards-mobile td::before { content: attr(data-label); color: var(--muted); text-align: left; font-size: 11.5px; font-weight: 400; font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .cards-mobile td:first-child { grid-column: 1 / -1; font-weight: 600; font-size: 13.5px; text-align: left; }
+    .cards-mobile td:first-child::before { content: none; }
+
+    /* lista de tarefas: cartão por tarefa (checkbox + título, depois detalhes, depois ações) */
+    .tarefas-mobile { max-height: none !important; }
+    .tarefas-mobile table { min-width: 0; width: 100%; }
+    .tarefas-mobile thead { display: none; }
+    .tarefas-mobile tbody, .tarefas-mobile tr, .tarefas-mobile td { display: block; }
+    .tarefas-mobile tbody tr {
+      position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px;
+      padding: 12px 4px 12px 40px; border-bottom: 1px solid var(--line);
+    }
+    .tarefas-mobile td { border: 0; padding: 0; font-size: 12.5px; }
+    .tarefas-mobile td:nth-child(1) { position: absolute; left: 4px; top: 12px; }
+    .tarefas-mobile td:nth-child(2) { flex: 1 1 100%; font-size: 14px; }
+    .tarefas-mobile td:nth-child(3)::before,
+    .tarefas-mobile td:nth-child(5)::before,
+    .tarefas-mobile td:nth-child(6)::before { content: attr(data-label) ": "; color: var(--muted); font-weight: 400; }
+    .tarefas-mobile td:nth-child(7) { margin-left: auto; }
   }
 </style>
 </head>
-<body>
+<body data-view="diarias">
 
 <div class="topbar">
   <div>
@@ -463,7 +528,7 @@
     <div class="panel full">
       <h2>Stock de copos — máquinas de café</h2>
       <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Dados ao vivo. Ordenado pelas máquinas com menos copos primeiro.</div>
-      <div class="table-wrap" id="coposMaquinasWrap"><div class="state small">a carregar…</div></div>
+      <div class="table-wrap cards-mobile" id="coposMaquinasWrap"><div class="state small">a carregar…</div></div>
     </div>
 
     <div class="panel full">
@@ -480,7 +545,7 @@
           <input type="text" id="alertaProdutoPesquisa" placeholder="ex: café, água…" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;" />
         </div>
       </div>
-      <div id="stockAlertsWrap" style="max-height:340px;overflow-y:auto;"><div class="state small">a carregar…</div></div>
+      <div id="stockAlertsWrap" class="cards-mobile" style="max-height:340px;overflow-y:auto;"><div class="state small">a carregar…</div></div>
     </div>
 
     <div class="panel full">
@@ -537,7 +602,7 @@
           <input type="text" id="previsaoPesquisa" placeholder="ex: café, coca cola…" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;" />
         </div>
       </div>
-      <div class="table-wrap" id="previsaoCompraWrap"><div class="state small">a carregar…</div></div>
+      <div class="table-wrap cards-mobile" id="previsaoCompraWrap"><div class="state small">a carregar…</div></div>
     </div>
 
     <div class="panel full">
@@ -569,7 +634,7 @@
     <div class="panel full">
       <h2>Valor em cofre por máquina</h2>
       <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Dados ao vivo — atualizado a cada visita ao painel.</div>
-      <div class="table-wrap" id="valorCofreWrap"><div class="state small">a carregar…</div></div>
+      <div class="table-wrap cards-mobile" id="valorCofreWrap"><div class="state small">a carregar…</div></div>
     </div>
 
     <div class="panel full">
@@ -642,7 +707,7 @@
     <div class="panel full">
       <h2>Margem por produto (vendas de hoje)</h2>
       <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Valores já sem IVA (faturação a 13%).</div>
-      <div class="table-wrap" id="financeiroTableWrap"><div class="state small">a carregar…</div></div>
+      <div class="table-wrap cards-mobile" id="financeiroTableWrap"><div class="state small">a carregar…</div></div>
     </div>
 
     <div class="panel full">
@@ -656,7 +721,7 @@
         <div class="kpi"><div class="value" id="finLucroMes">—</div><div class="label">Lucro bruto do mês</div></div>
         <div class="kpi"><div class="value" id="finMargemMes">—</div><div class="label">Margem bruta do mês</div></div>
       </div>
-      <div class="table-wrap" id="financeiroTableWrapMes"><div class="state small">a carregar…</div></div>
+      <div class="table-wrap cards-mobile" id="financeiroTableWrapMes"><div class="state small">a carregar…</div></div>
     </div>
   </div>
 
@@ -804,7 +869,10 @@
       <div class="kpi"><div class="value" id="tarefasKpiConcluidas">—</div><div class="label">Concluídas</div></div>
     </div>
 
-    <div class="panel full">
+    <div class="panel full tarefa-form-panel" id="tarefaFormPanel">
+      <button type="button" id="tarefaNovaBtn" class="tarefa-toggle">＋ Nova tarefa</button>
+      <div id="tarefaToggleMsg" class="tarefa-toggle-msg"></div>
+      <div id="tarefaFormCorpo">
       <h2 id="tarefaFormTitulo">Nova tarefa</h2>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
         <div style="flex:1 1 280px;">
@@ -837,7 +905,13 @@
         </div>
         <div>
           <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Responsável</label>
-          <input type="text" id="tarefaResponsavel" maxlength="60" placeholder="opcional" style="width:130px;border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;" />
+          <select id="tarefaResponsavel" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;">
+            <option value="">— escolher —</option>
+            <option value="Pedro">Pedro</option>
+            <option value="Meir">Meir</option>
+            <option value="__outro__">Outro…</option>
+          </select>
+          <input type="text" id="tarefaResponsavelOutro" maxlength="60" placeholder="nome" style="display:none;width:110px;margin-top:6px;border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;" />
         </div>
       </div>
       <div style="margin-top:10px;">
@@ -848,6 +922,7 @@
         <button type="button" id="tarefaGuardarBtn" style="background:var(--ink);color:#fff;border:none;border-radius:4px;padding:9px 18px;font-size:13px;cursor:pointer;">Adicionar tarefa</button>
         <button type="button" id="tarefaCancelarBtn" style="display:none;background:none;border:1px solid var(--line);border-radius:4px;padding:8px 14px;font-size:13px;cursor:pointer;">Cancelar edição</button>
         <span id="tarefaFormMsg" style="font-size:12px;"></span>
+      </div>
       </div>
     </div>
 
@@ -877,7 +952,7 @@
           </div>
         </div>
       </div>
-      <div class="table-wrap" id="tarefasListaWrap"><div class="state small">a carregar…</div></div>
+      <div class="table-wrap tarefas-mobile" id="tarefasListaWrap"><div class="state small">a carregar…</div></div>
     </div>
   </div>
 
@@ -3242,9 +3317,39 @@
   let tarefasEventosLigados = false;
 
   function tarefaMsg(texto, erro) {
-    const el = document.getElementById('tarefaFormMsg');
-    el.style.color = erro ? 'var(--negative)' : 'var(--positive)';
-    el.textContent = texto;
+    // a mensagem aparece dentro do formulário (desktop) e também junto ao botão "＋ Nova tarefa" (telemóvel,
+    // onde o formulário fecha depois de guardar e a mensagem lá dentro ficaria escondida)
+    for (const id of ['tarefaFormMsg', 'tarefaToggleMsg']) {
+      const el = document.getElementById(id);
+      el.style.color = erro ? 'var(--negative)' : 'var(--positive)';
+      el.textContent = texto;
+    }
+  }
+
+  function abrirFormTarefa() {
+    document.getElementById('tarefaFormPanel').classList.add('aberto');
+    document.getElementById('tarefaNovaBtn').textContent = '✕ Fechar';
+  }
+
+  function fecharFormTarefa() {
+    document.getElementById('tarefaFormPanel').classList.remove('aberto');
+    document.getElementById('tarefaNovaBtn').textContent = '＋ Nova tarefa';
+  }
+
+  // Responsável: Pedro, Meir ou "Outro…" (que abre uma caixa para escrever o nome)
+  function lerResponsavel() {
+    const valor = document.getElementById('tarefaResponsavel').value;
+    if (valor === '__outro__') return document.getElementById('tarefaResponsavelOutro').value.trim() || 'Outro';
+    return valor;
+  }
+
+  function definirResponsavel(nome) {
+    const select = document.getElementById('tarefaResponsavel');
+    const outro = document.getElementById('tarefaResponsavelOutro');
+    if (!nome) { select.value = ''; outro.value = ''; }
+    else if (nome === 'Pedro' || nome === 'Meir') { select.value = nome; outro.value = ''; }
+    else { select.value = '__outro__'; outro.value = nome === 'Outro' ? '' : nome; }
+    outro.style.display = select.value === '__outro__' ? '' : 'none';
   }
 
   function limparFormTarefa() {
@@ -3254,10 +3359,11 @@
     document.getElementById('tarefaCategoria').value = 'Leads';
     document.getElementById('tarefaUrgencia').value = 'Média';
     document.getElementById('tarefaData').value = '';
-    document.getElementById('tarefaResponsavel').value = '';
+    definirResponsavel('');
     document.getElementById('tarefaObs').value = '';
     document.getElementById('tarefaGuardarBtn').textContent = 'Adicionar tarefa';
     document.getElementById('tarefaCancelarBtn').style.display = 'none';
+    fecharFormTarefa();
   }
 
   async function carregarTarefas() {
@@ -3349,7 +3455,7 @@
       categoria: document.getElementById('tarefaCategoria').value,
       urgencia: document.getElementById('tarefaUrgencia').value,
       dataConclusao: document.getElementById('tarefaData').value,
-      responsavel: document.getElementById('tarefaResponsavel').value.trim(),
+      responsavel: lerResponsavel(),
       observacoes: document.getElementById('tarefaObs').value.trim(),
     };
     btn.disabled = true;
@@ -3388,6 +3494,24 @@
     tarefasEventosLigados = true;
 
     document.getElementById('tarefaGuardarBtn').addEventListener('click', guardarTarefa);
+    document.getElementById('tarefaNovaBtn').addEventListener('click', () => {
+      const aberto = document.getElementById('tarefaFormPanel').classList.contains('aberto');
+      if (aberto) {
+        // a fechar: se estava a editar, cancela a edição; se era uma tarefa nova, mantém o rascunho escrito
+        if (tarefaEmEdicao) { limparFormTarefa(); tarefaMsg('', false); } else { fecharFormTarefa(); }
+      }
+      else {
+        tarefaMsg('', false);
+        abrirFormTarefa();
+        document.getElementById('tarefaTitulo').focus({ preventScroll: true });
+      }
+    });
+    document.getElementById('tarefaResponsavel').addEventListener('change', () => {
+      const outro = document.getElementById('tarefaResponsavelOutro');
+      const escolheuOutro = document.getElementById('tarefaResponsavel').value === '__outro__';
+      outro.style.display = escolheuOutro ? '' : 'none';
+      if (escolheuOutro) outro.focus();
+    });
     document.getElementById('tarefaCancelarBtn').addEventListener('click', () => { limparFormTarefa(); tarefaMsg('', false); });
     document.getElementById('tarefasFiltroEstado').addEventListener('change', renderTarefas);
     document.getElementById('tarefasFiltroCategoria').addEventListener('change', renderTarefas);
@@ -3404,7 +3528,8 @@
         document.getElementById('tarefaCategoria').value = t.categoria || 'Outros';
         document.getElementById('tarefaUrgencia').value = t.urgencia || 'Média';
         document.getElementById('tarefaData').value = t.dataConclusao || '';
-        document.getElementById('tarefaResponsavel').value = t.responsavel || '';
+        definirResponsavel(t.responsavel || '');
+        abrirFormTarefa();
         document.getElementById('tarefaObs').value = t.observacoes || '';
         document.getElementById('tarefaGuardarBtn').textContent = 'Guardar alterações';
         document.getElementById('tarefaCancelarBtn').style.display = '';
@@ -3771,8 +3896,31 @@
     }
   }
 
+  // Em ecrãs estreitos as tabelas viram cartões; o CSS precisa do nome da coluna em cada célula (data-label).
+  // Preenche-se aqui a partir do cabeçalho, sempre que um destes contentores é redesenhado.
+  (function ligarRotulosDeTabelasParaTelemovel() {
+    function rotular(container) {
+      container.querySelectorAll('table').forEach(table => {
+        const cabecalhos = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.trim());
+        table.querySelectorAll('tbody tr').forEach(tr => {
+          let coluna = 0;
+          Array.from(tr.children).forEach(td => {
+            if (!td.dataset.label && cabecalhos[coluna]) td.dataset.label = cabecalhos[coluna];
+            coluna += td.colSpan || 1;
+          });
+        });
+      });
+    }
+    document.querySelectorAll('.cards-mobile, .tarefas-mobile').forEach(container => {
+      new MutationObserver(() => rotular(container)).observe(container, { childList: true, subtree: true });
+      rotular(container);
+    });
+  })();
+
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
+      document.body.dataset.view = btn.dataset.view;
+      btn.scrollIntoView({ inline: 'center', block: 'nearest' });
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
       btn.classList.add('active');
