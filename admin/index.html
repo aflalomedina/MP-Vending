@@ -1115,7 +1115,9 @@
 
   const fmtEUR = (v) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(v || 0);
   const fmtInt = (v) => new Intl.NumberFormat('pt-PT').format(v || 0);
-  const todayStr = () => new Date().toISOString().slice(0, 10);
+  // data de hoje no fuso do browser (Lisboa). Com toISOString() seria a data em UTC e, no verão, entre as 00:00 e as 01:00
+  // devolvia "ontem" (a captura diária ia gravar os números do dia novo por cima dos de ontem).
+  const todayStr = () => formatarData(new Date());
 
   function toObjects(payload) {
     const cols = payload.data.cols.map(c => c.name);
@@ -1202,14 +1204,7 @@
     if (mesKey !== todayStr().slice(0, 7)) {
       return receitaAteAgora; // mês já fechado, é a soma real
     }
-
-    // mês em curso: projeta com base apenas no ritmo diário médio deste mês
-    const [y, m] = mesKey.split('-').map(Number);
-    const diasNoMes = new Date(y, m, 0).getDate();
-    const diaAtual = dias.length ? Math.max(...dias.map(d => parseInt(d.slice(8, 10), 10))) : 0;
-    if (!diaAtual) return receitaAteAgora;
-    const mediaDiaria = receitaAteAgora / diaAtual;
-    return receitaAteAgora + mediaDiaria * Math.max(diasNoMes - diaAtual, 0);
+    return projetarMes(mesKey).total; // mês em curso: feriados e fins de semana futuros pesam como tal
   }
 
   function renderCrescimentoMensal() {
@@ -1506,27 +1501,21 @@
     const quentes = dias.map(d => HISTORICO[d].porCategoria['Bebidas Quentes'] || 0);
     const snacks = dias.map(d => HISTORICO[d].porCategoria['Snacks'] || 0);
 
-    // compara a 2ª metade da janela com a 1ª metade, para ver se está a subir ou a descer
-    const metade = Math.floor(dias.length / 2);
-    function tendenciaPct(valores) {
-      const primeira = valores.slice(0, metade);
-      const segunda = valores.slice(metade);
-      const mediaPrimeira = primeira.reduce((s, v) => s + v, 0) / primeira.length;
-      const mediaSegunda = segunda.reduce((s, v) => s + v, 0) / segunda.length;
-      if (!mediaPrimeira) return 0;
-      return ((mediaSegunda - mediaPrimeira) / mediaPrimeira) * 100;
-    }
-    const tendQuentes = tendenciaPct(quentes);
-    const tendSnacks = tendenciaPct(snacks);
+    // compara a 2ª metade da janela com a 1ª, só em dias úteis (fins de semana e feriados distorcem a comparação)
+    const tendQuentes = tendenciaDiasUteis(dias, quentes);
+    const tendSnacks = tendenciaDiasUteis(dias, snacks);
 
-    function setaTexto(pct) {
+    function setaTexto(variacao) {
+      if (variacao === null) return '<span style="color:var(--muted);">sem dias úteis suficientes</span>';
+      if (variacao === Infinity) return '<span style="color:var(--positive);font-weight:600;">▲ sem vendas antes</span>';
+      const pct = variacao * 100;
       const seta = pct > 3 ? '▲' : pct < -3 ? '▼' : '▬';
       const cor = pct > 3 ? 'var(--positive)' : pct < -3 ? 'var(--negative)' : 'var(--muted)';
       return `<span style="color:${cor};font-weight:600;">${seta} ${pct >= 0 ? '+' : ''}${pct.toFixed(0)}%</span>`;
     }
 
     resumo.innerHTML = `
-      Bebidas Quentes: ${setaTexto(tendQuentes)} nos últimos ${dias.length} dias (2ª metade vs 1ª metade da janela)
+      Bebidas Quentes: ${setaTexto(tendQuentes)} nos últimos ${dias.length} dias (só dias úteis: 2ª metade vs 1ª metade — fins de semana e feriados não contam)
       &nbsp;·&nbsp; Snacks: ${setaTexto(tendSnacks)}
     `;
 
@@ -1691,25 +1680,60 @@
     return `${nomes[parseInt(m, 10) - 1]} ${y}`;
   }
 
-  // Feriados nacionais obrigatórios de Portugal em 2026
-  const FERIADOS_2026 = new Set([
-    '2026-01-01', // Ano Novo
-    '2026-04-03', // Sexta-feira Santa
-    '2026-04-05', // Páscoa
-    '2026-04-25', // Dia da Liberdade
-    '2026-05-01', // Dia do Trabalhador
-    '2026-06-04', // Corpo de Deus
-    '2026-06-10', // Dia de Portugal
-    '2026-08-15', // Assunção de Nossa Senhora
-    '2026-10-05', // Implantação da República
-    '2026-11-01', // Todos os Santos
-    '2026-12-01', // Restauração da Independência
-    '2026-12-08', // Imaculada Conceição
-    '2026-12-25', // Natal
-  ]);
+  // Feriados nacionais de Portugal, calculados para qualquer ano (a Páscoa é calculada; a Sexta-feira Santa
+  // e o Corpo de Deus dependem dela). Para acrescentar um feriado municipal, por exemplo o São João do Porto,
+  // basta pôr aqui uma entrada, como { '06-24': 'São João (Porto)' }.
+  const FERIADOS_LOCAIS_MMDD = {};
+  const feriadosPorAno = {};
+
+  function formatarData(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  function pascoa(ano) { // algoritmo de Meeus/Jones/Butcher
+    const a = ano % 19, b = Math.floor(ano / 100), c = ano % 100;
+    const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const mes = Math.floor((h + l - 7 * m + 114) / 31), dia = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(ano, mes - 1, dia);
+  }
+
+  function feriadosDoAno(ano) {
+    if (feriadosPorAno[ano]) return feriadosPorAno[ano];
+    const mapa = new Map();
+    const dePascoa = (dias) => { const p = pascoa(ano); return formatarData(new Date(ano, p.getMonth(), p.getDate() + dias)); };
+    mapa.set(`${ano}-01-01`, 'Ano Novo');
+    mapa.set(dePascoa(-2), 'Sexta-feira Santa');
+    mapa.set(dePascoa(0), 'Páscoa');
+    mapa.set(`${ano}-04-25`, 'Dia da Liberdade');
+    mapa.set(`${ano}-05-01`, 'Dia do Trabalhador');
+    mapa.set(dePascoa(60), 'Corpo de Deus');
+    mapa.set(`${ano}-06-10`, 'Dia de Portugal');
+    mapa.set(`${ano}-08-15`, 'Assunção de Nossa Senhora');
+    mapa.set(`${ano}-10-05`, 'Implantação da República');
+    mapa.set(`${ano}-11-01`, 'Todos os Santos');
+    mapa.set(`${ano}-12-01`, 'Restauração da Independência');
+    mapa.set(`${ano}-12-08`, 'Imaculada Conceição');
+    mapa.set(`${ano}-12-25`, 'Natal');
+    for (const [mmdd, nome] of Object.entries(FERIADOS_LOCAIS_MMDD)) mapa.set(`${ano}-${mmdd}`, nome);
+    feriadosPorAno[ano] = mapa;
+    return mapa;
+  }
 
   function isFeriado(dateStr) {
-    return FERIADOS_2026.has(dateStr);
+    return feriadosDoAno(parseInt(dateStr.slice(0, 4), 10)).has(dateStr);
+  }
+
+  function nomeFeriado(dateStr) {
+    return feriadosDoAno(parseInt(dateStr.slice(0, 4), 10)).get(dateStr) || '';
+  }
+
+  // 'util' | 'sabado' | 'domingo' | 'feriado'. Um feriado nacional conta sempre como "feriado", seja qual for o dia da semana.
+  function tipoDia(dateStr) {
+    if (isFeriado(dateStr)) return 'feriado';
+    const dow = parseDataLocal(dateStr).getDay();
+    return dow === 0 ? 'domingo' : dow === 6 ? 'sabado' : 'util';
   }
 
   function isDiaUtil(dateStr) {
@@ -1727,6 +1751,73 @@
     return uteis;
   }
 
+  // Tendência entre a 1.ª e a 2.ª metade de uma série diária, olhando só a dias úteis (sem fins de semana nem feriados,
+  // que distorcem a comparação) e, se indicado, só a dias com dados. Devolve a variação (0.15 = +15%), Infinity se passou
+  // de zero para vendas, ou null se houver menos de 4 dias úteis ou nenhuma venda em nenhuma das metades.
+  function tendenciaDiasUteis(datas, valores, temDados) {
+    const idx = [];
+    datas.forEach((d, i) => { if (isDiaUtil(d) && (!temDados || temDados(d, i))) idx.push(i); });
+    if (idx.length < 4) return null;
+    const metade = Math.floor(idx.length / 2);
+    const media = (ids) => ids.reduce((soma, i) => soma + (valores[i] || 0), 0) / ids.length;
+    const primeira = media(idx.slice(0, metade));
+    const segunda = media(idx.slice(metade));
+    if (!primeira && !segunda) return null;
+    if (!primeira) return Infinity;
+    return (segunda - primeira) / primeira;
+  }
+
+  // Quanto vale cada tipo de dia numa projeção: dia útil = 1; sábado e domingo = quanto vendem, em média, face a um dia
+  // útil (últimos 90 dias). Um feriado nunca pesa mais do que um domingo.
+  const PESOS_POR_OMISSAO = { sabado: 0.16, domingo: 0.02 };
+  function pesosPorTipoDeDia() {
+    const hoje = todayStr();
+    const dias = Object.keys(HISTORICO)
+      .filter(d => d < hoje && HISTORICO[d].receitaTotal != null)
+      .sort()
+      .slice(-90);
+    const acum = { util: [0, 0], sabado: [0, 0], domingo: [0, 0] };
+    for (const d of dias) {
+      const dow = parseDataLocal(d).getDay();
+      const tipo = dow === 0 ? 'domingo' : isFeriado(d) ? null : dow === 6 ? 'sabado' : 'util';
+      if (!tipo) continue; // feriados em dias de semana ficam de fora: valem como domingo, não como dia útil
+      acum[tipo][0] += HISTORICO[d].receitaTotal || 0;
+      acum[tipo][1] += 1;
+    }
+    const media = (t) => acum[t][1] ? acum[t][0] / acum[t][1] : 0;
+    const mediaUtil = acum.util[1] >= 5 ? media('util') : 0;
+    const sabado = mediaUtil && acum.sabado[1] >= 2 ? Math.min(media('sabado') / mediaUtil, 1) : PESOS_POR_OMISSAO.sabado;
+    const domingo = mediaUtil && acum.domingo[1] >= 2
+      ? Math.min(media('domingo') / mediaUtil, sabado)
+      : Math.min(PESOS_POR_OMISSAO.domingo, sabado);
+    return { util: 1, sabado, domingo, feriado: domingo, mediaUtil };
+  }
+
+  // Projeção de um mês: o nível vem do ritmo deste mês (receita por "dia útil equivalente") e os dias que faltam
+  // pesam conforme o tipo de dia, por isso feriados e fins de semana futuros não são tratados como dias normais.
+  function projetarMes(mesKey, diaAtualOpcional) {
+    const [ano, mes] = mesKey.split('-').map(Number);
+    const diasNoMes = new Date(ano, mes, 0).getDate();
+    const dias = Object.keys(HISTORICO).filter(d => d.startsWith(mesKey));
+    const receitaAteAgora = dias.reduce((soma, d) => soma + (HISTORICO[d].receitaTotal || 0), 0);
+    const diaAtual = diaAtualOpcional || (dias.length ? Math.max(...dias.map(d => parseInt(d.slice(8, 10), 10))) : 0);
+    const pesos = pesosPorTipoDeDia();
+    let pesoDecorrido = 0, pesoTotal = 0, diasUteisEmFalta = 0;
+    for (let dia = 1; dia <= diasNoMes; dia++) {
+      const dataStr = `${mesKey}-${String(dia).padStart(2, '0')}`;
+      const tipo = tipoDia(dataStr);
+      pesoTotal += pesos[tipo];
+      if (dia <= diaAtual) pesoDecorrido += pesos[tipo];
+      else if (tipo === 'util') diasUteisEmFalta++;
+    }
+    // com menos de um "dia útil equivalente" já passado (ex: o mês começou num feriado) o ritmo seria instável:
+    // nesse caso usa-se a média de um dia útil dos últimos 90 dias
+    const ritmo = pesoDecorrido >= 1 ? receitaAteAgora / pesoDecorrido : pesos.mediaUtil;
+    const restante = ritmo * Math.max(pesoTotal - pesoDecorrido, 0);
+    return { receitaAteAgora, diaAtual, diasNoMes, pesos, pesoDecorrido, pesoTotal, ritmo, restante,
+             total: receitaAteAgora + restante, diasUteisEmFalta };
+  }
+
   function mediasPorDiaSemana() {
     const somas = Array(7).fill(0);
     const contagens = Array(7).fill(0);
@@ -1742,9 +1833,7 @@
   function renderProjecaoMensal() {
     const panel = document.getElementById('projecaoPanel');
     const hoje = new Date();
-    const anoAtual = hoje.getFullYear();
-    const mesAtual = hoje.getMonth(); // 0-indexed
-    const mesKey = `${anoAtual}-${String(mesAtual + 1).padStart(2, '0')}`;
+    const mesKey = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
 
     const diasDoMesRegistados = Object.keys(HISTORICO).filter(d => d.startsWith(mesKey));
     if (!diasDoMesRegistados.length) {
@@ -1752,21 +1841,13 @@
       return;
     }
 
-    const receitaAteAgora = diasDoMesRegistados.reduce((s, d) => s + (HISTORICO[d].receitaTotal || 0), 0);
-    const diaAtual = Math.max(...diasDoMesRegistados.map(d => parseInt(d.slice(8, 10), 10)));
-    const diasNoMes = new Date(anoAtual, mesAtual + 1, 0).getDate();
-    const diasEmFalta = Math.max(diasNoMes - diaAtual, 0);
-
-    // projeção baseada apenas no ritmo diário médio deste mês (receita até agora / dias já decorridos)
-    const mediaDiariaMesCorrente = diaAtual ? receitaAteAgora / diaAtual : 0;
-    const receitaProjetadaRestante = mediaDiariaMesCorrente * diasEmFalta;
-    const totalProjetado = receitaAteAgora + receitaProjetadaRestante;
-
+    const proj = projetarMes(mesKey);
+    const diasEmFalta = Math.max(proj.diasNoMes - proj.diaAtual, 0);
     const diasUteis = diasUteisNoMes(mesKey);
     const feriadosDoMes = [];
-    for (let dia = 1; dia <= diasNoMes; dia++) {
+    for (let dia = 1; dia <= proj.diasNoMes; dia++) {
       const dataStr = `${mesKey}-${String(dia).padStart(2, '0')}`;
-      if (isFeriado(dataStr)) feriadosDoMes.push(`${dia} (${diaSemanaAbrev(dataStr)})`);
+      if (isFeriado(dataStr)) feriadosDoMes.push(`${dia} (${diaSemanaAbrev(dataStr)}) ${nomeFeriado(dataStr)}`);
     }
     const feriadosTexto = feriadosDoMes.length
       ? `Feriados este mês: ${feriadosDoMes.join(', ')}.`
@@ -1775,12 +1856,12 @@
     panel.innerHTML = `
       <h2>Projeção para ${monthName(mesKey)} <span style="font-weight:400;color:var(--muted);font-size:13px;">— ${diasUteis} dias úteis no mês</span></h2>
       <div class="kpis" style="margin-bottom:0;">
-        <div class="kpi"><div class="value">${fmtEUR(receitaAteAgora)}</div><div class="label">Já faturado (dia ${diaAtual})</div></div>
-        <div class="kpi"><div class="value">${fmtEUR(receitaProjetadaRestante)}</div><div class="label">Estimado p/ ${diasEmFalta} dias em falta</div></div>
-        <div class="kpi"><div class="value" style="color:var(--positive);">${fmtEUR(totalProjetado)}</div><div class="label">Total projetado do mês</div></div>
+        <div class="kpi"><div class="value">${fmtEUR(proj.receitaAteAgora)}</div><div class="label">Já faturado (dia ${proj.diaAtual})</div></div>
+        <div class="kpi"><div class="value">${fmtEUR(proj.restante)}</div><div class="label">Estimado p/ ${diasEmFalta} dias em falta (${proj.diasUteisEmFalta} úteis)</div></div>
+        <div class="kpi"><div class="value" style="color:var(--positive);">${fmtEUR(proj.total)}</div><div class="label">Total projetado do mês</div></div>
       </div>
       <p style="font-size:12px;color:var(--muted);margin-top:10px;">
-        Estimativa baseada apenas no ritmo diário médio deste mês (${fmtEUR(mediaDiariaMesCorrente)}/dia) — não usa outros meses como referência. ${feriadosTexto}
+        O nível vem só deste mês (${fmtEUR(proj.ritmo)} por dia útil). Nos dias que faltam, os sábados contam ≈${Math.round(proj.pesos.sabado * 100)}% e os domingos e feriados ≈${Math.round(proj.pesos.domingo * 100)}% de um dia útil (proporção média dos últimos 90 dias). ${feriadosTexto}
       </p>
     `;
   }
@@ -2011,34 +2092,45 @@
   }
   let HISTORICO = {}; // resumo diário 2026-02-25 → hoje, carregado de admin/historico.json
 
-  function renderSemaforoVendas(receitaHojeAteAgora) {
+  function renderSemaforoVendas() {
     const el = document.getElementById('semaforoVendas');
-    const hoje = new Date();
-    const horaAtual = hoje.getHours();
-    const diaSemana = hoje.getDay(); // 0=domingo, 6=sábado
+    const agora = new Date();
+    const horaAtual = agora.getHours();
     const hojeStr = todayStr();
+    const tipoHoje = tipoDia(hojeStr);
 
-    // escolhe os dias comparáveis: fins de semana comparam só com o mesmo dia da semana; dias úteis com os últimos dias úteis
-    const candidatos = Object.keys(HISTORICO)
-      .filter(d => d < hojeStr && HISTORICO[d].porHora)
-      .sort()
-      .reverse();
-
-    const comparaveis = [];
-    for (const d of candidatos) {
-      if (comparaveis.length >= 5) break;
+    // Com que dias se compara: dias úteis com os últimos dias úteis (feriados ficam de fora), sábados com sábados.
+    // Domingos e feriados comparam com domingos: um feriado nunca é comparado com mais do que um domingo.
+    const comparavel = (d) => {
       const dow = parseDataLocal(d).getDay();
-      if (diaSemana === 0 && dow !== 0) continue; // hoje é domingo: só compara com domingos
-      if (diaSemana === 6 && dow !== 6) continue; // hoje é sábado: só compara com sábados
-      if (diaSemana >= 1 && diaSemana <= 5 && (dow === 0 || dow === 6)) continue; // hoje é dia útil: ignora fins de semana
-      comparaveis.push(d);
-    }
+      if (tipoHoje === 'util') return dow >= 1 && dow <= 5 && !isFeriado(d);
+      if (tipoHoje === 'sabado') return dow === 6 && !isFeriado(d);
+      return dow === 0;
+    };
+    const nomeTipo = tipoHoje === 'util' ? 'dias úteis' : tipoHoje === 'sabado' ? 'sábados' : 'domingos';
+    const aviso = tipoHoje === 'feriado'
+      ? `<div style="margin-bottom:4px;">🎌 <strong>Feriado nacional — ${nomeFeriado(hojeStr)}.</strong> Vendas residuais esperadas, por isso compara-se com os domingos.</div>`
+      : '';
+
+    const comparaveis = Object.keys(HISTORICO)
+      .filter(d => d < hojeStr && HISTORICO[d].porHora && comparavel(d))
+      .sort().reverse().slice(0, 5);
 
     if (!comparaveis.length) {
-      el.innerHTML = '<span class="state small">A acumular histórico por hora — o semáforo aparece assim que houver dias comparáveis suficientes.</span>';
+      el.innerHTML = `${aviso}<span class="state small">A acumular histórico por hora de ${nomeTipo} — o semáforo aparece assim que houver dias comparáveis.</span>`;
+      return;
+    }
+    if (horaAtual === 0) {
+      el.innerHTML = `${aviso}<span class="state small">Ainda é cedo para comparar (a comparação começa depois da 1.ª hora do dia).</span>`;
       return;
     }
 
+    // compara o mesmo intervalo nos dois lados: horas completas até agora (a hora em curso fica de fora, porque
+    // nos dias de referência só se somam horas completas)
+    const hojeAteHora = lastVendasRows.reduce((soma, r) => {
+      const d = new Date(r.sale_at);
+      return (!isNaN(d) && d.getHours() < horaAtual) ? soma + (Number(r.value) || 0) : soma;
+    }, 0);
     const mediasAteAgora = comparaveis.map(d => {
       const ph = HISTORICO[d].porHora;
       let soma = 0;
@@ -2047,8 +2139,7 @@
     });
     const mediaComparavel = mediasAteAgora.reduce((s, v) => s + v, 0) / mediasAteAgora.length;
 
-    const pct = mediaComparavel ? (receitaHojeAteAgora / mediaComparavel) * 100 : 0;
-    const tipoDia = diaSemana === 0 ? 'domingos' : diaSemana === 6 ? 'sábados' : 'dias úteis';
+    const pct = mediaComparavel ? (hojeAteHora / mediaComparavel) * 100 : 0;
     let cor, texto, emoji;
     if (!mediaComparavel) {
       cor = 'var(--muted)'; emoji = '⚪'; texto = 'sem referência';
@@ -2060,9 +2151,9 @@
       cor = 'var(--negative)'; emoji = '🔴'; texto = 'abaixo da média';
     }
 
-    el.innerHTML = `${emoji} <span style="color:${cor};font-weight:600;">${texto}</span>
-      — ${fmtEUR(receitaHojeAteAgora)} até às ${String(horaAtual).padStart(2, '0')}h,
-      vs. média de ${fmtEUR(mediaComparavel)} nos últimos ${comparaveis.length} ${tipoDia} à mesma hora
+    el.innerHTML = `${aviso}${emoji} <span style="color:${cor};font-weight:600;">${texto}</span>
+      — ${fmtEUR(hojeAteHora)} até às ${String(horaAtual).padStart(2, '0')}h,
+      vs. média de ${fmtEUR(mediaComparavel)} nos últimos ${comparaveis.length} ${nomeTipo} à mesma hora
       ${mediaComparavel ? `(${pct.toFixed(0)}%)` : ''}`;
   }
 
@@ -2108,7 +2199,7 @@
       },
     });
 
-    renderSemaforoVendas(receitaTotal);
+    renderSemaforoVendas();
 
     // Top produtos: receita + quantidade (cafés agrupados; nomes longos truncados)
     const rowsComProduto = rows.filter(r => r.NOME_PRODUTO);
@@ -2555,13 +2646,10 @@
       });
 
       function tendenciaIcone(nome) {
-        const serie = porDiaProduto.get(nome) || [];
-        const primeira = serie.slice(0, 4).reduce((s, v) => s + v, 0) / 4;
-        const segunda = serie.slice(4).reduce((s, v) => s + v, 0) / 3;
-        if (!primeira && !segunda) return '';
-        if (!primeira) return '▲';
-        const variacao = (segunda - primeira) / primeira;
-        if (variacao > 0.15) return '▲';
+        // só dias úteis: um fim de semana ou feriado na janela não deve parecer uma queda de vendas
+        const variacao = tendenciaDiasUteis(diasOrdem, porDiaProduto.get(nome) || []);
+        if (variacao === null) return '';
+        if (variacao === Infinity || variacao > 0.15) return '▲';
         if (variacao < -0.15) return '▼';
         return '▬';
       }
@@ -2928,7 +3016,7 @@
       doc.setTextColor(0);
     }
 
-    doc.save(`reposicao_${amanha.toISOString().slice(0, 10)}.pdf`);
+    doc.save(`reposicao_${formatarData(amanha)}.pdf`);
     msg.style.color = 'var(--positive)';
     msg.textContent = 'PDF gerado.';
   }
@@ -3106,13 +3194,16 @@
     const diaAtual = new Date().getDate();
     const [anoN, mesN] = mesAtual.split('-').map(Number);
     const diasNoMes = new Date(anoN, mesN, 0).getDate();
+    // fator de projeção do mês: peso do mês inteiro / peso dos dias já passados (feriados e fins de semana pesam menos)
+    const projMes = projetarMes(mesAtual, diaAtual);
+    const fatorMes = projMes.pesoDecorrido >= 1 ? projMes.pesoTotal / projMes.pesoDecorrido : (diaAtual ? diasNoMes / diaAtual : 0);
 
     let linhas = Object.entries(previsaoCompraData)
       .filter(([nome]) => subfamiliaLabel(nome) !== 'Compostos')
       .filter(([nome]) => !termo || nome.toLowerCase().includes(termo))
       .map(([nome, d]) => {
         const esteMs = totalProdutoPeriodo(nome, mesAtual);
-        const projecao = diaAtual ? Math.round((esteMs / diaAtual) * diasNoMes * 10) / 10 : 0;
+        const projecao = Math.round(esteMs * fatorMes * 10) / 10;
         return {
           nome,
           media: d.mediaMensal, // pode ser null (produto novo) — média histórica, atualizada periodicamente
@@ -3720,15 +3811,11 @@
 
     const linhasHist = Array.from(porDiaProduto30.entries()).map(([nome, serie]) => {
       const total = serie.reduce((s, v) => s + v, 0);
-      const primeira = serie.slice(0, 15).reduce((s, v) => s + v, 0) / 15;
-      const segunda = serie.slice(15).reduce((s, v) => s + v, 0) / 15;
+      // só dias úteis e só dias já capturados (um dia sem dados não é um dia sem vendas)
+      const variacao = tendenciaDiasUteis(diasOrdem30, serie, (d) => HISTORICO[d] && HISTORICO[d].porProduto);
       let tendIcone = '▬', tendCor = 'var(--muted)';
-      if (primeira === 0 && segunda > 0) { tendIcone = '▲'; tendCor = 'var(--positive)'; }
-      else if (primeira > 0) {
-        const variacao = (segunda - primeira) / primeira;
-        if (variacao > 0.15) { tendIcone = '▲'; tendCor = 'var(--positive)'; }
-        else if (variacao < -0.15) { tendIcone = '▼'; tendCor = 'var(--negative)'; }
-      }
+      if (variacao === Infinity || (variacao !== null && variacao > 0.15)) { tendIcone = '▲'; tendCor = 'var(--positive)'; }
+      else if (variacao !== null && variacao < -0.15) { tendIcone = '▼'; tendCor = 'var(--negative)'; }
       return { nome, total, mediaDia: total / 30, tendIcone, tendCor };
     }).sort((a, b) => b.total - a.total);
 
