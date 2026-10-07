@@ -462,7 +462,8 @@
     <div class="grid-2">
       <div class="panel">
         <h2>Receita por máquina</h2>
-        <canvas id="chartMaquinas" height="200"></canvas>
+        <div id="chartMaquinasBox" style="position:relative;height:340px;"><canvas id="chartMaquinas"></canvas></div>
+        <div style="text-align:center;margin-top:8px;"><button id="chartMaquinasToggle" type="button" class="compare-box-btn" style="display:none;background:#1B1F27;color:#fff;border:0;border-radius:6px;padding:8px 14px;font-size:13px;cursor:pointer;"></button></div>
       </div>
       <div class="panel">
         <h2>Vendas por subfamília</h2>
@@ -834,6 +835,12 @@
     </div>
 
     <div class="panel full">
+      <h2>Vendas hoje e semana atual (2ª a sábado)</h2>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;" id="smartcakeSemanaInfo"></div>
+      <div class="table-wrap" id="smartcakeSemanaWrap"><div class="state small">a carregar…</div></div>
+    </div>
+
+    <div class="panel full">
       <h2>Stock atual por máquina</h2>
       <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
         "Dias de stock" estima quantos dias o stock atual dura ao ritmo real de vendas — acima de 5 dias é risco de validade; vazio ("—") significa ainda sem vendas reais suficientes para estimar.
@@ -978,8 +985,8 @@
     "009": "D'Casa Gondomar", "009-S": "D'Casa Gondomar", "010": "Blue Sky Gondomar",
     "011": "Jardins do Oriente", "012": "Águas Santas (só café)", "013": "Jardins do Oriente",
     "014": "Blue Sky Gondomar", "015": "Nogueira - Perafita", "016": "Nogueira - Perafita",
-    "017": "Divmac corredor", "018": "Divmac corredor",
-    "019": "Divmac corredor", "020": "Divmac corredor",
+    "017": "Divmac 017 (snacks)", "018": "Divmac 018 (snacks)",
+    "019": "Divmac 019 (café)", "020": "Divmac 020 (café)",
   };
 
   // Máquinas ainda por instalar: só entram na lista de reposição quando a data da visita for igual ou posterior
@@ -1011,7 +1018,8 @@
 
   function machineLabel(matricula) {
     const pdv = MACHINES[matricula];
-    return pdv ? `${pdv} · ${matricula}` : (matricula || '—');
+    if (!pdv) return matricula || '—';
+    return pdv.includes(matricula) ? pdv : `${pdv} · ${matricula}`;
   }
 
   // Catálogo de produtos ao vivo (card 65) — substitui os mapas fixos PRODUCTS/NAME_TO_SUBFAMILIA
@@ -2243,21 +2251,33 @@
       r => Number(r.value) || 0
     );
     const maquinas = Array.from(porMaquina.entries()).sort((a, b) => b[1] - a[1]);
-    new Chart(document.getElementById('chartMaquinas'), {
-      type: 'bar',
-      data: {
-        labels: maquinas.map(m => machineLabel(m[0])),
-        datasets: [{
-          label: 'Receita (€)',
-          data: maquinas.map(m => m[1]),
-          backgroundColor: '#1B1F27',
-        }],
-      },
-      options: {
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true } },
-      },
-    });
+    const MAQ_TOP = 10;
+    let maqExpandido = false;
+    let chartMaquinasInstance = null;
+    const desenharMaquinas = () => {
+      const lista = maqExpandido ? maquinas : maquinas.slice(0, MAQ_TOP);
+      const box = document.getElementById('chartMaquinasBox');
+      box.style.height = Math.max(260, lista.length * 30 + 50) + 'px';
+      if (chartMaquinasInstance) chartMaquinasInstance.destroy();
+      chartMaquinasInstance = new Chart(document.getElementById('chartMaquinas'), {
+        type: 'bar',
+        data: {
+          labels: lista.map(m => machineLabel(m[0])),
+          datasets: [{ label: 'Receita (€)', data: lista.map(m => m[1]), backgroundColor: '#1B1F27' }],
+        },
+        options: {
+          indexAxis: 'y',
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { beginAtZero: true } },
+        },
+      });
+      const btn = document.getElementById('chartMaquinasToggle');
+      btn.style.display = maquinas.length > MAQ_TOP ? 'inline-block' : 'none';
+      btn.textContent = maqExpandido ? `Mostrar só as top ${MAQ_TOP}` : `Mostrar todas as ${maquinas.length} máquinas`;
+    };
+    document.getElementById('chartMaquinasToggle').onclick = () => { maqExpandido = !maqExpandido; desenharMaquinas(); };
+    desenharMaquinas();
 
     // Vendas por subfamília
     const porSubfamilia = groupSum(
@@ -3689,9 +3709,50 @@
     document.getElementById('smartcakeUnidadesHoje').textContent = fmtInt(unidadesHoje);
     document.getElementById('smartcakeProdutosDistintos').textContent = fmtInt(produtosHoje.size);
 
+    // Vendas hoje + semana atual (2ª a sábado). Hoje vem dos dados ao vivo; dias anteriores do histórico (sem contar hoje duas vezes)
+    {
+      const agora = new Date();
+      const hojeStr = formatarData(agora);
+      const dow = agora.getDay(); // 0=domingo
+      const seg = new Date(agora); seg.setHours(12, 0, 0, 0);
+      seg.setDate(seg.getDate() - (dow === 0 ? 6 : dow - 1));
+      const diasSemana = [];
+      for (let i = 0; i < 6; i++) { const d = new Date(seg); d.setDate(seg.getDate() + i); diasSemana.push(formatarData(d)); }
+      const prod = new Map();
+      const get = (n) => { if (!prod.has(n)) prod.set(n, { hQtd: 0, hVal: 0, sQtd: 0, sVal: 0 }); return prod.get(n); };
+      for (const r of rowsHoje) {
+        const e = get(canonicalProduto(r.NOME_PRODUTO));
+        const q = Number(r.count) || 1, v = Number(r.value) || 0;
+        e.hQtd += q; e.hVal += v;
+        if (diasSemana.includes(hojeStr)) { e.sQtd += q; e.sVal += v; }
+      }
+      for (const d of diasSemana) {
+        if (d >= hojeStr) continue;
+        const res = HISTORICO[d];
+        if (!res || !res.porProduto) continue;
+        for (const [nome, v] of Object.entries(res.porProduto)) {
+          if (!isFresco(nome)) continue;
+          const e = get(nome);
+          e.sQtd += v.qtd || 0; e.sVal += v.valor || 0;
+        }
+      }
+      const linhas = Array.from(prod.entries()).sort((a, b) => b[1].sVal - a[1].sVal);
+      const tot = linhas.reduce((t, [, e]) => ({ hQtd: t.hQtd + e.hQtd, hVal: t.hVal + e.hVal, sQtd: t.sQtd + e.sQtd, sVal: t.sVal + e.sVal }), { hQtd: 0, hVal: 0, sQtd: 0, sVal: 0 });
+      document.getElementById('smartcakeSemanaInfo').textContent =
+        `Semana de ${diasSemana[0]} a ${diasSemana[5]}. Dias passados vêm do histórico diário capturado; hoje vem dos dados ao vivo.`;
+      document.getElementById('smartcakeSemanaWrap').innerHTML = linhas.length ? `
+        <table>
+          <thead><tr><th>Produto</th><th class="num">Hoje (un.)</th><th class="num">Hoje (€)</th><th class="num">Semana (un.)</th><th class="num">Semana (€)</th></tr></thead>
+          <tbody>
+            ${linhas.map(([n, e]) => `<tr><td>${n}</td><td class="num">${fmtInt(e.hQtd)}</td><td class="num">${fmtEUR(e.hVal)}</td><td class="num">${fmtInt(e.sQtd)}</td><td class="num">${fmtEUR(e.sVal)}</td></tr>`).join('')}
+            <tr style="font-weight:600;"><td>Total</td><td class="num">${fmtInt(tot.hQtd)}</td><td class="num">${fmtEUR(tot.hVal)}</td><td class="num">${fmtInt(tot.sQtd)}</td><td class="num">${fmtEUR(tot.sVal)}</td></tr>
+          </tbody>
+        </table>` : '<div class="state small">Sem vendas de produtos Smartcake esta semana.</div>';
+    }
+
     const porMaquinaHoje = groupSum(
       rowsHoje.filter(r => r.MATRICULA_MAQUINA && !MAQUINAS_EXCLUIDAS.has(r.MATRICULA_MAQUINA)),
-      r => pdvLabel(r.MATRICULA_MAQUINA), r => Number(r.value) || 0
+      r => machineLabel(r.MATRICULA_MAQUINA), r => Number(r.value) || 0
     );
     const entradasMaquina = Array.from(porMaquinaHoje.entries()).sort((a, b) => b[1] - a[1]);
     new Chart(document.getElementById('chartSmartcakeMaquinas'), {
