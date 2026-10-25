@@ -779,10 +779,12 @@
       </div>
       <div class="panel">
         <h2>Receita por ponto de venda este mês</h2>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;" id="pdvMesNota">
           Soma dos dias já disponíveis este mês com esta informação.
         </div>
-        <canvas id="chartPDVMes" height="220"></canvas>
+        <input type="search" id="pdvMesPesquisa" placeholder="Pesquisar local ou máquina (ex.: oasis, 008-S)…" autocomplete="off"
+          style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:4px;padding:10px;font-family:inherit;font-size:16px;margin-bottom:10px;" />
+        <div id="pdvMesLista"></div>
       </div>
     </div>
 
@@ -1536,49 +1538,108 @@
     });
   }
 
-  let chartPDVMesInstance = null;
+  // Receita do mês por ponto de venda e por máquina: lista com pesquisa (mais legível do que um gráfico com todas as barras)
+  const PDV_MES_TOP = 8;
+  let pdvMesDados = null;
+  let pdvMesMostrarTodos = false;
+
   function renderReceitaPDVMes() {
     const mesAtual = todayStr().slice(0, 7);
     const porPDV = new Map();
+    const porMaq = new Map();
+    let diasComDados = 0, diasComMaquina = 0;
     for (const [data, resumo] of Object.entries(HISTORICO)) {
       if (!data.startsWith(mesAtual)) continue;
-      if (!resumo.porPontoVenda) continue;
-      for (const [pdv, valor] of Object.entries(resumo.porPontoVenda)) {
-        if (pdv === 'Studio up Yoga') continue;
-        porPDV.set(pdv, (porPDV.get(pdv) || 0) + valor);
+      if (resumo.porPontoVenda) {
+        diasComDados++;
+        for (const [pdv, valor] of Object.entries(resumo.porPontoVenda)) {
+          if (pdv === 'Studio up Yoga') continue;
+          porPDV.set(pdv, (porPDV.get(pdv) || 0) + valor);
+        }
+      }
+      if (resumo.porMaquina) {
+        diasComMaquina++;
+        for (const [maq, valor] of Object.entries(resumo.porMaquina)) {
+          if (MAQUINAS_EXCLUIDAS.has(maq)) continue;
+          porMaq.set(maq, (porMaq.get(maq) || 0) + valor);
+        }
       }
     }
-    const entradas = Array.from(porPDV.entries()).sort((a, b) => b[1] - a[1]);
-    const canvas = document.getElementById('chartPDVMes');
+    pdvMesDados = {
+      pdvs: Array.from(porPDV.entries()).sort((a, b) => b[1] - a[1]),
+      maquinas: Array.from(porMaq.entries()).sort((a, b) => b[1] - a[1]),
+      diasComDados, diasComMaquina,
+    };
+    desenharReceitaPDVMes();
+  }
 
-    if (chartPDVMesInstance) chartPDVMesInstance.destroy();
-    if (!entradas.length) {
-      canvas.insertAdjacentHTML('afterend', '<div class="state small">Ainda sem dias suficientes capturados este mês com esta informação.</div>');
+  function desenharReceitaPDVMes() {
+    const wrap = document.getElementById('pdvMesLista');
+    const nota = document.getElementById('pdvMesNota');
+    if (!wrap || !pdvMesDados) return;
+    const { pdvs, maquinas, diasComDados, diasComMaquina } = pdvMesDados;
+    if (!pdvs.length) {
+      wrap.innerHTML = '<div class="state small">Ainda sem dias suficientes capturados este mês com esta informação.</div>';
       return;
     }
-    // altura dinâmica: cada local precisa de espaço suficiente para o nome não ficar cortado/apertado
-    canvas.parentElement.style.height = `${Math.max(220, entradas.length * 32 + 40)}px`;
-    canvas.style.height = '100%';
-    chartPDVMesInstance = new Chart(canvas, {
-      type: 'bar',
-      data: {
-        labels: entradas.map(e => truncar(e[0], 40)),
-        datasets: [{ label: 'Receita (€)', data: entradas.map(e => e[1]), backgroundColor: '#1B1F27' }],
-      },
-      options: {
-        indexAxis: 'y',
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { title: (items) => entradas[items[0].dataIndex][0] } },
-        },
-        scales: {
-          x: { beginAtZero: true },
-          y: { ticks: { autoSkip: false, font: { size: 12 } } },
-        },
-      },
-    });
+    const total = pdvs.reduce((s, e) => s + e[1], 0);
+    const termo = semAcentos(document.getElementById('pdvMesPesquisa').value.trim());
+
+    const linha = (nome, valor, max, sub) => `
+      <div style="padding:7px 0;border-bottom:1px solid var(--line);">
+        <div style="display:flex;justify-content:space-between;gap:10px;font-size:14px;">
+          <span style="min-width:0;overflow-wrap:anywhere;">${nome}${sub ? ` <span style="color:var(--muted);font-size:12px;">${sub}</span>` : ''}</span>
+          <span style="font-weight:600;white-space:nowrap;">${fmtEUR(valor)}</span>
+        </div>
+        <div style="height:5px;background:var(--line);border-radius:3px;margin-top:5px;">
+          <div style="height:5px;width:${max ? Math.max(2, (valor / max) * 100) : 0}%;background:#1B1F27;border-radius:3px;"></div>
+        </div>
+      </div>`;
+
+    if (!termo) {
+      nota.textContent = `Total do mês: ${fmtEUR(total)} em ${pdvs.length} locais (${diasComDados} dias capturados). Escreve acima para ver um local ou uma máquina.`;
+      const lista = pdvMesMostrarTodos ? pdvs : pdvs.slice(0, PDV_MES_TOP);
+      const max = pdvs[0][1];
+      wrap.innerHTML = lista.map(([n, v]) => linha(escapeHtml(n), v, max, total ? ((v / total) * 100).toFixed(0) + '%' : '')).join('') +
+        (pdvs.length > PDV_MES_TOP
+          ? `<button type="button" id="pdvMesToggle" style="margin-top:10px;background:none;border:1px solid var(--line);border-radius:4px;padding:8px 14px;font-size:13px;cursor:pointer;min-height:40px;">${pdvMesMostrarTodos ? 'Mostrar só os ' + PDV_MES_TOP + ' maiores' : 'Mostrar todos os ' + pdvs.length + ' locais'}</button>`
+          : '');
+      const btn = document.getElementById('pdvMesToggle');
+      if (btn) btn.onclick = () => { pdvMesMostrarTodos = !pdvMesMostrarTodos; desenharReceitaPDVMes(); };
+      return;
+    }
+
+    // pesquisa: locais cujo nome contém o termo + máquinas cuja matrícula, nome ou local contém o termo
+    const locais = pdvs.filter(([n]) => semAcentos(n).includes(termo));
+    const maqs = maquinas.filter(([m]) => semAcentos(machineLabel(m)).includes(termo));
+    const totalLocais = locais.reduce((s, e) => s + e[1], 0);
+    const totalMaqs = maqs.reduce((s, e) => s + e[1], 0);
+    if (!locais.length && !maqs.length) {
+      nota.textContent = 'Soma dos dias já disponíveis este mês com esta informação.';
+      wrap.innerHTML = '<div class="state small">Nada encontrado para esta pesquisa.</div>';
+      return;
+    }
+    nota.textContent = `Resultado da pesquisa — este mês (${diasComDados} dias capturados).`;
+    let html = '';
+    if (locais.length) {
+      const max = locais[0][1];
+      html += `<div style="font-size:12px;color:var(--muted);margin-top:4px;">Locais${locais.length > 1 ? ` · total ${fmtEUR(totalLocais)}` : ''}</div>` +
+        locais.map(([n, v]) => linha(escapeHtml(n), v, max, total ? ((v / total) * 100).toFixed(1) + '% do mês' : '')).join('');
+    }
+    if (maqs.length) {
+      const max = maqs[0][1];
+      html += `<div style="font-size:12px;color:var(--muted);margin-top:12px;">Máquinas${maqs.length > 1 ? ` · total ${fmtEUR(totalMaqs)}` : ''}</div>` +
+        maqs.map(([m, v]) => linha(escapeHtml(machineLabel(m)), v, max, '')).join('') +
+        (diasComMaquina < diasComDados
+          ? `<div style="font-size:11px;color:var(--muted);margin-top:6px;">Detalhe por máquina disponível em ${diasComMaquina} de ${diasComDados} dias deste mês.</div>`
+          : '');
+    }
+    wrap.innerHTML = html;
   }
+
+  document.addEventListener('input', (e) => {
+    if (e.target && e.target.id === 'pdvMesPesquisa') desenharReceitaPDVMes();
+  });
 
   async function renderValorCofre() {
     const wrap = document.getElementById('valorCofreWrap');
