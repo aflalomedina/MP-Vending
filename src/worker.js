@@ -345,6 +345,77 @@ async function handleTarefas(request, env) {
   return new Response("Método não suportado", { status: 405 });
 }
 
+// ===== Layouts planeados das máquinas de snacks (Cloudflare KV, chave "layout:<matrícula>") =====
+// Um plano por máquina: canal -> produto planeado. Estados: planeado -> troca_feita -> concluido (quando a Luope já bate certo).
+const LAYOUT_ESTADOS = ["planeado", "troca_feita", "concluido"];
+function limparCanaisLayout(lista) {
+  if (!Array.isArray(lista)) return null;
+  return lista.slice(0, 120).map((c) => ({
+    canal: String((c && c.canal) || "").slice(0, 12),
+    seletor: String((c && c.seletor) || "").slice(0, 12),
+    capacidade: Math.max(0, Math.min(99, Number(c && c.capacidade) || 0)),
+    produto: String((c && c.produto) || "").slice(0, 120),
+    teste: !!(c && c.teste),
+    nota: String((c && c.nota) || "").slice(0, 200),
+  })).filter((c) => c.canal);
+}
+async function handleLayouts(request, env) {
+  const url = new URL(request.url);
+  const maquina = (url.searchParams.get("maquina") || "").trim();
+  const validaMaquina = (m) => /^[0-9A-Za-z-]{1,10}$/.test(m);
+
+  if (request.method === "GET") {
+    const layouts = [];
+    let cursor;
+    do {
+      const listed = await env.HISTORY_KV.list({ prefix: "layout:", cursor });
+      for (const key of listed.keys) {
+        const value = await env.HISTORY_KV.get(key.name);
+        if (value) {
+          try { layouts.push(JSON.parse(value)); } catch { /* ignora entradas corrompidas */ }
+        }
+      }
+      cursor = listed.list_complete ? undefined : listed.cursor;
+    } while (cursor);
+    return jsonResponse({ layouts });
+  }
+
+  if (request.method === "PUT") {
+    if (!validaMaquina(maquina)) return jsonResponse({ error: "Falta ou é inválido o parâmetro maquina" }, 400);
+    let payload;
+    try { payload = await request.json(); } catch { return jsonResponse({ error: "JSON inválido" }, 400); }
+    const existente = await env.HISTORY_KV.get(`layout:${maquina}`);
+    let atual = null;
+    if (existente) { try { atual = JSON.parse(existente); } catch { atual = null; } }
+    const agora = new Date().toISOString();
+    if (!atual) atual = { maquina, estado: "planeado", canais: [], notas: "", visitasSemana: 2, criadoEm: agora, trocaFeitaEm: null, concluidoEm: null };
+    if (payload.canais !== undefined) {
+      const canais = limparCanaisLayout(payload.canais);
+      if (!canais) return jsonResponse({ error: "canais tem de ser uma lista" }, 400);
+      atual.canais = canais;
+    }
+    if (typeof payload.notas === "string") atual.notas = payload.notas.slice(0, 2000);
+    if (payload.visitasSemana !== undefined) atual.visitasSemana = Math.max(0.5, Math.min(7, Number(payload.visitasSemana) || 2));
+    if (LAYOUT_ESTADOS.includes(payload.estado) && payload.estado !== atual.estado) {
+      atual.estado = payload.estado;
+      if (payload.estado === "planeado") { atual.trocaFeitaEm = null; atual.concluidoEm = null; }
+      if (payload.estado === "troca_feita") { atual.trocaFeitaEm = /^\d{4}-\d{2}-\d{2}$/.test(payload.trocaFeitaEm || "") ? payload.trocaFeitaEm : agora.slice(0, 10); atual.concluidoEm = null; }
+      if (payload.estado === "concluido") { atual.concluidoEm = agora; if (!atual.trocaFeitaEm) atual.trocaFeitaEm = agora.slice(0, 10); }
+    }
+    atual.atualizadoEm = agora;
+    await env.HISTORY_KV.put(`layout:${maquina}`, JSON.stringify(atual));
+    return jsonResponse({ ok: true, layout: atual });
+  }
+
+  if (request.method === "DELETE") {
+    if (!validaMaquina(maquina)) return jsonResponse({ error: "Falta ou é inválido o parâmetro maquina" }, 400);
+    await env.HISTORY_KV.delete(`layout:${maquina}`);
+    return jsonResponse({ ok: true });
+  }
+
+  return new Response("Método não suportado", { status: 405 });
+}
+
 // ===== Despesas mensais (Cloudflare KV) =====
 // ===== Tracking próprio (visitas + leads do formulário) via KV =====
 async function handleTrack(request, env) {
@@ -547,6 +618,17 @@ export default {
     if (url.pathname === "/api/tarefas") {
       try {
         return await handleTarefas(request, env);
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    if (url.pathname === "/api/layouts") {
+      try {
+        return await handleLayouts(request, env);
       } catch (err) {
         return new Response(JSON.stringify({ error: err.message }), {
           status: 500,

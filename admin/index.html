@@ -387,6 +387,9 @@
     }
     .cards-mobile td::before { content: attr(data-label); color: var(--muted); text-align: left; font-size: 11.5px; font-weight: 400; font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
     #smartcakeGridTabela tbody tr { grid-template-columns: 1fr; }
+    #layoutTabelaWrap td:nth-child(4) { grid-column: 1 / -1; display: block; text-align: left; }
+    #layoutTabelaWrap td:nth-child(4)::before { display: block; margin-bottom: 4px; }
+    #layoutTabelaWrap select { max-width: none !important; font-size: 14px !important; padding: 7px !important; }
     #smartcakeGridTabela td.sc-vazio { display: none; }
     #smartcakeGridTabela td > div { display: none; }
     #smartcakeGridTabela td.num { align-items: center; }
@@ -514,6 +517,7 @@
         </div>
       </div>
       <div id="gerarPdfMsg" style="font-size:12px;margin-top:8px;"></div>
+      <div id="reposicaoLayoutsWrap" style="display:none;margin-top:10px;padding:10px 12px;border:1px dashed var(--line);border-radius:4px;"></div>
 
       <div id="checklistLocaisWrap" style="display:none;margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px;">
@@ -538,6 +542,36 @@
           Gerar PDF com os locais selecionados
         </button>
       </div>
+    </div>
+
+    <div class="panel full" id="layoutsPanel">
+      <h2>Layouts das máquinas de snacks</h2>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">
+        Compara o layout atual (export de canais da Luope) com um layout planeado, canal a canal. A sugestão usa as vendas dos últimos 20 dias úteis e mexe no mínimo de canais.
+        O plano guardado fica partilhado e pode ser usado na lista de reposição numa visita pontual. Depois da troca, os canais têm de ser atualizados na Luope.
+      </div>
+      <div id="layoutsResumo"><div class="state small">a carregar…</div></div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:14px 0 4px;">
+        <div>
+          <label for="layoutMaquina" style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Máquina</label>
+          <select id="layoutMaquina" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;"></select>
+        </div>
+        <div>
+          <label for="layoutVisitas" style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Visitas por semana</label>
+          <input type="number" id="layoutVisitas" min="0.5" max="7" step="0.5" value="2" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;width:80px;" />
+        </div>
+        <button type="button" id="layoutSugerirBtn" style="background:none;border:1px solid var(--ink);border-radius:4px;padding:8px 12px;font-size:12.5px;cursor:pointer;">Sugerir pelas vendas</button>
+        <button type="button" id="layoutPropostaBtn" style="display:none;background:none;border:1px solid var(--line);border-radius:4px;padding:8px 12px;font-size:12.5px;cursor:pointer;">Carregar proposta</button>
+        <button type="button" id="layoutAtualBtn" style="background:none;border:1px solid var(--line);border-radius:4px;padding:8px 12px;font-size:12.5px;cursor:pointer;">Partir do layout atual</button>
+        <button type="button" id="layoutGuardarBtn" style="background:var(--ink);color:#fff;border:none;border-radius:4px;padding:9px 14px;font-size:12.5px;cursor:pointer;">Guardar plano</button>
+        <button type="button" id="layoutTrocaFeitaBtn" style="display:none;background:var(--accent);color:var(--ink);border:none;border-radius:4px;padding:9px 14px;font-size:12.5px;cursor:pointer;font-weight:600;">Marcar troca feita</button>
+        <button type="button" id="layoutApagarBtn" style="display:none;background:none;border:none;color:var(--negative);padding:8px 6px;font-size:12.5px;cursor:pointer;">Apagar plano</button>
+      </div>
+      <div id="layoutMsg" style="font-size:12px;min-height:16px;"></div>
+      <div id="layoutEstado"></div>
+      <div class="table-wrap cards-mobile" id="layoutTabelaWrap" style="max-height:620px;overflow-y:auto;"></div>
+      <h3 style="font-size:13.5px;margin:16px 0 6px;">Cobertura por produto</h3>
+      <div class="table-wrap cards-mobile" id="layoutCoberturaWrap"></div>
     </div>
 
     <div class="panel full">
@@ -2753,6 +2787,7 @@
     if (stocksLoaded) return;
     stocksLoaded = true;
     loadLayoutAndRender();
+    iniciarPainelLayouts();
     await garantirMensalCompletoData();
     renderTop7Dias();
     renderPrevisaoCompra();
@@ -2817,6 +2852,7 @@
         fetch('/admin/preco_medio_produto.json').then(r => r.ok ? r.json() : {}),
       ]);
       const layout = toObjects(layoutRaw);
+      const ajusteLayout = ajustarLayoutParaReposicao(layout); // layouts planeados + frescos fora de validade
       const stockRows = toObjects(stockRaw);
 
       // stock disponível por armazém, por nome de produto (7 = usado para repor; 3 = só para saber se existe noutro lado)
@@ -2835,7 +2871,7 @@
       const amanhaLocal = agoraPT();
       amanhaLocal.setDate(amanhaLocal.getDate() + 1);
       const dataVisita = `${amanhaLocal.getFullYear()}-${String(amanhaLocal.getMonth() + 1).padStart(2, '0')}-${String(amanhaLocal.getDate()).padStart(2, '0')}`;
-      for (const r of layout) {
+      for (const r of ajusteLayout.linhas) {
         if (!r.NOME_PRODUTO || !r.MATRICULA_MAQUINA) continue;
         if (MAQUINAS_EXCLUIDAS.has(r.MATRICULA_MAQUINA)) continue;
         if (!MACHINES[r.MATRICULA_MAQUINA]) { maquinasIgnoradas.add(r.MATRICULA_MAQUINA); continue; } // não pertence à frota
@@ -2914,7 +2950,7 @@
 
       if (!itens.length) {
         if (gridSC) {
-          ultimoCalculoReposicao = { locaisOrdenados: [], semStockTotal, gridSC };
+          ultimoCalculoReposicao = { locaisOrdenados: [], semStockTotal, gridSC, ajusteLayout };
           document.getElementById('checklistLocais').innerHTML = '<div style="font-size:12px;color:var(--muted);">Nada a repor nos restantes produtos.</div>';
           renderGridSmartcake(gridSC);
           checklistWrap.style.display = 'block';
@@ -2947,7 +2983,7 @@
           nivel: idx < 4 ? 'VISITAR AMANHÃ' : idx < 7 ? 'VISITAR EM BREVE' : 'SEM URGÊNCIA POR AGORA',
         }));
 
-      ultimoCalculoReposicao = { locaisOrdenados, semStockTotal, gridSC };
+      ultimoCalculoReposicao = { locaisOrdenados, semStockTotal, gridSC, ajusteLayout };
       renderGridSmartcake(gridSC);
 
       // pré-marca conforme o "Nº de locais" (se preenchido); senão marca todos
@@ -3078,6 +3114,8 @@
 
     let y = 30;
     let nivelAtual = null;
+    const trocasLayout = (ultimoCalculoReposicao.ajusteLayout && ultimoCalculoReposicao.ajusteLayout.trocas) || [];
+    const trocasDesenhadas = new Set();
     locaisOrdenados.forEach(({ local, lista, mediaPct, score, nivel }) => {
       if (nivel !== nivelAtual) {
         nivelAtual = nivel;
@@ -3124,7 +3162,35 @@
         margin: { left: 14, right: 14 },
       });
       y = doc.lastAutoTable.finalY + 8;
+      for (const troca of trocasLayout.filter(t => pdvLabel(t.maquina) === local && !trocasDesenhadas.has(t.maquina))) {
+        y = desenharTrocaLayoutPDF(doc, y, troca);
+        trocasDesenhadas.add(troca.maquina);
+      }
     });
+
+    for (const troca of trocasLayout.filter(t => !trocasDesenhadas.has(t.maquina))) {
+      y = desenharTrocaLayoutPDF(doc, y, troca);
+      trocasDesenhadas.add(troca.maquina);
+    }
+
+    const frescosRetirar = (ultimoCalculoReposicao.ajusteLayout && ultimoCalculoReposicao.ajusteLayout.frescosRetirar) || [];
+    if (frescosRetirar.length) {
+      if (y > 225) { doc.addPage(); y = 20; }
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text('Frescos a retirar das máquinas (fora de validade)', 14, y);
+      doc.setFont(undefined, 'normal');
+      doc.autoTable({
+        startY: y + 4,
+        head: [['Máquina', 'Canal', 'Produto', 'Unid.']],
+        body: frescosRetirar.map(f => [machineLabel(f.maquina), f.canal, f.produto, fmtInt(f.qtd)]),
+        theme: 'grid',
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [224, 49, 49] },
+        margin: { left: 14, right: 14 },
+      });
+      y = doc.lastAutoTable.finalY + 8;
+    }
 
     if (smartcakeDivisao.length) {
       if (y > 215) { doc.addPage(); y = 20; }
@@ -4240,6 +4306,569 @@
       rotular(container);
     });
   })();
+
+  // ===== Layouts das máquinas de snacks (planeado vs atual) =====
+  // O layout atual vem do export de canais da Luope (/api/layout-maquinas). O planeado fica guardado na KV (/api/layouts),
+  // partilhado entre os sócios. A lista de reposição pode usar o planeado numa visita pontual (troca de layout nesse dia).
+  const LAYOUT_SMARTCAKE = 'Smartcake (conforme entrega)';
+  const LAYOUT_MIN_SMARTCAKE = { '017': 5, '018': 5 }; // Divmac: mínimo de canais para frescos Smartcake
+  const LAYOUT_ORDEM_FAMILIAS = ['Bebidas', 'Frescos', 'Chocolates', 'Bolachas', 'Snacks', 'Outros'];
+  const LAYOUT_COR_FAMILIA = { Bebidas: '#E3EEF9', Frescos: '#E1F3E6', Chocolates: '#F0E4D7', Bolachas: '#F8EFCF', Snacks: '#FBE7D6', Outros: '#F1F1F1' };
+  const LAYOUT_SNACK_SUBFAMILIAS = new Set(['Bebidas', 'Snacks', 'Bolachas', 'Chocolates', 'Sandes', 'Frescos']);
+  let layoutsPlaneados = {};   // matrícula -> registo guardado na KV
+  let layoutsPropostos = {};   // matrícula -> proposta do ficheiro admin/layouts_propostos.json
+  let layoutsPropostosInfo = {};
+  let layoutExportRows = [];   // export de canais, só máquinas de snacks
+  let layoutStockArm7 = {};
+  let layoutEditor = null;     // { maquina, canais, visitasSemana, notas, origem, alterado }
+  let layoutsDadosPromise = null;
+  let layoutVelEstatica = {};
+
+  const fmt1 = (v) => (Number(v) || 0).toLocaleString('pt-PT', { maximumFractionDigits: 1 });
+  const LAYOUT_BEBIDA_RE = /\b\d+([.,]\d+)?\s*(cl|ml|l)\b|\blata\b|iogurte|\bagua\b|\bágua\b|tisana|fresky|santal/i;
+
+  function familiaLayout(p) {
+    if (!p) return 'Outros';
+    if (p === LAYOUT_SMARTCAKE || isSmartcakeProd(p)) return 'Frescos';
+    const sf = subfamiliaLabel(p);
+    if (sf === 'Bebidas' || LAYOUT_BEBIDA_RE.test(p)) return 'Bebidas';
+    if (sf === 'Chocolates' || sf === 'Bolachas') return sf;
+    return 'Snacks';
+  }
+
+  function canalNum(c) { return parseInt(String(c).replace(/\D/g, ''), 10) || 0; }
+
+  async function carregarDadosLayouts(forcar) {
+    if (layoutsDadosPromise && !forcar) return layoutsDadosPromise;
+    layoutsDadosPromise = (async () => {
+      const [layoutRaw, stockRaw, planos, propostas, vel] = await Promise.all([
+        fetchJSON('/api/layout-maquinas'),
+        fetchJSON('/api/stock-armazens'),
+        fetch('/api/layouts').then(r => r.ok ? r.json() : { layouts: [] }).catch(() => ({ layouts: [] })),
+        fetch('/admin/layouts_propostos.json').then(r => r.ok ? r.json() : {}).catch(() => ({})),
+        fetch('/admin/velocidade_maquina_produto.json').then(r => r.ok ? r.json() : {}).catch(() => ({})),
+        carregarCatalogoProdutos(),
+      ]);
+      layoutExportRows = toObjects(layoutRaw).filter(r => r.MATRICULA_MAQUINA && r.CANAL_CONF && isSnackMachine(r.MATRICULA_MAQUINA)
+        && !MAQUINAS_EXCLUIDAS.has(r.MATRICULA_MAQUINA) && MACHINES[r.MATRICULA_MAQUINA]);
+      layoutStockArm7 = {};
+      for (const r of toObjects(stockRaw)) {
+        if (String(r.CODIGO_ARMAZEM) !== '7') continue;
+        const n = canonicalProduto(productLabel(r.CODIGO_PRODUTO));
+        layoutStockArm7[n] = (layoutStockArm7[n] || 0) + (Number(r.sum) || 0);
+      }
+      layoutsPlaneados = {};
+      for (const l of (planos.layouts || [])) if (l && l.maquina) layoutsPlaneados[l.maquina] = l;
+      layoutsPropostos = (propostas && propostas.maquinas) || {};
+      layoutsPropostosInfo = propostas || {};
+      layoutVelEstatica = vel || {};
+    })();
+    try { await layoutsDadosPromise; } catch (e) { layoutsDadosPromise = null; throw e; }
+    return layoutsDadosPromise;
+  }
+
+  async function recarregarPlanos() {
+    const r = await fetch('/api/layouts');
+    const data = r.ok ? await r.json() : { layouts: [] };
+    if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    layoutsPlaneados = {};
+    for (const l of (data.layouts || [])) if (l && l.maquina) layoutsPlaneados[l.maquina] = l;
+  }
+
+  function canaisAtuais(maquina) {
+    return layoutExportRows.filter(r => r.MATRICULA_MAQUINA === maquina)
+      .map(r => ({
+        canal: String(r.CANAL_CONF), seletor: String(r.CODIGO_SELETOR || ''), capacidade: Number(r.CAPACIDADE_SELETOR) || 0,
+        produto: canonicalProduto(r.NOME_PRODUTO || ''), stock: Math.max(0, Number(r.sum) || 0),
+      }))
+      .sort((a, b) => canalNum(a.canal) - canalNum(b.canal));
+  }
+
+  function maquinasSnackLayout() {
+    return Array.from(new Set(layoutExportRows.map(r => r.MATRICULA_MAQUINA))).sort();
+  }
+
+  // vendas por dia útil: média dos últimos 20 dias úteis capturados (ou desde uma data); sem dias capturados usa a calibração estática
+  function diasUteisCapturados(desde) {
+    const hoje = todayStr();
+    return Object.keys(HISTORICO)
+      .filter(d => d < hoje && HISTORICO[d].porMaquinaProduto && !isFimDeSemana(d) && !isFeriado(d) && (!desde || d >= desde))
+      .sort().slice(desde ? 0 : -20);
+  }
+  function vendasDiaLayout(maquina, produto, desde) {
+    const dias = diasUteisCapturados(desde);
+    if (dias.length >= 3 || desde) {
+      if (!dias.length) return null;
+      return dias.reduce((s, d) => s + (((HISTORICO[d].porMaquinaProduto[maquina] || {})[produto]) || 0), 0) / dias.length;
+    }
+    return ((layoutVelEstatica[maquina] || {})[produto]) || 0;
+  }
+  function vendasDiaFrota(produto) {
+    return maquinasSnackLayout().reduce((s, m) => s + (vendasDiaLayout(m, produto) || 0), 0);
+  }
+
+  // em que espirais (código do seletor) cada produto já esteve, na frota toda e nos planos guardados
+  function espiraisUsadas() {
+    const mapa = {};
+    const add = (p, s) => { if (!p || !s) return; (mapa[p] = mapa[p] || new Set()).add(s); };
+    for (const r of layoutExportRows) add(canonicalProduto(r.NOME_PRODUTO || ''), String(r.CODIGO_SELETOR || ''));
+    for (const l of Object.values(layoutsPlaneados)) for (const c of (l.canais || [])) add(c.produto, c.seletor);
+    for (const pr of Object.values(layoutsPropostos)) for (const c of (pr.canais || [])) add(c.produto, c.seletor);
+    return mapa;
+  }
+
+  // ---- Sugestão automática a partir das vendas ----
+  // Parte do layout atual e mexe no mínimo: liberta canais sem vendas e canais a mais, garante o mínimo de frescos
+  // (Divmac), dá canais a quem esgota antes da visita seguinte e propõe testes nos canais que sobram.
+  function sugerirLayout(maquina, visitasSemana) {
+    const mapa = espiraisUsadas();
+    const diasCobrir = 5 / (visitasSemana || 2);
+    const v = (p) => vendasDiaLayout(maquina, p) || 0;
+    const precisa = (p) => Math.ceil(v(p) * diasCobrir * 1.2);
+    const isSC = (p) => p === LAYOUT_SMARTCAKE || isSmartcakeProd(p);
+    const compat = (p, seletor) => !!(mapa[p] && mapa[p].has(seletor));
+    const minSC = LAYOUT_MIN_SMARTCAKE[maquina] || 0;
+    const plano = canaisAtuais(maquina).map(c => ({ canal: c.canal, seletor: c.seletor, capacidade: c.capacidade, produto: c.produto, teste: false, nota: '' }));
+    const porProduto = () => {
+      const m = new Map();
+      plano.forEach(c => { if (c.produto) { if (!m.has(c.produto)) m.set(c.produto, []); m.get(c.produto).push(c); } });
+      return m;
+    };
+
+    // 1. sem vendas (menos de 0,5 por semana): o canal fica livre (os frescos da Divmac ficam, tratados no passo 3)
+    for (const c of plano) if (c.produto && !(minSC && isSC(c.produto)) && v(c.produto) * 5 < 0.5) { c.nota = `saiu: ${c.produto}`; c.produto = ''; }
+
+    // 2. canais a mais: fica com os canais de maior capacidade até cobrir o necessário
+    for (const [p, lista] of porProduto()) {
+      if (lista.length < 2) continue;
+      const nec = isSC(p) ? 0 : precisa(p);
+      lista.sort((a, b) => b.capacidade - a.capacidade);
+      let cap = 0;
+      lista.forEach((c, i) => { if (i > 0 && cap >= nec) { c.nota = `canal a mais de ${p}`; c.produto = ''; } else cap += c.capacidade; });
+    }
+
+    // 3. mínimo de canais Smartcake (frescos distintos, ordenados por vendas nesta máquina; o resto fica "conforme entrega")
+    if (minSC) {
+      const scSeletores = new Set();
+      Object.entries(mapa).forEach(([p, s]) => { if (isSC(p)) s.forEach(x => scSeletores.add(x)); });
+      const vendidosSC = Object.keys(Object.assign({}, ...diasUteisCapturados().map(d => HISTORICO[d].porMaquinaProduto[maquina] || {})))
+        .filter(isSC).sort((a, b) => v(b) - v(a));
+      let nSC = plano.filter(c => c.produto && isSC(c.produto)).length;
+      while (nSC < minSC) {
+        let alvo = plano.filter(c => !c.produto && scSeletores.has(c.seletor)).sort((a, b) => b.capacidade - a.capacidade)[0];
+        if (!alvo) {
+          const pp = porProduto();
+          alvo = plano.filter(c => c.produto && !isSC(c.produto) && scSeletores.has(c.seletor))
+            .sort((a, b) => (pp.get(b.produto).length - pp.get(a.produto).length) || (v(a.produto) - v(b.produto)))[0];
+        }
+        if (!alvo) break;
+        const presentes = new Set(plano.map(c => c.produto));
+        alvo.produto = vendidosSC.find(p => !presentes.has(p)) || LAYOUT_SMARTCAKE;
+        alvo.nota = 'mínimo de canais Smartcake';
+        nSC++;
+      }
+    }
+
+    // 4. falta de capacidade: canais livres compatíveis para quem esgota antes da visita seguinte
+    for (let guard = 0; guard < 60; guard++) {
+      const pp = porProduto();
+      const faltas = Array.from(pp.entries())
+        .filter(([p]) => !isSC(p))
+        .map(([p, lista]) => ({ p, falta: precisa(p) - lista.reduce((s, c) => s + c.capacidade, 0) }))
+        .filter(x => x.falta > 0)
+        .sort((a, b) => b.falta * v(b.p) - a.falta * v(a.p));
+      let mudou = false;
+      for (const f of faltas) {
+        const livre = plano.filter(c => !c.produto && compat(f.p, c.seletor)).sort((a, b) => b.capacidade - a.capacidade)[0];
+        if (livre) { livre.produto = f.p; livre.nota = `reforço: vende ${fmt1(v(f.p) * 5)}/semana`; mudou = true; break; }
+      }
+      if (!mudou) break;
+    }
+
+    // 5. canais que sobram: testes com produtos que vendem bem noutras máquinas, cabem na espiral e há no armazém 7
+    const presentes = new Set(plano.map(c => c.produto));
+    const candidatos = Object.keys(mapa)
+      .filter(p => p && !presentes.has(p) && !isSC(p) && (layoutStockArm7[p] || 0) > 0)
+      .map(p => ({ p, vf: vendasDiaFrota(p) }))
+      .sort((a, b) => b.vf - a.vf);
+    for (const c of plano.filter(x => !x.produto)) {
+      const k = candidatos.findIndex(x => compat(x.p, c.seletor));
+      if (k < 0) continue;
+      const { p, vf } = candidatos.splice(k, 1)[0];
+      c.produto = p; c.teste = true;
+      c.nota = vf > 0 ? `teste: vende ${fmt1(vf * 5)}/semana noutras máquinas` : 'teste: produto novo';
+    }
+    return plano;
+  }
+
+  // ---- Lista de produtos para escolher em cada canal ----
+  let _opcoesLayoutCache = null;
+  function opcoesProdutosLayout() {
+    if (_opcoesLayoutCache) return _opcoesLayoutCache;
+    const nomes = new Set();
+    const fontes = [SUBFAMILIA_LIVE || {}, NAME_TO_SUBFAMILIA];
+    for (const f of fontes) for (const [n, sf] of Object.entries(f)) if (LAYOUT_SNACK_SUBFAMILIAS.has(sf)) nomes.add(canonicalProduto(n));
+    for (const r of layoutExportRows) nomes.add(canonicalProduto(r.NOME_PRODUTO || ''));
+    for (const n of Object.keys(layoutStockArm7)) if (LAYOUT_SNACK_SUBFAMILIAS.has(subfamiliaLabel(n))) nomes.add(n);
+    for (const pr of Object.values(layoutsPropostos)) for (const c of (pr.canais || [])) nomes.add(c.produto);
+    nomes.delete(''); nomes.delete(LAYOUT_SMARTCAKE); nomes.delete('ND');
+    const porFam = {};
+    for (const n of nomes) (porFam[familiaLayout(n)] = porFam[familiaLayout(n)] || []).push(n);
+    _opcoesLayoutCache = LAYOUT_ORDEM_FAMILIAS.filter(f => porFam[f]).map(f => ({ familia: f, nomes: porFam[f].sort((a, b) => a.localeCompare(b, 'pt')) }));
+    return _opcoesLayoutCache;
+  }
+  function opcoesHtml(selecionado) {
+    const grupos = opcoesProdutosLayout();
+    const existe = !selecionado || selecionado === LAYOUT_SMARTCAKE || grupos.some(g => g.nomes.includes(selecionado));
+    const opt = (n) => `<option value="${escapeHtml(n)}"${n === selecionado ? ' selected' : ''}>${escapeHtml(n)}${layoutStockArm7[n] ? ` (arm. 7: ${fmtInt(layoutStockArm7[n])})` : ''}</option>`;
+    return `<option value=""${!selecionado ? ' selected' : ''}>— vazio —</option>` +
+      `<option value="${LAYOUT_SMARTCAKE}"${selecionado === LAYOUT_SMARTCAKE ? ' selected' : ''}>${LAYOUT_SMARTCAKE}</option>` +
+      (existe ? '' : opt(selecionado)) +
+      grupos.map(g => `<optgroup label="${g.familia}">${g.nomes.map(opt).join('')}</optgroup>`).join('');
+  }
+
+  // ---- Estado do plano face ao export da Luope ----
+  function compararComLuope(maquina, canais) {
+    const atuais = new Map(canaisAtuais(maquina).map(c => [c.canal, c]));
+    const diferentes = canais.filter(c => c.produto !== LAYOUT_SMARTCAKE && ((atuais.get(c.canal) || {}).produto || '') !== (c.produto || ''));
+    return { iguais: canais.length - diferentes.length, diferentes, atuais };
+  }
+
+  function avaliarTestes(plano) {
+    if (!plano || !plano.trocaFeitaEm) return [];
+    const dias = Math.round((new Date(todayStr()) - new Date(plano.trocaFeitaEm)) / 86400000);
+    return (plano.canais || []).filter(c => c.teste && c.produto).map(c => {
+      const vd = vendasDiaLayout(plano.maquina, c.produto, plano.trocaFeitaEm);
+      const porSemana = vd == null ? null : vd * 5;
+      let estado = 'a decorrer';
+      if (dias >= 21 && porSemana != null) estado = porSemana >= 2 ? 'aprovado' : 'fraco: trocar';
+      return { canal: c.canal, produto: c.produto, porSemana, dias, estado };
+    });
+  }
+
+  function estadoPlanoTexto(plano) {
+    if (!plano) return '';
+    const cmp = compararComLuope(plano.maquina, plano.canais || []);
+    if (plano.estado === 'concluido') return `Aplicado e confirmado na Luope${plano.concluidoEm ? ' em ' + plano.concluidoEm.slice(0, 10).split('-').reverse().join('/') : ''}`;
+    if (plano.estado === 'troca_feita') return cmp.diferentes.length
+      ? `Troca feita a ${String(plano.trocaFeitaEm || '').split('-').reverse().join('/')} · falta atualizar ${cmp.diferentes.length} canais na Luope`
+      : 'Troca feita e Luope atualizada';
+    return cmp.diferentes.length ? `Planeado · ${cmp.diferentes.length} canais por trocar` : 'Planeado · a Luope já tem este layout';
+  }
+
+  // quando a troca foi feita e a Luope já bate certo, o plano passa a concluído sozinho
+  async function confirmarPlanosConcluidos() {
+    for (const plano of Object.values(layoutsPlaneados)) {
+      if (plano.estado !== 'troca_feita') continue;
+      if (compararComLuope(plano.maquina, plano.canais || []).diferentes.length) continue;
+      try {
+        const r = await fetch(`/api/layouts?maquina=${encodeURIComponent(plano.maquina)}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado: 'concluido' }),
+        });
+        if (r.ok) layoutsPlaneados[plano.maquina] = (await r.json()).layout;
+      } catch { /* tenta outra vez na próxima abertura */ }
+    }
+  }
+
+  // ---- Painel ----
+  function renderLayoutsResumo() {
+    const wrap = document.getElementById('layoutsResumo');
+    const maqs = maquinasSnackLayout();
+    const testes = [];
+    const chips = maqs.map(m => {
+      const plano = layoutsPlaneados[m];
+      avaliarTestes(plano).forEach(t => testes.push({ maquina: m, ...t }));
+      const cor = !plano ? 'var(--muted)' : plano.estado === 'concluido' ? 'var(--positive)' : plano.estado === 'troca_feita' ? 'var(--accent-deep)' : 'var(--ink)';
+      const txt = plano ? estadoPlanoTexto(plano) : (layoutsPropostos[m] ? 'Há uma proposta por rever' : 'Sem plano');
+      return `<button type="button" class="layout-chip" data-m="${m}" style="text-align:left;background:${layoutEditor && layoutEditor.maquina === m ? '#FFF4E3' : 'var(--panel)'};border:1px solid var(--line);border-radius:6px;padding:8px 10px;cursor:pointer;font-family:inherit;min-width:190px;">
+        <div style="font-weight:600;font-size:13px;">${escapeHtml(machineLabel(m))}</div>
+        <div style="font-size:11.5px;color:${cor};">${escapeHtml(txt)}</div></button>`;
+    }).join('');
+    const tabTestes = testes.length ? `
+      <div style="margin-top:12px;font-weight:600;font-size:13px;">Produtos em teste</div>
+      <div class="table-wrap"><table><thead><tr><th>Máquina</th><th>Canal</th><th>Produto</th><th class="num">Vendas/semana</th><th class="num">Dias</th><th>Estado</th></tr></thead><tbody>
+      ${testes.map(t => `<tr><td>${escapeHtml(machineLabel(t.maquina))}</td><td>${t.canal}</td><td>${escapeHtml(t.produto)}</td><td class="num">${t.porSemana == null ? '—' : fmt1(t.porSemana)}</td><td class="num">${t.dias}</td>
+        <td style="color:${t.estado === 'fraco: trocar' ? 'var(--negative)' : t.estado === 'aprovado' ? 'var(--positive)' : 'var(--muted)'};font-weight:600;">${t.estado}</td></tr>`).join('')}
+      </tbody></table></div>
+      <div style="font-size:11.5px;color:var(--muted);">Ao fim de 3 semanas: aprovado com 2 ou mais vendas por semana; abaixo disso, trocar por outro produto.</div>` : '';
+    wrap.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px;">${chips}</div>${tabTestes}`;
+    wrap.querySelectorAll('.layout-chip').forEach(b => b.addEventListener('click', () => abrirEditorLayout(b.dataset.m)));
+  }
+
+  function abrirEditorLayout(maquina, origem) {
+    const plano = layoutsPlaneados[maquina];
+    const proposta = layoutsPropostos[maquina];
+    const visitas = (plano && plano.visitasSemana) || (proposta && proposta.visitasSemana) || (LAYOUT_MIN_SMARTCAKE[maquina] ? 1 : 2);
+    let canais, notas = '', desc;
+    if (origem === 'sugestao') { canais = sugerirLayout(maquina, visitas); desc = 'Sugestão calculada pelas vendas (ainda não guardada)'; }
+    else if (origem === 'proposta' && proposta) { canais = proposta.canais.map(c => ({ ...c })); notas = proposta.notas || ''; desc = 'Proposta da análise de layout (ainda não guardada)'; }
+    else if (origem === 'atual' || !plano) { canais = canaisAtuais(maquina).map(c => ({ canal: c.canal, seletor: c.seletor, capacidade: c.capacidade, produto: c.produto, teste: false, nota: '' })); desc = plano ? 'Cópia do layout atual (ainda não guardada)' : 'Sem plano guardado: a mostrar o layout atual'; }
+    else { canais = plano.canais.map(c => ({ ...c })); notas = plano.notas || ''; desc = 'Plano guardado'; }
+    // canais que existem no export e faltam no plano entram como estão
+    const tem = new Set(canais.map(c => c.canal));
+    canaisAtuais(maquina).forEach(c => { if (!tem.has(c.canal)) canais.push({ canal: c.canal, seletor: c.seletor, capacidade: c.capacidade, produto: c.produto, teste: false, nota: 'canal novo no export' }); });
+    canais.sort((a, b) => canalNum(a.canal) - canalNum(b.canal));
+    layoutEditor = { maquina, canais, visitasSemana: visitas, notas, desc, alterado: origem === 'sugestao' || origem === 'proposta' || (origem === 'atual' && !!plano) };
+    document.getElementById('layoutMaquina').value = maquina;
+    document.getElementById('layoutVisitas').value = visitas;
+    renderLayoutsResumo();
+    renderLayoutEditor();
+  }
+
+  function renderLayoutEditor() {
+    const wrap = document.getElementById('layoutTabelaWrap');
+    const estadoEl = document.getElementById('layoutEstado');
+    const cobWrap = document.getElementById('layoutCoberturaWrap');
+    const btnProposta = document.getElementById('layoutPropostaBtn');
+    if (!layoutEditor) { wrap.innerHTML = ''; cobWrap.innerHTML = ''; estadoEl.innerHTML = ''; return; }
+    const { maquina, canais } = layoutEditor;
+    const plano = layoutsPlaneados[maquina];
+    btnProposta.style.display = layoutsPropostos[maquina] ? '' : 'none';
+    document.getElementById('layoutTrocaFeitaBtn').style.display = plano && plano.estado === 'planeado' ? '' : 'none';
+    document.getElementById('layoutApagarBtn').style.display = plano ? '' : 'none';
+
+    const cmp = compararComLuope(maquina, canais);
+    const mapa = espiraisUsadas();
+    const visitas = Number(document.getElementById('layoutVisitas').value) || layoutEditor.visitasSemana || 2;
+    const diasCobrir = 5 / visitas;
+
+    // resumo por família (atual -> planeado)
+    const contar = (lista) => { const o = {}; lista.forEach(c => { const f = familiaLayout(c.produto); o[f] = (o[f] || 0) + 1; }); return o; };
+    const fa = contar(Array.from(cmp.atuais.values())), fp = contar(canais);
+    const familias = LAYOUT_ORDEM_FAMILIAS.filter(f => fa[f] || fp[f]);
+    const nSC = canais.filter(c => c.produto && (c.produto === LAYOUT_SMARTCAKE || isSmartcakeProd(c.produto))).length;
+    const minSC = LAYOUT_MIN_SMARTCAKE[maquina] || 0;
+    estadoEl.innerHTML = `
+      <div style="font-size:12.5px;margin:6px 0 8px;"><b>${escapeHtml(layoutEditor.desc || '')}</b>${plano ? ` · ${escapeHtml(estadoPlanoTexto(plano))}` : ''}${layoutEditor.alterado ? ' · <span style="color:var(--accent-deep);font-weight:600;">alterações por guardar</span>' : ''}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">${familias.map(f => `<span style="background:${LAYOUT_COR_FAMILIA[f]};border-radius:4px;padding:3px 8px;font-size:12px;">${f}: ${fa[f] || 0} → <b>${fp[f] || 0}</b></span>`).join('')}
+      <span style="font-size:12px;padding:3px 0;color:var(--muted);">${cmp.diferentes.length} canais diferentes do atual</span></div>
+      ${minSC && nSC < minSC ? `<div class="state small error" style="margin-bottom:8px;">Só ${nSC} canais Smartcake: o mínimo nesta máquina é ${minSC}.</div>` : ''}
+      ${plano && plano.estado === 'troca_feita' && cmp.diferentes.length ? `<div class="state small" style="margin-bottom:8px;color:var(--accent-deep);">A Luope ainda mostra o layout antigo nestes canais: ${cmp.diferentes.map(c => `${c.canal} (${escapeHtml(truncar((cmp.atuais.get(c.canal) || {}).produto || 'vazio', 18))} → ${escapeHtml(truncar(c.produto || 'vazio', 18))})`).join(', ')}. Atualiza na Luope; o admin confirma sozinho quando bater certo.</div>` : ''}`;
+
+    wrap.innerHTML = `<table><thead><tr><th>Canal</th><th>Espiral</th><th>Atual (stock)</th><th>Planeado</th><th>Teste</th><th class="num">Vende/sem.</th><th>Mudança</th></tr></thead><tbody>
+      ${canais.map((c, i) => {
+        const a = cmp.atuais.get(c.canal) || { produto: '', stock: 0 };
+        const muda = (a.produto || '') !== (c.produto || '');
+        const vd = c.produto && c.produto !== LAYOUT_SMARTCAKE ? vendasDiaLayout(maquina, c.produto) : null;
+        const espiralNova = c.produto && c.produto !== LAYOUT_SMARTCAKE && mapa[c.produto] && !mapa[c.produto].has(c.seletor);
+        return `<tr style="background:${LAYOUT_COR_FAMILIA[familiaLayout(c.produto)]};">
+          <td style="font-weight:600;">${c.canal}</td>
+          <td>${escapeHtml(c.seletor)} · ${c.capacidade}</td>
+          <td>${escapeHtml(a.produto || '—')} <span style="color:var(--muted);">(${a.stock})</span></td>
+          <td><select class="layout-sel" data-i="${i}" style="max-width:300px;width:100%;border:1px solid var(--line);border-radius:4px;padding:4px;font-family:inherit;font-size:12.5px;background:#fff;">${opcoesHtml(c.produto)}</select>
+            ${espiralNova ? '<div style="font-size:11px;color:var(--negative);">este produto nunca esteve neste tipo de espiral</div>' : ''}
+            ${c.nota ? `<div style="font-size:11px;color:var(--muted);">${escapeHtml(c.nota)}</div>` : ''}</td>
+          <td><input type="checkbox" class="layout-teste" data-i="${i}" ${c.teste ? 'checked' : ''} /></td>
+          <td class="num">${vd == null ? '—' : fmt1(vd * 5)}</td>
+          <td style="font-weight:${muda ? 600 : 400};color:${muda ? 'var(--accent-deep)' : 'var(--muted)'};">${muda ? 'Troca' : 'Mantém'}</td></tr>`;
+      }).join('')}</tbody></table>`;
+    wrap.querySelectorAll('.layout-sel').forEach(s => s.addEventListener('change', () => {
+      const c = layoutEditor.canais[Number(s.dataset.i)];
+      c.produto = s.value; c.nota = '';
+      layoutEditor.alterado = true;
+      renderLayoutEditor();
+    }));
+    wrap.querySelectorAll('.layout-teste').forEach(s => s.addEventListener('change', () => {
+      layoutEditor.canais[Number(s.dataset.i)].teste = s.checked;
+      layoutEditor.alterado = true;
+      renderLayoutEditor();
+    }));
+
+    // cobertura por produto: capacidade planeada vs vendas até à visita seguinte
+    const porProd = new Map();
+    canais.forEach(c => { if (c.produto && c.produto !== LAYOUT_SMARTCAKE) { const x = porProd.get(c.produto) || { canais: [], cap: 0, teste: false }; x.canais.push(c.canal); x.cap += c.capacidade; x.teste = x.teste || c.teste; porProd.set(c.produto, x); } });
+    const linhas = Array.from(porProd.entries()).map(([p, x]) => {
+      const vd = vendasDiaLayout(maquina, p) || 0;
+      const nec = Math.ceil(vd * diasCobrir * 1.2);
+      const dias = vd > 0 ? x.cap / vd : null;
+      let aval = 'OK', cor = 'var(--positive)';
+      if (vd === 0) { aval = x.teste ? 'Teste' : 'Sem vendas aqui'; cor = 'var(--muted)'; }
+      else if (dias < diasCobrir) { aval = 'Esgota antes da visita'; cor = 'var(--negative)'; }
+      else if (x.cap < nec) { aval = 'Justo'; cor = 'var(--accent-deep)'; }
+      else if (dias > diasCobrir * 4) { aval = 'Rotação lenta: encher a meio'; cor = 'var(--muted)'; }
+      return { p, x, vd, dias, aval, cor };
+    }).sort((a, b) => LAYOUT_ORDEM_FAMILIAS.indexOf(familiaLayout(a.p)) - LAYOUT_ORDEM_FAMILIAS.indexOf(familiaLayout(b.p)) || b.vd - a.vd);
+    cobWrap.innerHTML = `<table><thead><tr><th>Produto</th><th>Canais</th><th class="num">Capacidade</th><th class="num">Vende/sem.</th><th class="num">Dias úteis cobertos</th><th class="num">Arm. 7</th><th>Avaliação</th></tr></thead><tbody>
+      ${linhas.map(l => `<tr><td>${escapeHtml(l.p)}</td><td>${l.x.canais.join(', ')}</td><td class="num">${l.x.cap}</td><td class="num">${fmt1(l.vd * 5)}</td>
+        <td class="num">${l.dias == null ? '—' : fmt1(l.dias)}</td><td class="num">${fmtInt(layoutStockArm7[l.p] || 0)}</td><td style="color:${l.cor};font-weight:600;">${l.aval}</td></tr>`).join('')}
+      </tbody></table>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:4px;">Vendas: média dos últimos 20 dias úteis com dados. Visita a cada ${fmt1(diasCobrir)} dias úteis (${fmt1(visitas)} por semana).</div>`;
+  }
+
+  async function guardarLayout(extra) {
+    const msg = document.getElementById('layoutMsg');
+    if (!layoutEditor) return null;
+    const { maquina } = layoutEditor;
+    const plano = layoutsPlaneados[maquina];
+    const body = {
+      canais: layoutEditor.canais.map(c => ({ canal: c.canal, seletor: c.seletor, capacidade: c.capacidade, produto: c.produto || '', teste: !!c.teste, nota: c.nota || '' })),
+      visitasSemana: Number(document.getElementById('layoutVisitas').value) || 2,
+      notas: layoutEditor.notas || '',
+      ...(plano && plano.estado === 'concluido' && layoutEditor.alterado ? { estado: 'planeado' } : {}),
+      ...(extra || {}),
+    };
+    msg.style.color = 'var(--muted)'; msg.textContent = 'A guardar…';
+    try {
+      const r = await fetch(`/api/layouts?maquina=${encodeURIComponent(maquina)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+      layoutsPlaneados[maquina] = data.layout;
+      layoutEditor.alterado = false;
+      layoutEditor.desc = 'Plano guardado';
+      msg.style.color = 'var(--positive)'; msg.textContent = 'Guardado.';
+      renderLayoutsResumo(); renderLayoutEditor(); renderReposicaoLayouts();
+      return data.layout;
+    } catch (err) {
+      msg.style.color = 'var(--negative)'; msg.textContent = 'Erro ao guardar: ' + err.message;
+      return null;
+    }
+  }
+
+  async function iniciarPainelLayouts() {
+    const wrap = document.getElementById('layoutsResumo');
+    try {
+      await carregarDadosLayouts();
+      await confirmarPlanosConcluidos();
+    } catch (err) {
+      wrap.innerHTML = `<div class="state small error">Erro ao carregar layouts: ${escapeHtml(err.message)}</div>`;
+      return;
+    }
+    const sel = document.getElementById('layoutMaquina');
+    sel.innerHTML = maquinasSnackLayout().map(m => `<option value="${m}">${escapeHtml(machineLabel(m))}</option>`).join('');
+    sel.onchange = () => abrirEditorLayout(sel.value);
+    document.getElementById('layoutVisitas').onchange = () => { if (layoutEditor) { layoutEditor.visitasSemana = Number(document.getElementById('layoutVisitas').value) || 2; layoutEditor.alterado = true; renderLayoutEditor(); } };
+    document.getElementById('layoutSugerirBtn').onclick = () => abrirEditorLayout(sel.value, 'sugestao');
+    document.getElementById('layoutPropostaBtn').onclick = () => abrirEditorLayout(sel.value, 'proposta');
+    document.getElementById('layoutAtualBtn').onclick = () => abrirEditorLayout(sel.value, 'atual');
+    document.getElementById('layoutGuardarBtn').onclick = () => guardarLayout();
+    document.getElementById('layoutTrocaFeitaBtn').onclick = async () => {
+      if (!layoutEditor) return;
+      const hoje = todayStr();
+      if (!confirm(`Marcar a troca de layout como feita hoje (${hoje.split('-').reverse().join('/')}) em ${machineLabel(layoutEditor.maquina)}?\nDepois falta atualizar os canais na Luope.`)) return;
+      await guardarLayout({ estado: 'troca_feita', trocaFeitaEm: hoje });
+    };
+    document.getElementById('layoutApagarBtn').onclick = async () => {
+      if (!layoutEditor || !confirm(`Apagar o plano de layout de ${machineLabel(layoutEditor.maquina)}?`)) return;
+      const r = await fetch(`/api/layouts?maquina=${encodeURIComponent(layoutEditor.maquina)}`, { method: 'DELETE' });
+      if (r.ok) { delete layoutsPlaneados[layoutEditor.maquina]; abrirEditorLayout(layoutEditor.maquina); renderReposicaoLayouts(); }
+    };
+    // abre a primeira máquina com proposta ou plano por aplicar
+    const primeira = maquinasSnackLayout().find(m => layoutsPlaneados[m] && layoutsPlaneados[m].estado !== 'concluido')
+      || maquinasSnackLayout().find(m => layoutsPropostos[m] && !layoutsPlaneados[m]) || maquinasSnackLayout()[0];
+    if (primeira) abrirEditorLayout(primeira, !layoutsPlaneados[primeira] && layoutsPropostos[primeira] ? 'proposta' : undefined);
+    renderReposicaoLayouts();
+  }
+
+  // ---- Lista de reposição: usar o layout planeado numa visita ----
+  function renderReposicaoLayouts() {
+    const wrap = document.getElementById('reposicaoLayoutsWrap');
+    if (!wrap) return;
+    const marcadosAntes = new Set(Array.from(document.querySelectorAll('.repo-usar-layout:checked')).map(el => el.value));
+    const primeiraVez = !wrap.dataset.pronto;
+    const planos = Object.values(layoutsPlaneados).filter(p => p.estado !== 'concluido').sort((a, b) => a.maquina.localeCompare(b.maquina));
+    const frescosMarcado = document.getElementById('repoFrescosValidade') ? document.getElementById('repoFrescosValidade').checked : false;
+    wrap.innerHTML = `
+      ${planos.length ? `<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Usar o layout planeado nesta visita (o PDF inclui a troca canal a canal):</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px 16px;">${planos.map(p => {
+        const marcado = primeiraVez ? p.estado === 'troca_feita' : marcadosAntes.has(p.maquina);
+        return `<label style="font-size:13px;display:flex;gap:6px;align-items:center;cursor:pointer;"><input type="checkbox" class="repo-usar-layout" value="${p.maquina}" ${marcado ? 'checked' : ''}/> ${escapeHtml(machineLabel(p.maquina))} <span style="font-size:11px;color:var(--muted);">(${p.estado === 'troca_feita' ? 'troca feita' : 'planeado'})</span></label>`;
+      }).join('')}</div>` : ''}
+      <label style="font-size:13px;display:flex;gap:6px;align-items:center;cursor:pointer;margin-top:6px;"><input type="checkbox" id="repoFrescosValidade" ${frescosMarcado ? 'checked' : ''}/> Frescos nas máquinas fora de validade (não contam como stock e saem no PDF para retirar)</label>`;
+    wrap.dataset.pronto = '1';
+    wrap.style.display = 'block';
+  }
+
+  // Ajusta o export de canais antes do cálculo: frescos a zero (validade) e máquinas com layout planeado
+  function ajustarLayoutParaReposicao(layout) {
+    const usar = new Set(Array.from(document.querySelectorAll('.repo-usar-layout:checked')).map(el => el.value));
+    const frescosFora = !!(document.getElementById('repoFrescosValidade') || {}).checked;
+    const trocas = [];
+    const frescosRetirar = [];
+    let linhas = layout;
+    if (frescosFora) {
+      linhas = linhas.map(r => {
+        if (!r.NOME_PRODUTO || !isSnackMachine(r.MATRICULA_MAQUINA)) return r;
+        const p = canonicalProduto(r.NOME_PRODUTO);
+        const q = Math.max(0, Number(r.sum) || 0);
+        if (!isSmartcakeProd(p)) return r;
+        if (q > 0) frescosRetirar.push({ maquina: r.MATRICULA_MAQUINA, canal: String(r.CANAL_CONF || ''), produto: p, qtd: q });
+        return { ...r, sum: 0 };
+      });
+    }
+    for (const maq of usar) {
+      const plano = layoutsPlaneados[maq];
+      if (!plano || !(plano.canais || []).length) continue;
+      const atuais = linhas.filter(r => r.MATRICULA_MAQUINA === maq);
+      const porCanal = new Map(atuais.map(r => [String(r.CANAL_CONF), r]));
+      const restante = {};
+      atuais.forEach(r => { const p = canonicalProduto(r.NOME_PRODUTO || ''); if (p) restante[p] = (restante[p] || 0) + Math.max(0, Number(r.sum) || 0); });
+      const canais = plano.canais.map(c => {
+        const a = porCanal.get(c.canal);
+        return {
+          canal: c.canal, seletor: c.seletor || (a && String(a.CODIGO_SELETOR || '')) || '',
+          capacidade: c.capacidade || (a && Number(a.CAPACIDADE_SELETOR)) || 0,
+          antes: a ? canonicalProduto(a.NOME_PRODUTO || '') : '', stockAntes: a ? Math.max(0, Number(a.sum) || 0) : 0,
+          depois: c.produto || '', teste: !!c.teste, nota: c.nota || '', stockDepois: 0,
+        };
+      });
+      // o produto que já está no canal certo fica; o que sai de um canal pode entrar noutro canal do mesmo produto
+      canais.filter(x => x.depois && x.depois === x.antes).forEach(x => {
+        const q = Math.min(x.capacidade, x.stockAntes, restante[x.depois] || 0); x.stockDepois = q; restante[x.depois] -= q;
+      });
+      canais.filter(x => x.depois && x.depois !== LAYOUT_SMARTCAKE).forEach(x => {
+        const q = Math.min(x.capacidade - x.stockDepois, restante[x.depois] || 0); if (q > 0) { x.stockDepois += q; restante[x.depois] -= q; }
+      });
+      const retirar = Object.entries(restante).filter(([p, q]) => p && q > 0).map(([produto, qtd]) => ({ produto, qtd }));
+      trocas.push({ maquina: maq, canais, retirar, estado: plano.estado });
+      linhas = linhas.filter(r => r.MATRICULA_MAQUINA !== maq).concat(
+        canais.filter(x => x.depois && x.depois !== LAYOUT_SMARTCAKE).map(x => ({
+          MATRICULA_MAQUINA: maq, NOME_PRODUTO: x.depois, CAPACIDADE_SELETOR: x.capacidade, CANAL_CONF: x.canal, CODIGO_SELETOR: x.seletor, sum: x.stockDepois,
+        })));
+    }
+    return { linhas, trocas, frescosRetirar };
+  }
+
+  // PDF: tabela de troca de layout de uma máquina (canal a canal) + o que volta para o armazém
+  function desenharTrocaLayoutPDF(doc, y, troca) {
+    if (y > 225) { doc.addPage(); y = 20; }
+    const n = troca.canais.filter(c => c.antes !== c.depois).length;
+    doc.setFontSize(11.5); doc.setFont(undefined, 'bold');
+    doc.text(`Troca de layout — ${machineLabel(troca.maquina)} (${n} canais mudam)`, 14, y);
+    doc.setFont(undefined, 'normal'); doc.setFontSize(8.5); doc.setTextColor(110);
+    doc.text(troca.estado === 'troca_feita' ? 'Troca já feita: conferir canal a canal.' : 'Primeiro retirar o que sai (guardar à parte), depois carregar canal a canal. O que sai de um canal pode ir para outro do mesmo produto.', 14, y + 4.5, { maxWidth: 182 });
+    doc.setTextColor(0);
+    doc.autoTable({
+      startY: y + 9,
+      head: [['Canal', 'Espiral', 'Antes (stock)', 'Depois', 'Ação']],
+      body: troca.canais.map(c => {
+        const muda = c.antes !== c.depois;
+        const acao = !muda ? 'Manter' : !c.depois ? 'Esvaziar (fica vazio)' : c.depois === LAYOUT_SMARTCAKE ? 'Esvaziar · frescos da entrega' : 'Esvaziar e carregar';
+        return [c.canal, `${c.seletor} · ${c.capacidade}`, `${c.antes || '—'} (${c.stockAntes})`, (c.depois || '— vazio —') + (c.teste ? ' (teste)' : ''), acao];
+      }),
+      theme: 'grid',
+      styles: { fontSize: 7.5, cellPadding: 1.2 },
+      headStyles: { fillColor: [27, 31, 39] },
+      columnStyles: { 0: { cellWidth: 13 }, 1: { cellWidth: 18 }, 4: { cellWidth: 34 } },
+      margin: { left: 14, right: 14 },
+      didParseCell: (d) => {
+        if (d.section !== 'body') return;
+        const c = troca.canais[d.row.index];
+        if (c && c.antes !== c.depois) { d.cell.styles.fillColor = [255, 241, 214]; if (d.column.index === 3) d.cell.styles.fontStyle = 'bold'; }
+      },
+    });
+    y = doc.lastAutoTable.finalY + 4;
+    if (troca.retirar.length) {
+      doc.setFontSize(9); doc.setFont(undefined, 'bold');
+      doc.text('Trazer de volta para o armazém:', 14, y + 3);
+      doc.setFont(undefined, 'normal');
+      doc.text(troca.retirar.map(r => `${r.qtd} × ${r.produto}`).join(' · '), 14, y + 7.5, { maxWidth: 182 });
+      y += 7.5 + 4 * Math.ceil(troca.retirar.map(r => `${r.qtd} × ${r.produto}`).join(' · ').length / 110);
+    }
+    doc.setFontSize(8); doc.setTextColor(110);
+    doc.text('Depois da troca: atualizar os canais na Luope e marcar "Troca feita" no admin.', 14, y + 4);
+    doc.setTextColor(0);
+    return y + 10;
+  }
 
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
