@@ -345,6 +345,39 @@
   .tarefa-toggle, .tarefa-toggle-msg { display: none; }
 
   /* ===== Telemóvel: tudo aqui dentro só se aplica a ecrãs estreitos — o desktop fica igual ===== */
+  /* ===== Notas rápidas (post-its) ===== */
+  .nota-nova textarea {
+    width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 6px;
+    padding: 10px 12px; font-family: inherit; font-size: 14px; line-height: 1.45; resize: vertical;
+  }
+  .notas-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px; margin-top: 16px; align-items: start;
+  }
+  .nota-card {
+    position: relative; border: 1px solid; border-radius: 4px; padding: 12px 12px 8px;
+    box-shadow: 0 2px 6px rgba(27, 31, 39, 0.10); min-height: 120px; display: flex; flex-direction: column;
+  }
+  .nota-card.fixada { box-shadow: 0 3px 10px rgba(27, 31, 39, 0.18); }
+  .nota-pin { position: absolute; top: -9px; right: 10px; background: var(--ink); color: #fff; font-size: 9.5px; font-weight: 600; letter-spacing: 0.06em; padding: 2px 6px; border-radius: 3px; }
+  .nota-texto { white-space: pre-wrap; word-break: break-word; font-size: 14px; line-height: 1.45; flex: 1; cursor: text; min-height: 48px; }
+  .nota-edit { width: 100%; box-sizing: border-box; min-height: 110px; border: 1px solid rgba(27,31,39,0.25); border-radius: 4px; padding: 6px; font-family: inherit; font-size: 14px; line-height: 1.45; background: rgba(255,255,255,0.6); resize: vertical; }
+  .nota-rodape { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; font-size: 11.5px; color: rgba(27,31,39,0.6); }
+  .nota-acoes { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
+  .nota-acoes button { background: rgba(255,255,255,0.55); border: 1px solid rgba(27,31,39,0.15); border-radius: 4px; padding: 3px 7px; font-size: 11.5px; font-family: inherit; cursor: pointer; color: var(--ink); }
+  .nota-acoes button.nota-btn-forte { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .nota-acoes button.nota-btn-apagar { color: var(--negative); }
+  .nota-cores { display: inline-flex; gap: 4px; align-items: center; }
+  .nota-cores button { width: 18px; height: 18px; min-height: 0 !important; padding: 0 !important; border-radius: 50%; border: 2px solid; cursor: pointer; }
+  #notaNovaCores button { width: 24px; height: 24px; }
+  @media (max-width: 640px) {
+    .notas-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .nota-texto { font-size: 13.5px; }
+    .nota-acoes button { min-height: 32px !important; }
+    .nota-cores button, .nota-acoes .nota-cores button { width: 22px; height: 22px; min-height: 0 !important; }
+  }
+  @media (max-width: 380px) { .notas-grid { grid-template-columns: 1fr; } }
+
   @media (max-width: 640px) {
     /* formulário de tarefas: fechado por defeito (a lista aparece logo), abre ao tocar em "＋ Nova tarefa" */
     .tarefa-toggle {
@@ -922,6 +955,27 @@
       <div class="kpi"><div class="value" id="tarefasKpiUrgentes">—</div><div class="label">Urgentes / altas</div></div>
       <div class="kpi"><div class="value" id="tarefasKpiAtraso">—</div><div class="label">Em atraso</div></div>
       <div class="kpi"><div class="value" id="tarefasKpiConcluidas">—</div><div class="label">Concluídas</div></div>
+    </div>
+
+    <div class="panel full" id="notasPanel">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+        <h2 style="margin:0;">Notas rápidas <span id="notasContagem" style="font-size:12px;font-weight:400;color:var(--muted);margin-left:6px;"></span></h2>
+        <input type="text" id="notaPesquisa" placeholder="procurar nas notas…" style="border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-family:inherit;font-size:13px;min-width:200px;" />
+      </div>
+      <div class="nota-nova">
+        <textarea id="notaNovaTexto" rows="3" maxlength="2000" placeholder="Ideia, troca de máquina, algo a não esquecer… (Ctrl+Enter para guardar)"></textarea>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:8px;">
+          <span id="notaNovaCores" class="nota-cores"></span>
+          <select id="notaNovaAutor" style="border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-family:inherit;font-size:13px;">
+            <option value="">— autor —</option>
+            <option value="Pedro">Pedro</option>
+            <option value="Meir">Meir</option>
+          </select>
+          <button type="button" id="notaNovaBtn" style="background:var(--ink);color:#fff;border:none;border-radius:4px;padding:8px 16px;font-size:13px;cursor:pointer;">Adicionar nota</button>
+          <span id="notaMsg" style="font-size:12px;"></span>
+        </div>
+      </div>
+      <div id="notasGrid" class="notas-grid"><div class="state small">a carregar…</div></div>
     </div>
 
     <div class="panel full tarefa-form-panel" id="tarefaFormPanel">
@@ -3833,7 +3887,186 @@
     }
   }
 
+  // ===== Notas rápidas (post-its partilhados pelos sócios, guardados na KV) =====
+  const NOTA_CORES = {
+    amarelo: { fundo: '#FFF3B0', borda: '#E9D46A' },
+    rosa: { fundo: '#FFDCE4', borda: '#EDA9B9' },
+    verde: { fundo: '#D7F2DA', borda: '#9ED3A5' },
+    azul: { fundo: '#DAEAFB', borda: '#9DC2EA' },
+    laranja: { fundo: '#FFE2C6', borda: '#F2B57A' },
+  };
+  let notasLista = [];
+  let notaCorNova = 'amarelo';
+  let notaEmEdicao = null;
+  let notasEventosLigados = false;
+
+  function notaMsg(texto, erro) {
+    const el = document.getElementById('notaMsg');
+    el.textContent = texto;
+    el.style.color = erro ? 'var(--negative)' : 'var(--muted)';
+  }
+
+  function dataCurtaNota(iso) {
+    if (!iso) return '';
+    const d = paraHoraPT(new Date(iso));
+    const hoje = agoraPT();
+    const mesmoDia = d.toDateString() === hoje.toDateString();
+    const hora = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    return mesmoDia ? `hoje ${hora}` : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}${d.getFullYear() !== hoje.getFullYear() ? '/' + d.getFullYear() : ''}`;
+  }
+
+  async function carregarNotas() {
+    const res = await fetch('/api/notas');
+    const data = res.ok ? await res.json() : { notas: [] };
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    notasLista = data.notas || [];
+  }
+
+  async function pedidoNota(metodo, id, corpo) {
+    const res = await fetch('/api/notas' + (id ? `?id=${encodeURIComponent(id)}` : ''), {
+      method: metodo, headers: { 'Content-Type': 'application/json' }, body: corpo ? JSON.stringify(corpo) : undefined,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  }
+
+  function renderNotas() {
+    const wrap = document.getElementById('notasGrid');
+    const filtro = (document.getElementById('notaPesquisa').value || '').trim().toLowerCase();
+    const lista = notasLista
+      .filter(n => !filtro || n.texto.toLowerCase().includes(filtro) || (n.autor || '').toLowerCase().includes(filtro))
+      .sort((a, b) => (b.fixada ? 1 : 0) - (a.fixada ? 1 : 0) || String(b.atualizadaEm).localeCompare(String(a.atualizadaEm)));
+    document.getElementById('notasContagem').textContent = notasLista.length ? `${notasLista.length} nota${notasLista.length === 1 ? '' : 's'}` : '';
+    if (!lista.length) {
+      wrap.innerHTML = `<div class="state small">${notasLista.length ? 'Nenhuma nota com esse texto.' : 'Ainda não há notas. Escreve a primeira acima.'}</div>`;
+      return;
+    }
+    wrap.innerHTML = lista.map(n => {
+      const cor = NOTA_CORES[n.cor] || NOTA_CORES.amarelo;
+      const editar = notaEmEdicao === n.id;
+      return `<div class="nota-card${n.fixada ? ' fixada' : ''}" data-id="${escapeHtml(n.id)}" style="background:${cor.fundo};border-color:${cor.borda};">
+        ${n.fixada ? '<div class="nota-pin" title="Fixada">FIXADA</div>' : ''}
+        ${editar
+          ? `<textarea class="nota-edit" maxlength="2000">${escapeHtml(n.texto)}</textarea>
+             <div class="nota-acoes"><button type="button" data-acao="guardar" class="nota-btn-forte">Guardar</button><button type="button" data-acao="cancelar">Cancelar</button></div>`
+          : `<div class="nota-texto" data-acao="editar" title="Tocar para editar">${escapeHtml(n.texto)}</div>`}
+        <div class="nota-rodape">
+          <span>${escapeHtml(n.autor || '')}${n.autor ? ' · ' : ''}${dataCurtaNota(n.atualizadaEm || n.criadaEm)}</span>
+          ${editar ? '' : `<span class="nota-acoes">
+            <button type="button" data-acao="fixar">${n.fixada ? 'Desafixar' : 'Fixar'}</button>
+            <span class="nota-cores">${Object.keys(NOTA_CORES).map(c => `<button type="button" data-acao="cor" data-cor="${c}" title="${c}" aria-label="cor ${c}" style="background:${NOTA_CORES[c].fundo};border-color:${c === n.cor ? 'var(--ink)' : NOTA_CORES[c].borda};"></button>`).join('')}</span>
+            <button type="button" data-acao="tarefa" title="Criar uma tarefa a partir desta nota">→ Tarefa</button>
+            <button type="button" data-acao="apagar" class="nota-btn-apagar">Apagar</button>
+          </span>`}
+        </div>
+      </div>`;
+    }).join('');
+    const emEdicao = wrap.querySelector('.nota-edit');
+    if (emEdicao) {
+      emEdicao.focus();
+      emEdicao.setSelectionRange(emEdicao.value.length, emEdicao.value.length);
+      emEdicao.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { notaEmEdicao = null; renderNotas(); }
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); acaoNota(notaEmEdicao, 'guardar'); }
+      });
+    }
+  }
+
+  async function acaoNota(id, acao, extra) {
+    const nota = notasLista.find(n => n.id === id);
+    if (!nota) return;
+    try {
+      if (acao === 'editar') { notaEmEdicao = id; renderNotas(); return; }
+      if (acao === 'cancelar') { notaEmEdicao = null; renderNotas(); return; }
+      if (acao === 'guardar') {
+        const texto = (document.querySelector(`.nota-card[data-id="${CSS.escape(id)}"] .nota-edit`) || {}).value || '';
+        if (!texto.trim()) { notaMsg('A nota não pode ficar vazia. Para a tirar, usa "Apagar".', true); return; }
+        const { nota: atual } = await pedidoNota('PUT', id, { texto });
+        Object.assign(nota, atual); notaEmEdicao = null;
+      }
+      if (acao === 'fixar') Object.assign(nota, (await pedidoNota('PUT', id, { fixada: !nota.fixada })).nota);
+      if (acao === 'cor') Object.assign(nota, (await pedidoNota('PUT', id, { cor: extra })).nota);
+      if (acao === 'apagar') {
+        if (!confirm('Apagar esta nota?')) return;
+        await pedidoNota('DELETE', id);
+        notasLista = notasLista.filter(n => n.id !== id);
+      }
+      if (acao === 'tarefa') {
+        const linhas = nota.texto.split('\n');
+        if (tarefaEmEdicao) limparFormTarefa();
+        document.getElementById('tarefaTitulo').value = linhas[0].slice(0, 200);
+        document.getElementById('tarefaObs').value = linhas.slice(1).join('\n').trim();
+        abrirFormTarefa();
+        document.getElementById('tarefaFormPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        tarefaMsg('Tarefa preenchida a partir da nota. Completa e carrega em "Adicionar tarefa".', false);
+        return;
+      }
+      notaMsg('', false);
+      renderNotas();
+    } catch (err) {
+      notaMsg('Erro: ' + err.message, true);
+    }
+  }
+
+  async function adicionarNota() {
+    const campo = document.getElementById('notaNovaTexto');
+    const texto = campo.value.trim();
+    if (!texto) { notaMsg('Escreve alguma coisa primeiro.', true); return; }
+    const autor = document.getElementById('notaNovaAutor').value;
+    try { localStorage.setItem('notaAutor', autor); } catch {}
+    const btn = document.getElementById('notaNovaBtn');
+    btn.disabled = true;
+    try {
+      const { nota } = await pedidoNota('POST', null, { texto, cor: notaCorNova, autor });
+      notasLista.push(nota);
+      campo.value = '';
+      notaMsg('', false);
+      renderNotas();
+    } catch (err) {
+      notaMsg('Erro ao guardar: ' + err.message, true);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function pintarCoresNovaNota() {
+    document.querySelectorAll('#notaNovaCores button').forEach(b => {
+      b.style.borderColor = b.dataset.cor === notaCorNova ? 'var(--ink)' : NOTA_CORES[b.dataset.cor].borda;
+    });
+    document.getElementById('notaNovaTexto').style.background = NOTA_CORES[notaCorNova].fundo;
+  }
+
+  async function loadNotas() {
+    try {
+      await carregarNotas();
+      notaEmEdicao = null;
+      renderNotas();
+    } catch (err) {
+      document.getElementById('notasGrid').innerHTML = `<div class="state small error">Erro: ${escapeHtml(err.message)}</div>`;
+    }
+    if (notasEventosLigados) return;
+    notasEventosLigados = true;
+    document.getElementById('notaNovaCores').innerHTML = Object.keys(NOTA_CORES).map(c =>
+      `<button type="button" data-cor="${c}" title="${c}" aria-label="cor ${c}" style="background:${NOTA_CORES[c].fundo};"></button>`).join('');
+    document.querySelectorAll('#notaNovaCores button').forEach(b => b.addEventListener('click', () => { notaCorNova = b.dataset.cor; pintarCoresNovaNota(); }));
+    pintarCoresNovaNota();
+    try { const a = localStorage.getItem('notaAutor'); if (a !== null) document.getElementById('notaNovaAutor').value = a; } catch {}
+    document.getElementById('notaNovaBtn').addEventListener('click', adicionarNota);
+    document.getElementById('notaNovaTexto').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); adicionarNota(); }
+    });
+    document.getElementById('notaPesquisa').addEventListener('input', renderNotas);
+    document.getElementById('notasGrid').addEventListener('click', (e) => {
+      const alvo = e.target.closest('[data-acao]');
+      const card = e.target.closest('.nota-card');
+      if (!alvo || !card) return;
+      acaoNota(card.dataset.id, alvo.dataset.acao, alvo.dataset.cor);
+    });
+  }
+
   async function loadTarefasView() {
+    loadNotas();
     // volta a ir buscar a lista de cada vez que se abre o separador, para ver o que o outro sócio acrescentou
     try {
       await carregarTarefas();

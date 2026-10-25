@@ -416,6 +416,79 @@ async function handleLayouts(request, env) {
   return new Response("Método não suportado", { status: 405 });
 }
 
+// ===== Notas rápidas (post-its partilhados, Cloudflare KV, chave "nota:<id>") =====
+const NOTA_CORES = ["amarelo", "rosa", "verde", "azul", "laranja"];
+async function handleNotas(request, env) {
+  const url = new URL(request.url);
+
+  if (request.method === "GET") {
+    const notas = [];
+    let cursor;
+    do {
+      const listed = await env.HISTORY_KV.list({ prefix: "nota:", cursor });
+      for (const key of listed.keys) {
+        const value = await env.HISTORY_KV.get(key.name);
+        if (value) {
+          try { notas.push(JSON.parse(value)); } catch { /* ignora entradas corrompidas */ }
+        }
+      }
+      cursor = listed.list_complete ? undefined : listed.cursor;
+    } while (cursor);
+    return jsonResponse({ notas });
+  }
+
+  if (request.method === "POST") {
+    let payload;
+    try { payload = await request.json(); } catch { return jsonResponse({ error: "JSON inválido" }, 400); }
+    const texto = String((payload && payload.texto) || "").trim();
+    if (!texto) return jsonResponse({ error: "A nota está vazia" }, 400);
+    const agora = new Date().toISOString();
+    const id = crypto.randomUUID();
+    const registo = {
+      id,
+      texto: texto.slice(0, 2000),
+      cor: NOTA_CORES.includes(payload.cor) ? payload.cor : "amarelo",
+      autor: String(payload.autor || "").slice(0, 60),
+      fixada: !!payload.fixada,
+      criadaEm: agora,
+      atualizadaEm: agora,
+    };
+    await env.HISTORY_KV.put(`nota:${id}`, JSON.stringify(registo));
+    return jsonResponse({ ok: true, nota: registo });
+  }
+
+  if (request.method === "PUT") {
+    const id = url.searchParams.get("id");
+    if (!id) return jsonResponse({ error: "Falta o parâmetro id" }, 400);
+    const existente = await env.HISTORY_KV.get(`nota:${id}`);
+    if (!existente) return jsonResponse({ error: "Nota não encontrada" }, 404);
+    let atual;
+    try { atual = JSON.parse(existente); } catch { return jsonResponse({ error: "Nota corrompida" }, 500); }
+    let payload;
+    try { payload = await request.json(); } catch { return jsonResponse({ error: "JSON inválido" }, 400); }
+    if (typeof payload.texto === "string") {
+      const texto = payload.texto.trim();
+      if (!texto) return jsonResponse({ error: "A nota está vazia" }, 400);
+      atual.texto = texto.slice(0, 2000);
+    }
+    if (NOTA_CORES.includes(payload.cor)) atual.cor = payload.cor;
+    if (typeof payload.autor === "string") atual.autor = payload.autor.slice(0, 60);
+    if (typeof payload.fixada === "boolean") atual.fixada = payload.fixada;
+    atual.atualizadaEm = new Date().toISOString();
+    await env.HISTORY_KV.put(`nota:${id}`, JSON.stringify(atual));
+    return jsonResponse({ ok: true, nota: atual });
+  }
+
+  if (request.method === "DELETE") {
+    const id = url.searchParams.get("id");
+    if (!id) return jsonResponse({ error: "Falta o parâmetro id" }, 400);
+    await env.HISTORY_KV.delete(`nota:${id}`);
+    return jsonResponse({ ok: true });
+  }
+
+  return new Response("Método não suportado", { status: 405 });
+}
+
 // ===== Despesas mensais (Cloudflare KV) =====
 // ===== Tracking próprio (visitas + leads do formulário) via KV =====
 async function handleTrack(request, env) {
@@ -610,6 +683,17 @@ export default {
       } catch (err) {
         return new Response(JSON.stringify({ error: err.message }), {
           status: 502,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    if (url.pathname === "/api/notas") {
+      try {
+        return await handleNotas(request, env);
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
           headers: { "Content-Type": "application/json" },
         });
       }
