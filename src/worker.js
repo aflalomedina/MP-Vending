@@ -489,6 +489,40 @@ async function handleNotas(request, env) {
   return new Response("Método não suportado", { status: 405 });
 }
 
+// ===== Encomendas a fornecedores marcadas no admin (Cloudflare KV, chave única "encomendas") =====
+// Mapa produto -> { qtd, data, autor }. Serve para a lista "Stock a comprar" não voltar a alarmar o que já foi encomendado.
+async function handleEncomendas(request, env) {
+  const url = new URL(request.url);
+  const ler = async () => {
+    const raw = await env.HISTORY_KV.get("encomendas");
+    try { return raw ? JSON.parse(raw) : {}; } catch { return {}; }
+  };
+  if (request.method === "GET") return jsonResponse({ encomendas: await ler() });
+  if (request.method === "PUT") {
+    let payload;
+    try { payload = await request.json(); } catch { return jsonResponse({ error: "JSON inválido" }, 400); }
+    const produto = String((payload && payload.produto) || "").trim().slice(0, 120);
+    if (!produto) return jsonResponse({ error: "Falta o produto" }, 400);
+    const mapa = await ler();
+    mapa[produto] = {
+      qtd: Math.max(0, Math.min(100000, Math.round(Number(payload.qtd) || 0))),
+      data: /^\d{4}-\d{2}-\d{2}$/.test(payload.data || "") ? payload.data : new Date().toISOString().slice(0, 10),
+      autor: String(payload.autor || "").slice(0, 60),
+    };
+    await env.HISTORY_KV.put("encomendas", JSON.stringify(mapa));
+    return jsonResponse({ ok: true, encomendas: mapa });
+  }
+  if (request.method === "DELETE") {
+    const produto = (url.searchParams.get("produto") || "").trim();
+    if (!produto) return jsonResponse({ error: "Falta o parâmetro produto" }, 400);
+    const mapa = await ler();
+    delete mapa[produto];
+    await env.HISTORY_KV.put("encomendas", JSON.stringify(mapa));
+    return jsonResponse({ ok: true, encomendas: mapa });
+  }
+  return new Response("Método não suportado", { status: 405 });
+}
+
 // ===== Despesas mensais (Cloudflare KV) =====
 // ===== Tracking próprio (visitas + leads do formulário) via KV =====
 async function handleTrack(request, env) {
@@ -683,6 +717,17 @@ export default {
       } catch (err) {
         return new Response(JSON.stringify({ error: err.message }), {
           status: 502,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    if (url.pathname === "/api/encomendas") {
+      try {
+        return await handleEncomendas(request, env);
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
           headers: { "Content-Type": "application/json" },
         });
       }
