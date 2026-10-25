@@ -345,6 +345,7 @@
   .tarefa-toggle, .tarefa-toggle-msg { display: none; }
 
   /* ===== Telemóvel: tudo aqui dentro só se aplica a ecrãs estreitos — o desktop fica igual ===== */
+  .compra-btn { background: none; border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; font-size: 11.5px; font-family: inherit; cursor: pointer; white-space: nowrap; }
   /* ===== Notas rápidas (post-its) ===== */
   .nota-nova textarea {
     width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 6px;
@@ -531,6 +532,38 @@
   </div>
 
   <div id="view-stocks" class="view">
+    <div class="panel full" id="compraPanel">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
+        <div>
+          <h2 style="margin:0 0 4px;">Stock a comprar</h2>
+          <div style="font-size:12px;color:var(--muted);max-width:640px;">
+            Armazéns 7 e 3 (sem o stock dentro das máquinas) contra o ritmo de vendas de todas as máquinas. Primeiro o que está esgotado nos dois armazéns,
+            depois o que é preciso passar do 3 para o 7 e o que não chega para os 5 dias úteis que uma encomenda pode demorar. Frescos Smartcake ficam de fora (ver aba Smartcake).
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
+          <div>
+            <label for="compraHorizonte" style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Comprar para</label>
+            <select id="compraHorizonte" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;">
+              <option value="1">1 semana</option>
+              <option value="2" selected>2 semanas</option>
+              <option value="4">1 mês</option>
+            </select>
+          </div>
+          <div>
+            <label for="compraPesquisa" style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Procurar</label>
+            <input type="text" id="compraPesquisa" placeholder="produto…" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;width:150px;" />
+          </div>
+          <button type="button" id="compraCopiarBtn" style="background:none;border:1px solid var(--line);border-radius:4px;padding:8px 12px;font-size:12.5px;cursor:pointer;">Copiar lista</button>
+          <button type="button" id="compraPdfBtn" style="background:var(--ink);color:#fff;border:none;border-radius:4px;padding:9px 14px;font-size:12.5px;cursor:pointer;">PDF da lista de compras</button>
+        </div>
+      </div>
+      <div class="kpis" id="compraKpis" style="margin:14px 0 8px;"></div>
+      <div id="compraResumo" style="font-size:12px;color:var(--muted);margin-bottom:6px;"></div>
+      <div id="compraMsg" style="font-size:12px;min-height:14px;"></div>
+      <div class="table-wrap cards-mobile" id="compraWrap" style="max-height:640px;overflow-y:auto;"><div class="state small">a carregar…</div></div>
+    </div>
+
     <div class="panel full">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
         <div>
@@ -915,6 +948,32 @@
       <div class="kpi"><div class="value" id="smartcakeUnidadesHoje">—</div><div class="label">Unidades vendidas hoje</div></div>
       <div class="kpi"><div class="value" id="smartcakeStockTotal">—</div><div class="label">Stock total nas máquinas</div></div>
       <div class="kpi"><div class="value" id="smartcakeProdutosDistintos">—</div><div class="label">Produtos distintos</div></div>
+    </div>
+
+    <div class="panel full" id="smartcakeEncomendaPanel">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
+        <div>
+          <h2 style="margin:0 0 4px;">Sugestão de encomenda Smartcake</h2>
+          <div style="font-size:12px;color:var(--muted);max-width:680px;" id="smartcakeEncomendaInfo"></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
+          <div>
+            <label for="smartcakeEncomendaEntrega" style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Entrega</label>
+            <select id="smartcakeEncomendaEntrega" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;"></select>
+          </div>
+          <div>
+            <label for="smartcakeEncomendaMargem" style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Margem</label>
+            <select id="smartcakeEncomendaMargem" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;">
+              <option value="0">0%</option>
+              <option value="10" selected>+10%</option>
+              <option value="20">+20%</option>
+            </select>
+          </div>
+          <button type="button" id="smartcakeEncomendaCopiar" style="background:var(--ink);color:#fff;border:none;border-radius:4px;padding:9px 14px;font-size:12.5px;cursor:pointer;">Copiar encomenda</button>
+        </div>
+      </div>
+      <div id="smartcakeEncomendaMsg" style="font-size:12px;min-height:14px;margin-top:6px;"></div>
+      <div class="table-wrap cards-mobile" id="smartcakeEncomendaWrap"><div class="state small">a carregar…</div></div>
     </div>
 
     <div class="panel full">
@@ -2903,6 +2962,7 @@
     stocksLoaded = true;
     loadLayoutAndRender();
     iniciarPainelLayouts();
+    renderStockAComprar();
     await garantirMensalCompletoData();
     renderTop7Dias();
     renderPrevisaoCompra();
@@ -4218,10 +4278,345 @@
     });
   }
 
+  // ===== Vendas por dia útil (últimos 20 dias úteis capturados), por máquina e produto =====
+  // Usado pelo "Stock a comprar" e pela sugestão de encomenda Smartcake. Sem dias suficientes usa a calibração estática.
+  let _velFrotaCache = null;
+  async function velocidadesDiaUtil() {
+    if (_velFrotaCache) return _velFrotaCache;
+    const hoje = todayStr();
+    const dias = Object.keys(HISTORICO)
+      .filter(d => d < hoje && HISTORICO[d].porMaquinaProduto && !isFimDeSemana(d) && !isFeriado(d))
+      .sort().slice(-20);
+    const porMaquina = {};
+    if (dias.length >= 3) {
+      for (const d of dias) for (const [m, prods] of Object.entries(HISTORICO[d].porMaquinaProduto)) {
+        if (MAQUINAS_EXCLUIDAS.has(m)) continue;
+        for (const [p, q] of Object.entries(prods)) {
+          const pc = canonicalProduto(p);
+          (porMaquina[m] = porMaquina[m] || {})[pc] = ((porMaquina[m] || {})[pc] || 0) + (Number(q) || 0) / dias.length;
+        }
+      }
+    } else {
+      const est = await fetch('/admin/velocidade_maquina_produto.json').then(r => r.ok ? r.json() : {}).catch(() => ({}));
+      for (const [m, prods] of Object.entries(est)) {
+        if (MAQUINAS_EXCLUIDAS.has(m)) continue;
+        for (const [p, q] of Object.entries(prods)) { const pc = canonicalProduto(p); (porMaquina[m] = porMaquina[m] || {})[pc] = (porMaquina[m][pc] || 0) + (Number(q) || 0); }
+      }
+    }
+    const frota = {};
+    for (const prods of Object.values(porMaquina)) for (const [p, q] of Object.entries(prods)) frota[p] = (frota[p] || 0) + q;
+    _velFrotaCache = { porMaquina, frota, nDias: dias.length, primeiro: dias[0], ultimo: dias[dias.length - 1] };
+    return _velFrotaCache;
+  }
+
+  // custo unitário pelo nome canónico (o mapa de custos usa os nomes do catálogo, alguns com "(SDR)")
+  let _custoCanon = null;
+  function custoCanonico(nome) {
+    if (!_custoCanon) {
+      _custoCanon = {};
+      for (const [n, c] of Object.entries(NAME_TO_COST)) { const k = canonicalProduto(n); if (c > 0 && (!_custoCanon[k] || c > _custoCanon[k])) _custoCanon[k] = c; }
+    }
+    return _custoCanon[nome] || NAME_TO_COST[nome] || 0;
+  }
+
+  // ===== Stock a comprar (armazéns 7 e 3 vs ritmo de vendas) =====
+  const COMPRA_PRAZO_ENTREGA = 5; // dias úteis que uma encomenda pode demorar (margem de segurança)
+  const COMPRA_FAMILIAS = new Set(['Bebidas', 'Snacks', 'Bolachas', 'Chocolates']); // frescos e cafetaria ficam de fora
+  let compraDados = null;
+  let compraEncomendas = {};
+
+  function grupoCompraLabel(g) {
+    return { esgotado: 'Esgotado nos dois armazéns: comprar já', passar: 'Pouco ou nada no armazém 7: passar do armazém 3', curto: `Não chega para ${COMPRA_PRAZO_ENTREGA} dias úteis: comprar`, encomendado: 'Já encomendado' }[g];
+  }
+  const COMPRA_COR = { esgotado: 'var(--negative)', passar: '#C7710A', curto: '#A07A00', encomendado: 'var(--muted)' };
+
+  async function carregarCompras() {
+    const [stockRaw, layoutRaw, enc, vel] = await Promise.all([
+      fetchJSON('/api/stock-armazens'),
+      fetchJSON('/api/layout-maquinas'),
+      fetch('/api/encomendas').then(r => r.ok ? r.json() : { encomendas: {} }).catch(() => ({ encomendas: {} })),
+      velocidadesDiaUtil(),
+      carregarCatalogoProdutos(),
+    ]);
+    compraEncomendas = enc.encomendas || {};
+    const arm = {};
+    const get = (p) => (arm[p] = arm[p] || { a7: 0, a3: 0 });
+    for (const r of toObjects(stockRaw)) {
+      const p = canonicalProduto(productLabel(r.CODIGO_PRODUTO));
+      const q = Number(r.sum) || 0;
+      if (String(r.CODIGO_ARMAZEM) === '7') get(p).a7 += q;
+      else if (String(r.CODIGO_ARMAZEM) === '3') get(p).a3 += q;
+    }
+    const noLayout = new Set();
+    for (const r of toObjects(layoutRaw)) {
+      if (!r.NOME_PRODUTO || !r.MATRICULA_MAQUINA || MAQUINAS_EXCLUIDAS.has(r.MATRICULA_MAQUINA) || !MACHINES[r.MATRICULA_MAQUINA]) continue;
+      noLayout.add(canonicalProduto(r.NOME_PRODUTO));
+    }
+    const nomes = new Set([...Object.keys(arm), ...noLayout, ...Object.keys(vel.frota).filter(p => vel.frota[p] > 0)]);
+    const linhas = [];
+    for (const p of nomes) {
+      if (!p || !COMPRA_FAMILIAS.has(subfamiliaLabel(p)) || isSmartcakeProd(p)) continue;
+      const s = arm[p] || { a7: 0, a3: 0 };
+      const vd = vel.frota[p] || 0;
+      const ativo = vd > 0 || noLayout.has(p);
+      if (!ativo) continue; // produtos que já não se vendem nem estão em nenhuma máquina
+      linhas.push({ produto: p, a7: Math.max(0, s.a7), a3: Math.max(0, s.a3), vd, noLayout: noLayout.has(p), custo: custoCanonico(p) });
+    }
+    compraDados = { linhas, vel };
+  }
+
+  function calcularCompras(semanas) {
+    const horizonte = semanas * 5; // dias úteis a cobrir depois de a encomenda chegar
+    const hojeStr = todayStr();
+    return compraDados.linhas.map(l => {
+      const total = l.a7 + l.a3;
+      const dias7 = l.vd > 0 ? l.a7 / l.vd : (l.a7 > 0 ? Infinity : 0);
+      const diasTotal = l.vd > 0 ? total / l.vd : (total > 0 ? Infinity : 0);
+      let grupo = null;
+      if (total <= 0) grupo = 'esgotado';
+      else if (diasTotal < COMPRA_PRAZO_ENTREGA) grupo = 'curto';
+      else if (l.a7 <= 0 || (l.a3 > 0 && dias7 < COMPRA_PRAZO_ENTREGA)) grupo = 'passar';
+      // passar do 3 para o 7: o que for preciso para a próxima semana, até ao que há no 3
+      const passar = grupo === 'passar' || (l.a3 > 0 && dias7 < COMPRA_PRAZO_ENTREGA)
+        ? Math.min(l.a3, Math.max(0, Math.ceil(l.vd * COMPRA_PRAZO_ENTREGA - l.a7)) || (l.a7 <= 0 ? l.a3 : 0)) : 0;
+      // comprar: chega para o prazo de entrega + o horizonte escolhido, descontando o que há nos dois armazéns
+      const precisa = Math.ceil(l.vd * (COMPRA_PRAZO_ENTREGA + horizonte));
+      let comprar = Math.max(0, precisa - total);
+      if (grupo === 'esgotado' && comprar === 0) comprar = null; // sem vendas recentes: decidir à mão
+      if (grupo === 'passar' && diasTotal >= COMPRA_PRAZO_ENTREGA) comprar = Math.max(0, precisa - total) || 0;
+      const enc = compraEncomendas[l.produto];
+      const diasEnc = enc ? Math.round((new Date(hojeStr) - new Date(enc.data)) / 86400000) : null;
+      if (grupo && enc && grupo !== 'passar') grupo = 'encomendado';
+      return { ...l, total, dias7, diasTotal, grupo, passar, comprar, enc, diasEnc };
+    }).filter(l => l.grupo);
+  }
+
+  function renderCompras() {
+    const wrap = document.getElementById('compraWrap');
+    if (!compraDados) return;
+    const semanas = Number(document.getElementById('compraHorizonte').value) || 1;
+    const termo = (document.getElementById('compraPesquisa').value || '').trim().toLowerCase();
+    const ordemGrupo = { esgotado: 0, passar: 1, curto: 2, encomendado: 3 };
+    const todas = calcularCompras(semanas);
+    const linhas = todas
+      .filter(l => !termo || l.produto.toLowerCase().includes(termo))
+      .sort((a, b) => ordemGrupo[a.grupo] - ordemGrupo[b.grupo] || (a.diasTotal - b.diasTotal) || (b.vd - a.vd));
+    const n = (g) => todas.filter(l => l.grupo === g).length;
+    document.getElementById('compraKpis').innerHTML = [['esgotado', 'Esgotados'], ['passar', 'Passar do 3 para o 7'], ['curto', 'Não chegam p/ 1 semana'], ['encomendado', 'Já encomendados']]
+      .map(([g, t]) => `<div class="kpi"><div class="value" style="color:${n(g) ? COMPRA_COR[g] : 'var(--ink)'};">${n(g)}</div><div class="label">${t}</div></div>`).join('');
+    const custoTotal = todas.filter(l => l.grupo !== 'encomendado').reduce((s, l) => s + (l.comprar || 0) * l.custo, 0);
+    document.getElementById('compraResumo').textContent = linhas.length
+      ? `A comprar (sem os já encomendados): ${fmtInt(todas.filter(l => l.grupo !== 'encomendado' && l.comprar > 0).length)} produtos · custo estimado ${fmtEUR(custoTotal)} s/ IVA. ` +
+        `Vendas: média dos últimos ${compraDados.vel.nDias || 0} dias úteis em todas as máquinas.`
+      : '';
+    if (!linhas.length) {
+      wrap.innerHTML = `<div class="state small" style="color:var(--positive);">${termo ? 'Nenhum produto com esse nome na lista.' : 'Tudo com stock para mais de uma semana.'}</div>`;
+      return;
+    }
+    let grupoAtual = null;
+    const linhasHtml = linhas.map(l => {
+      let cab = '';
+      if (l.grupo !== grupoAtual) {
+        grupoAtual = l.grupo;
+        cab = `<tr class="compra-grupo"><td colspan="9" style="background:#FAF8F3;color:${COMPRA_COR[l.grupo]};font-weight:600;font-size:12.5px;">${grupoCompraLabel(l.grupo)}</td></tr>`;
+      }
+      const dura = l.vd > 0 ? (l.diasTotal === Infinity ? '—' : fmt1(l.diasTotal)) : '—';
+      const encTxt = l.enc ? `Encomendado ${l.enc.qtd ? fmtInt(l.enc.qtd) + ' un. ' : ''}a ${l.enc.data.split('-').reverse().join('/')}${l.diasEnc > 10 ? ' · há ' + l.diasEnc + ' dias, confirmar' : ''}` : '';
+      return cab + `<tr data-p="${escapeHtml(l.produto)}">
+        <td>${escapeHtml(l.produto)}${l.vd === 0 ? '<div style="font-size:11px;color:var(--muted);">sem vendas nos últimos dias úteis</div>' : ''}${encTxt ? `<div style="font-size:11px;color:var(--muted);">${encTxt}</div>` : ''}</td>
+        <td class="num" style="${l.a7 <= 0 ? 'color:var(--negative);font-weight:600;' : ''}">${fmtInt(l.a7)}</td>
+        <td class="num">${fmtInt(l.a3)}</td>
+        <td class="num">${fmt1(l.vd)}</td>
+        <td class="num">${dura}</td>
+        <td class="num">${l.passar ? `<b style="color:#C7710A;">${fmtInt(l.passar)}</b>` : '—'}</td>
+        <td class="num"><b>${l.comprar == null ? '?' : l.comprar ? fmtInt(l.comprar) : '—'}</b></td>
+        <td class="num">${l.comprar && l.custo ? fmtEUR(l.comprar * l.custo) : '—'}</td>
+        <td>${l.enc ? `<button type="button" class="compra-btn" data-acao="limpar">Recebido / limpar</button>` : `<button type="button" class="compra-btn" data-acao="encomendar">Marcar encomendado</button>`}</td>
+      </tr>`;
+    }).join('');
+    wrap.innerHTML = `<table><thead><tr><th>Produto</th><th class="num">Arm. 7</th><th class="num">Arm. 3</th><th class="num">Vende/dia útil</th><th class="num">Dias que dura (7+3)</th><th class="num">Passar 3→7</th><th class="num">Comprar</th><th class="num">Custo est.</th><th></th></tr></thead><tbody>${linhasHtml}</tbody></table>`;
+  }
+
+  async function acaoCompra(produto, acao) {
+    const msg = document.getElementById('compraMsg');
+    try {
+      if (acao === 'encomendar') {
+        const linha = calcularCompras(Number(document.getElementById('compraHorizonte').value) || 1).find(l => l.produto === produto);
+        const sugerido = linha && linha.comprar ? linha.comprar : '';
+        const resp = prompt(`Quantas unidades de "${produto}" foram encomendadas?`, sugerido);
+        if (resp === null) return;
+        const r = await fetch('/api/encomendas', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ produto, qtd: parseInt(resp, 10) || 0, data: todayStr() }) });
+        const d = await r.json(); if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+        compraEncomendas = d.encomendas || {};
+      }
+      if (acao === 'limpar') {
+        const r = await fetch(`/api/encomendas?produto=${encodeURIComponent(produto)}`, { method: 'DELETE' });
+        const d = await r.json(); if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+        compraEncomendas = d.encomendas || {};
+      }
+      msg.textContent = '';
+      renderCompras();
+    } catch (err) {
+      msg.style.color = 'var(--negative)'; msg.textContent = 'Erro: ' + err.message;
+    }
+  }
+
+  function textoListaCompras() {
+    const semanas = Number(document.getElementById('compraHorizonte').value) || 1;
+    const linhas = calcularCompras(semanas).filter(l => l.grupo !== 'encomendado' && l.comprar > 0)
+      .sort((a, b) => a.produto.localeCompare(b.produto, 'pt'));
+    return { semanas, linhas, texto: `Encomenda MP Vending — ${todayStr().split('-').reverse().join('/')}\n` + linhas.map(l => `- ${l.produto}: ${l.comprar} un.`).join('\n') };
+  }
+
+  function pdfListaCompras() {
+    const { semanas, linhas } = textoListaCompras();
+    const transferir = calcularCompras(semanas).filter(l => l.passar > 0);
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(16); doc.text('Lista de compras', 14, 16);
+    doc.setFontSize(10); doc.setTextColor(120);
+    doc.text(`${todayStr().split('-').reverse().join('/')} · para ${COMPRA_PRAZO_ENTREGA} dias úteis de entrega + ${semanas} semana(s) · sem os produtos já encomendados`, 14, 22);
+    doc.setTextColor(0);
+    doc.autoTable({
+      startY: 27,
+      head: [['Produto', 'Arm. 7', 'Arm. 3', 'Vende/dia', 'Comprar', 'Custo est.']],
+      body: linhas.map(l => [l.produto, fmtInt(l.a7), fmtInt(l.a3), fmt1(l.vd), fmtInt(l.comprar), l.custo ? fmtEUR(l.comprar * l.custo) : '—']),
+      foot: [['Total', '', '', '', fmtInt(linhas.reduce((s, l) => s + l.comprar, 0)), fmtEUR(linhas.reduce((s, l) => s + l.comprar * l.custo, 0))]],
+      theme: 'grid', styles: { fontSize: 9 }, headStyles: { fillColor: [27, 31, 39] }, footStyles: { fillColor: [240, 240, 240], textColor: 20, fontStyle: 'bold' },
+      columnStyles: { 4: { fontStyle: 'bold', halign: 'center' } }, margin: { left: 14, right: 14 },
+    });
+    if (transferir.length) {
+      const y = doc.lastAutoTable.finalY + 10;
+      doc.setFontSize(12); doc.text('Passar do armazém 3 para o armazém 7', 14, y);
+      doc.autoTable({ startY: y + 4, head: [['Produto', 'Arm. 7', 'Arm. 3', 'Passar']], body: transferir.map(l => [l.produto, fmtInt(l.a7), fmtInt(l.a3), fmtInt(l.passar)]),
+        theme: 'grid', styles: { fontSize: 9 }, headStyles: { fillColor: [199, 113, 10] }, margin: { left: 14, right: 14 } });
+    }
+    doc.save(`compras_${todayStr()}.pdf`);
+  }
+
+  let comprasEventosLigados = false;
+  async function renderStockAComprar() {
+    const wrap = document.getElementById('compraWrap');
+    try {
+      await carregarCompras();
+      renderCompras();
+    } catch (err) {
+      wrap.innerHTML = `<div class="state small error">Erro: ${escapeHtml(err.message)}</div>`;
+      return;
+    }
+    if (comprasEventosLigados) return;
+    comprasEventosLigados = true;
+    document.getElementById('compraHorizonte').addEventListener('change', renderCompras);
+    document.getElementById('compraPesquisa').addEventListener('input', renderCompras);
+    wrap.addEventListener('click', (e) => {
+      const b = e.target.closest('.compra-btn'); const tr = e.target.closest('tr[data-p]');
+      if (b && tr) acaoCompra(tr.dataset.p, b.dataset.acao);
+    });
+    document.getElementById('compraCopiarBtn').addEventListener('click', async () => {
+      const { texto, linhas } = textoListaCompras();
+      const msg = document.getElementById('compraMsg');
+      if (!linhas.length) { msg.style.color = 'var(--muted)'; msg.textContent = 'Nada para comprar.'; return; }
+      try { await navigator.clipboard.writeText(texto); msg.style.color = 'var(--positive)'; msg.textContent = `Lista copiada (${linhas.length} produtos).`; }
+      catch { msg.style.color = 'var(--negative)'; msg.textContent = 'Não foi possível copiar neste browser.'; }
+    });
+    document.getElementById('compraPdfBtn').addEventListener('click', pdfListaCompras);
+  }
+
+  // ===== Smartcake: sugestão de encomenda (entregas às 2ªs e 4ªs, validade de 5 dias) =====
+  // A entrega de 2ª tem de chegar até 4ª (2 dias úteis); a de 4ª até à 2ª seguinte (3 dias úteis: 4ª, 5ª e 6ª).
+  // Na entrega de 2ª o que está nas máquinas já passou a validade (veio na 4ª anterior), por isso não se desconta;
+  // na de 4ª desconta-se o que ainda deve sobrar da entrega de 2ª.
+  const SMARTCAKE_DIAS_ENTREGA = { 1: 2, 3: 3 }; // dia da semana da entrega -> dias úteis que tem de cobrir
+
+  function proximasEntregasSmartcake() {
+    const res = [];
+    const d = agoraPT(); d.setHours(12, 0, 0, 0);
+    for (let i = 1; i <= 9 && res.length < 2; i++) {
+      const x = new Date(d); x.setDate(d.getDate() + i);
+      if (SMARTCAKE_DIAS_ENTREGA[x.getDay()]) res.push(x);
+    }
+    return res;
+  }
+
+  async function renderSugestaoSmartcake() {
+    const wrap = document.getElementById('smartcakeEncomendaWrap');
+    const sel = document.getElementById('smartcakeEncomendaEntrega');
+    const margemEl = document.getElementById('smartcakeEncomendaMargem');
+    try {
+      const [vel, layoutRaw] = await Promise.all([velocidadesDiaUtil(), fetchJSON('/api/layout-maquinas'), carregarCatalogoProdutos()]);
+      const layout = toObjects(layoutRaw);
+      const entregas = proximasEntregasSmartcake();
+      if (!sel.options.length) {
+        sel.innerHTML = entregas.map((d, i) => `<option value="${i}">${d.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'numeric' })}</option>`).join('');
+        sel.onchange = () => renderSugestaoSmartcake();
+        margemEl.onchange = () => renderSugestaoSmartcake();
+      }
+      const entrega = entregas[Number(sel.value) || 0];
+      const diasCobrir = SMARTCAKE_DIAS_ENTREGA[entrega.getDay()];
+      const margem = 1 + (Number(margemEl.value) || 0) / 100;
+      // stock e capacidade atuais por máquina+produto (frescos)
+      const atual = {};
+      for (const r of layout) {
+        if (!r.NOME_PRODUTO || !r.MATRICULA_MAQUINA || MAQUINAS_EXCLUIDAS.has(r.MATRICULA_MAQUINA) || !MACHINES[r.MATRICULA_MAQUINA]) continue;
+        const p = canonicalProduto(r.NOME_PRODUTO);
+        if (!isSmartcakeProd(p)) continue;
+        const k = r.MATRICULA_MAQUINA + '|' + p;
+        const a = (atual[k] = atual[k] || { stock: 0, cap: 0 });
+        a.stock += Math.max(0, Number(r.sum) || 0); a.cap += Number(r.CAPACIDADE_SELETOR) || 0;
+      }
+      // dias úteis até à entrega (para estimar o que sobra na máquina na entrega de 4ª)
+      const hoje = agoraPT(); hoje.setHours(12, 0, 0, 0);
+      let diasAteEntrega = 0;
+      for (let x = new Date(hoje); x < entrega; x.setDate(x.getDate() + 1)) if (x.getDay() >= 1 && x.getDay() <= 5) diasAteEntrega++;
+      // só na entrega de 4ª e se a de 2ª desta semana já chegou (o stock atual é dessa entrega); antes disso o que está na máquina já terá passado a validade
+      const descontaStock = entrega.getDay() === 3 && hoje.getDay() >= 1 && hoje.getDay() <= 3;
+      const grelha = {}; const maquinas = new Set();
+      for (const [m, prods] of Object.entries(vel.porMaquina)) {
+        if (!isSnackMachine(m) || !MACHINES[m]) continue;
+        for (const [p, vd] of Object.entries(prods)) {
+          if (!isSmartcakeProd(p) || vd <= 0) continue;
+          const a = atual[m + '|' + p] || { stock: 0, cap: 0 };
+          const previsto = vd * diasCobrir * margem;
+          if (previsto < 0.5) continue; // vende tão pouco que a unidade quase de certeza passava a validade
+          let q = Math.round(previsto);
+          if (descontaStock) q -= Math.max(0, Math.floor(a.stock - vd * diasAteEntrega));
+          if (a.cap > 0) q = Math.min(q, a.cap);
+          q = Math.max(0, q);
+          if (!q) continue;
+          (grelha[p] = grelha[p] || {})[m] = { q, vd, cap: a.cap };
+          maquinas.add(m);
+        }
+      }
+      const ms = Array.from(maquinas).sort();
+      const produtos = Object.keys(grelha).sort((a, b) => Object.values(grelha[b]).reduce((s, x) => s + x.q, 0) - Object.values(grelha[a]).reduce((s, x) => s + x.q, 0));
+      document.getElementById('smartcakeEncomendaInfo').textContent =
+        `Entrega de ${entrega.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'numeric' })}: tem de chegar para ${diasCobrir} dias úteis até à entrega seguinte, dentro dos 5 dias de validade. ` +
+        (descontaStock ? 'Desconta o que deve sobrar nas máquinas da entrega de segunda. ' : entrega.getDay() === 3 ? 'Conta que a entrega de segunda chega à justa até quarta, por isso não desconta nada. ' : 'O que está nas máquinas não conta (já terá passado a validade). ') +
+        `Vendas: média dos últimos ${vel.nDias || 0} dias úteis por máquina; produtos que venderiam menos de meia unidade no período ficam de fora. Nunca passa da capacidade dos canais. Se um fresco esgota muitas vezes, as vendas subestimam a procura: sobe a margem.`;
+      if (!produtos.length) { wrap.innerHTML = '<div class="state small">Sem vendas de frescos suficientes para sugerir uma encomenda.</div>'; smartcakeEncomendaTexto = ''; return; }
+      const totProd = (p) => Object.values(grelha[p]).reduce((s, x) => s + x.q, 0);
+      wrap.innerHTML = `<table><thead><tr><th>Produto</th>${ms.map(m => `<th class="num">${escapeHtml(machineLabel(m))}</th>`).join('')}<th class="num">Total</th></tr></thead><tbody>
+        ${produtos.map(p => `<tr><td>${escapeHtml(p)}</td>${ms.map(m => { const c = grelha[p][m]; return `<td class="num">${c ? `<b>${c.q}</b><div style="font-size:10.5px;color:var(--muted);">${fmt1(c.vd)}/dia${c.cap ? ' · cap. ' + c.cap : ''}</div>` : '—'}</td>`; }).join('')}<td class="num"><b>${totProd(p)}</b></td></tr>`).join('')}
+        <tr style="font-weight:600;"><td>Total</td>${ms.map(m => `<td class="num">${produtos.reduce((s, p) => s + ((grelha[p][m] || {}).q || 0), 0)}</td>`).join('')}<td class="num">${produtos.reduce((s, p) => s + totProd(p), 0)}</td></tr>
+      </tbody></table>`;
+      smartcakeEncomendaTexto = `Encomenda Smartcake — entrega ${entrega.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'numeric' })}\n` + produtos.map(p => `- ${p}: ${totProd(p)}`).join('\n');
+    } catch (err) {
+      wrap.innerHTML = `<div class="state small error">Erro: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+  let smartcakeEncomendaTexto = '';
+
   let smartcakeLoaded = false;
   async function loadSmartcakeView() {
     if (smartcakeLoaded) return;
     smartcakeLoaded = true;
+    renderSugestaoSmartcake();
+    document.getElementById('smartcakeEncomendaCopiar').addEventListener('click', async () => {
+      const msg = document.getElementById('smartcakeEncomendaMsg');
+      if (!smartcakeEncomendaTexto) { msg.textContent = 'Nada para encomendar.'; return; }
+      try { await navigator.clipboard.writeText(smartcakeEncomendaTexto); msg.style.color = 'var(--positive)'; msg.textContent = 'Encomenda copiada.'; }
+      catch { msg.style.color = 'var(--negative)'; msg.textContent = 'Não foi possível copiar neste browser.'; }
+    });
     await garantirMensalCompletoData();
 
     // KPIs e vendas por máquina hoje (dados já carregados em lastVendasRows)
