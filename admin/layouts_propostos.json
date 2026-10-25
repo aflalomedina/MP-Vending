@@ -1,0 +1,1284 @@
+{
+ "geradoEm": "2026-10-25",
+ "origem": "Análise de vendas 24 jul–24 out 2026 (Claude)",
+ "maquinas": {
+  "006-S": {
+   "canais": [
+    {
+     "canal": "S11",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Bitee - Croissant Recheio Cacau 60g",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S12",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Lanche Fiambre",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S13",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Agua S. Martinho 50cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S14",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Agua S. Martinho 50cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S15",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Agua S. Martinho 50cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S16",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Bola de Carne",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S17",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Bebida Energetica Hell Classic 250ml",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S18",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Frisumo Laranja Lata 0.33cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S22",
+     "seletor": "D07",
+     "capacidade": 7,
+     "produto": "Bitee - Croissant Recheio Cacau 60g",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S23",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Barra Go On Energy 45 Gr Sante",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S24",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Snack de Chocolate Twix 50 G",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S25",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Kit Kat 41,5 Gr",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S26",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Kinder Bueno",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S28",
+     "seletor": "D07",
+     "capacidade": 7,
+     "produto": "Batatas Fritas - Super Douradas Onduladas 40gr",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S31",
+     "seletor": "S10",
+     "capacidade": 10,
+     "produto": "Dulcesol - Zebra",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S32",
+     "seletor": "S10",
+     "capacidade": 10,
+     "produto": "Bolachas Crackers Tuc Originais 31 G",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S33",
+     "seletor": "S10",
+     "capacidade": 10,
+     "produto": "Kings - Soft Cookies com Pedaços de Chocolate Triplo 40gr",
+     "teste": true,
+     "nota": ""
+    },
+    {
+     "canal": "S34",
+     "seletor": "S10",
+     "capacidade": 10,
+     "produto": "Fatia Bolo Ecobolos (Variados)",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S35",
+     "seletor": "S07",
+     "capacidade": 7,
+     "produto": "Tarte de Amêndoa 80Gr",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S36",
+     "seletor": "S07",
+     "capacidade": 7,
+     "produto": "Fatia Bolo Ecobolos (Variados)",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S37",
+     "seletor": "S14",
+     "capacidade": 14,
+     "produto": "Poker Wafer Cacao",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S38",
+     "seletor": "S14",
+     "capacidade": 14,
+     "produto": "Kit Kat Chunky Funky 40g",
+     "teste": true,
+     "nota": ""
+    },
+    {
+     "canal": "S41",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Fuze Tea Pêssego Sleek 330ml",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S42",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Hell Energy Coffee Latte 250ml",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S43",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Coca Cola Original Lata 33 Cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S44",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Coca Cola Original Lata 33 Cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S45",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Coca Cola Original Lata 33 Cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S46",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Guaraná Brasil 33cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S47",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "7Up Sleek 330ml",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S48",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Frisumo Laranja Lata 0.33cl",
+     "teste": false,
+     "nota": ""
+    }
+   ],
+   "notas": "Proposta outono/inverno 2026.",
+   "visitasSemana": 2
+  },
+  "007-S": {
+   "canais": [
+    {
+     "canal": "S11",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Agua S. Martinho 50cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S12",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Agua S. Martinho 50cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S13",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Bola de Carne",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S14",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "REF S/G FRESKY F TROP TET 20CL",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S15",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Bitee - Croissant Recheio Cacau 60g",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S16",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Lanche Fiambre",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S17",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Bebida Energetica Hell Classic 250ml",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S18",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Hell Energy Coffee Latte 250ml",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S22",
+     "seletor": "D07",
+     "capacidade": 7,
+     "produto": "Tarte de Amêndoa 80Gr",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S23",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Kinder Bueno",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S24",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Snack de Chocolate Twix 50 G",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S25",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Kit Kat 41,5 Gr",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S26",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Barra Go On Energy 45 Gr Sante",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S28",
+     "seletor": "D07",
+     "capacidade": 7,
+     "produto": "Batatas Fritas - Super Douradas Onduladas 40gr",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S31",
+     "seletor": "S10",
+     "capacidade": 10,
+     "produto": "Oreo original 6 66g",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S32",
+     "seletor": "S10",
+     "capacidade": 10,
+     "produto": "Dulcesol - Zebra",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S33",
+     "seletor": "S10",
+     "capacidade": 10,
+     "produto": "Kinder Bueno",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S34",
+     "seletor": "S10",
+     "capacidade": 10,
+     "produto": "Bolachas Crackers Tuc Originais 31 G",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S35",
+     "seletor": "S07",
+     "capacidade": 7,
+     "produto": "Fatia Bolo Ecobolos (Variados)",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S36",
+     "seletor": "S07",
+     "capacidade": 7,
+     "produto": "Padaria da Arrifana - Folhado de Chocolate 4 Uni 70 Gr",
+     "teste": true,
+     "nota": ""
+    },
+    {
+     "canal": "S37",
+     "seletor": "S15",
+     "capacidade": 15,
+     "produto": "Poker Wafer Cacao",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S38",
+     "seletor": "S15",
+     "capacidade": 15,
+     "produto": "Kit Kat 41,5 Gr",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S41",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "7Up Sleek 330ml",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S42",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Coca Cola Original Lata 33 Cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S43",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Coca Cola Original Lata 33 Cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S44",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Guaraná Brasil 33cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S45",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Coca Cola Original Lata 33 Cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S46",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Frisumo Laranja Lata 0.33cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S47",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Fuze Tea Pêssego Sleek 330ml",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S48",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Bebida Energetica Hell Classic 250ml",
+     "teste": true,
+     "nota": "Hell Zero"
+    }
+   ],
+   "notas": "Proposta outono/inverno 2026.",
+   "visitasSemana": 2
+  },
+  "008-S": {
+   "canais": [
+    {
+     "canal": "S11",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Agua S. Martinho 50cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S12",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Lanche Fiambre",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S13",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Bola de Carne",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S14",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Bitee - Croissant Recheio Cacau 60g",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S15",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Bebida Energetica Hell Classic 250ml",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S16",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Agua S. Martinho 50cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S17",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Coca Cola Original Lata 33 Cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S18",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Santal Active Drink Laranja/Cenoura",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S22",
+     "seletor": "D07",
+     "capacidade": 7,
+     "produto": "Bitee - Chips Mediterranean Taro Snack 35g",
+     "teste": true,
+     "nota": ""
+    },
+    {
+     "canal": "S23",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Barra Go On Energy 45 Gr Sante",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S24",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Snack de Chocolate Twix 50 G",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S25",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Kinder Bueno",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S26",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Kit Kat 41,5 Gr",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S28",
+     "seletor": "D07",
+     "capacidade": 7,
+     "produto": "Batatas Fritas - Super Douradas Onduladas 40gr",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S31",
+     "seletor": "S10",
+     "capacidade": 10,
+     "produto": "Bitee - Bolachas Húngaras 70 Gr",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S32",
+     "seletor": "S10",
+     "capacidade": 10,
+     "produto": "Oreo original 6 66g",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S33",
+     "seletor": "S10",
+     "capacidade": 10,
+     "produto": "Dulcesol - Zebra",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S34",
+     "seletor": "S10",
+     "capacidade": 10,
+     "produto": "Dulcesol - Zebra",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S35",
+     "seletor": "S07",
+     "capacidade": 7,
+     "produto": "Fatia Bolo Ecobolos (Variados)",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S36",
+     "seletor": "S07",
+     "capacidade": 7,
+     "produto": "Fatia Bolo Ecobolos (Variados)",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S37",
+     "seletor": "S14",
+     "capacidade": 14,
+     "produto": "Poker Wafer Cacao",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S38",
+     "seletor": "S14",
+     "capacidade": 14,
+     "produto": "Kit Kat Chunky Funky 40g",
+     "teste": true,
+     "nota": ""
+    },
+    {
+     "canal": "S41",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "REF S/G FRESKY F TROP TET 20CL",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S42",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Fuze Tea Pêssego Sleek 330ml",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S43",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Bitee - Croissant Recheio Cacau 60g",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S44",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Bebida Energetica Hell Classic 250ml",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S45",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Coca Cola Original Lata 33 Cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S46",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "REF S/G FRESKY F TROP TET 20CL",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S47",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Guaraná Brasil 33cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S48",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Frisumo Laranja Lata 0.33cl",
+     "teste": false,
+     "nota": ""
+    }
+   ],
+   "notas": "Proposta outono/inverno 2026.",
+   "visitasSemana": 2
+  },
+  "017": {
+   "canais": [
+    {
+     "canal": "S11",
+     "seletor": "D09",
+     "capacidade": 9,
+     "produto": "Tarte de Amêndoa 80Gr",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S13",
+     "seletor": "D09",
+     "capacidade": 9,
+     "produto": "Batatas Fritas - Super Douradas Onduladas 40gr",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S15",
+     "seletor": "D09",
+     "capacidade": 9,
+     "produto": "Tarte de Amêndoa 80Gr",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S20",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Poker Wafer Cacao",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S21",
+     "seletor": "D13",
+     "capacidade": 13,
+     "produto": "Maria 25 Gr Vieira de Castro",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S22",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Dulcesol - Zebra",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S23",
+     "seletor": "D15",
+     "capacidade": 15,
+     "produto": "Bolacha Digestiva Viera",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S24",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Barra Go On Energy 45 Gr Sante",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S25",
+     "seletor": "D07",
+     "capacidade": 7,
+     "produto": "Bitee - Chips Mediterranean Taro Snack 35g",
+     "teste": true,
+     "nota": ""
+    },
+    {
+     "canal": "S30",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Oreo original 6 66g",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S31",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Bolachas Crackers Tuc Originais 31 G",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S32",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Snack de Chocolate Twix 50 G",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S33",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Pastilhas Elásticas Chiclets Spearmint 16,5 G",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S34",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Kit Kat 41,5 Gr",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S35",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Kinder Bueno",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S40",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Croissant Queijo",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S41",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Pan Misto",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S42",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Lanche Fiambre",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S43",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Pão com Chouriço",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S44",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Pizza",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S45",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Pão com Chouriço",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S50",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Bolo de Arroz",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S51",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Fatia Bolo Ecobolos (Variados)",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S52",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Bitee - Croissant Recheio Cacau 60g",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S53",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Fatia Bolo Ecobolos (Variados)",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S54",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Iogurte Liquido Mimosa Tropical",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S55",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "REF S/G FRESKY F TROP TET 20CL",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S60",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Agua Vimeiro c/ gás 0.25 SDR",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S61",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Agua S. Martinho 50cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S62",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Coca Cola Original Lata 33 Cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S63",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Guaraná Brasil 33cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S64",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Frisumo Laranja Lata 0.33cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S65",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Bebida Energetica Hell Classic 250ml",
+     "teste": true,
+     "nota": ""
+    }
+   ],
+   "notas": "Layout aplicado na visita de 26/10/2026 (Kit Kat Chunky e Kings sem stock: esses canais ficaram como estavam).",
+   "visitasSemana": 1
+  },
+  "018": {
+   "canais": [
+    {
+     "canal": "S11",
+     "seletor": "D09",
+     "capacidade": 9,
+     "produto": "Bitee - Chips Mediterranean Taro Snack 35g",
+     "teste": true,
+     "nota": ""
+    },
+    {
+     "canal": "S13",
+     "seletor": "D09",
+     "capacidade": 9,
+     "produto": "Batatas Fritas - Super Douradas Onduladas 40gr",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S15",
+     "seletor": "D09",
+     "capacidade": 9,
+     "produto": "Tarte de Amêndoa 80Gr",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S20",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Bitee - Bolachas Húngaras 70 Gr",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S21",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Poker Wafer Cacao",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S22",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Dulcesol - Zebra",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S23",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Bolacha Digestiva Viera",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S24",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Pastilhas Elásticas Chiclets Spearmint 16,5 G",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S25",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Dulcesol -Triângulo Creme",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S30",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Kinder Bueno",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S31",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Bolachas Crackers Tuc Originais 31 G",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S32",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Oreo original 6 66g",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S33",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Barra Go On Energy 45 Gr Sante",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S34",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Kit Kat 41,5 Gr",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S35",
+     "seletor": "S13",
+     "capacidade": 13,
+     "produto": "Snack de Chocolate Twix 50 G",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S40",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Pão com Chouriço",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S41",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Bitee - Croissant Recheio Cacau 60g",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S42",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Pizza",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S43",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Bolo de Arroz",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S44",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Lanche Fiambre",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S45",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Pan Misto",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S50",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Agua S. Martinho 50cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S51",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Frisumo Laranja Lata 0.33cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S52",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Agua Vimeiro c/ gás 0.25 SDR",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S53",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "REF S/G FRESKY F TROP TET 20CL",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S54",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Fatia Bolo Ecobolos (Variados)",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S55",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Agua S. Martinho 50cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S60",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Iogurte Liquido Mimosa Tropical",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S61",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "REF S/G FRESKY F TROP TET 20CL",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S62",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Coca Cola Original Lata 33 Cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S63",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Guaraná Brasil 33cl",
+     "teste": false,
+     "nota": ""
+    },
+    {
+     "canal": "S64",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Bebida Energetica Hell Classic 250ml",
+     "teste": true,
+     "nota": ""
+    },
+    {
+     "canal": "S65",
+     "seletor": "S06",
+     "capacidade": 6,
+     "produto": "Tisana Pleno Chá Verde e Limão PET 33 Cl",
+     "teste": false,
+     "nota": ""
+    }
+   ],
+   "notas": "Layout aplicado na visita de 26/10/2026 (Kit Kat Chunky e Kings sem stock: esses canais ficaram como estavam).",
+   "visitasSemana": 1
+  }
+ }
+}
