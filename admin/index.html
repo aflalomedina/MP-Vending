@@ -3119,11 +3119,15 @@
           const dar = Math.max(0, Math.min(it.aLevar, disponivel));
           disponivel -= dar;
           it.aLevar = dar;
+          it.arm3 = Math.floor(armazem3[produto] || 0);
         }
       }
-      itens = itens.filter(it => it.aLevar > 0);
+      // O que não há no armazém 7 não vai na carrinha, mas não pode desaparecer sem aviso: nas máquinas com troca de layout
+      // (canais novos) ou quando há no armazém 3, a linha fica com 0 a levar e entra em "Falta no armazém 7" no PDF.
+      const maquinasTroca = new Set(((ajusteLayout && ajusteLayout.trocas) || []).map(t => t.maquina));
+      itens = itens.filter(it => it.aLevar > 0 || maquinasTroca.has(it.maquina) || it.arm3 > 0);
 
-      if (!itens.length) {
+      if (!itens.length && !maquinasTroca.size) {
         if (gridSC) {
           ultimoCalculoReposicao = { locaisOrdenados: [], semStockTotal, gridSC, ajusteLayout };
           document.getElementById('checklistLocais').innerHTML = '<div style="font-size:12px;color:var(--muted);">Nada a repor nos restantes produtos.</div>';
@@ -3145,12 +3149,15 @@
         if (!porLocal.has(local)) porLocal.set(local, []);
         porLocal.get(local).push(it);
       }
+      const locaisComTroca = new Set(Array.from(maquinasTroca).map(m => pdvLabel(m)));
+      for (const local of locaisComTroca) if (!porLocal.has(local)) porLocal.set(local, []);
       const locaisOrdenados = Array.from(porLocal.entries())
         .map(([local, lista]) => ({
           local,
           lista,
+          temTroca: locaisComTroca.has(local),
           score: lista.reduce((s, x) => s + x.score, 0),
-          mediaPct: lista.reduce((s, x) => s + x.pct, 0) / lista.length,
+          mediaPct: lista.length ? lista.reduce((s, x) => s + x.pct, 0) / lista.length : 0,
         }))
         .sort((a, b) => b.score - a.score) // mais urgente (maior receita perdida/em risco) primeiro
         .map((l, idx) => ({
@@ -3167,12 +3174,12 @@
 
       const checklist = document.getElementById('checklistLocais');
       checklist.innerHTML = locaisOrdenados.map((l, idx) => {
-        const marcado = nrMaquinas > 0 ? idx < nrMaquinas : true;
+        const marcado = (nrMaquinas > 0 ? idx < nrMaquinas : true) || l.temTroca; // com troca de layout marcada vai sempre
         const corNivel = l.nivel === 'VISITAR AMANHÃ' ? 'var(--negative)' : l.nivel === 'VISITAR EM BREVE' ? '#C7710A' : 'var(--muted)';
         return `
           <label style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--line);cursor:pointer;">
             <input type="checkbox" class="checklist-local" value="${idx}" ${marcado ? 'checked' : ''} />
-            <span style="flex:1;">${l.local}</span>
+            <span style="flex:1;">${l.local}${l.temTroca ? ' <span style="font-size:11px;color:var(--accent-deep);font-weight:600;">· troca de layout</span>' : ''}</span>
             <span style="font-size:11px;color:${corNivel};font-weight:600;">${l.nivel}</span>
             <span style="font-size:11px;color:var(--muted);">${fmtEUR(l.score)}</span>
           </label>
@@ -3313,7 +3320,12 @@
 
       const linhasOrdenadas = [...lista].sort((a, b) => (ehPesado(b.produto) ? 1 : 0) - (ehPesado(a.produto) ? 1 : 0));
 
-      doc.autoTable({
+      if (!linhasOrdenadas.length) {
+        doc.setFontSize(9); doc.setTextColor(110);
+        doc.text('Nada a repor neste local além da troca de layout.', 14, y + 3);
+        doc.setTextColor(0);
+        y += 8;
+      } else doc.autoTable({
         startY: y,
         head: [['Produto', 'Stock', 'Cap.', '%', 'A levar', 'Canais', 'Nota']],
         body: linhasOrdenadas.map(it => [
@@ -3325,7 +3337,8 @@
           it.canais.length > 1 ? it.canais.join(', ') : (it.canais[0] || '—'),
           [
             it.semVendaRecente ? 'sem vendas recentes' : '',
-            it.aLevar < it.precisava ? `só ${fmtInt(it.aLevar)} de ${fmtInt(it.precisava)} — armazém insuficiente` : '',
+            it.aLevar === 0 && it.precisava > 0 ? `sem stock no armazém 7${it.arm3 > 0 ? ` — há ${fmtInt(it.arm3)} no armazém 3` : ''}`
+              : it.aLevar < it.precisava ? `só ${fmtInt(it.aLevar)} de ${fmtInt(it.precisava)} — armazém insuficiente` : '',
           ].filter(Boolean).join(' · '),
         ]),
         theme: 'grid',
@@ -3336,16 +3349,21 @@
         },
         margin: { left: 14, right: 14 },
       });
-      y = doc.lastAutoTable.finalY + 8;
+      if (linhasOrdenadas.length) y = doc.lastAutoTable.finalY + 8;
       for (const troca of trocasLayout.filter(t => pdvLabel(t.maquina) === local && !trocasDesenhadas.has(t.maquina))) {
         y = desenharTrocaLayoutPDF(doc, y, troca);
         trocasDesenhadas.add(troca.maquina);
       }
     });
 
-    for (const troca of trocasLayout.filter(t => !trocasDesenhadas.has(t.maquina))) {
-      y = desenharTrocaLayoutPDF(doc, y, troca);
-      trocasDesenhadas.add(troca.maquina);
+    // trocas de layout de locais que não foram selecionados: não se imprimem (o que levar não estaria no resumo), só se avisa
+    const trocasDeFora = trocasLayout.filter(t => !trocasDesenhadas.has(t.maquina));
+    if (trocasDeFora.length) {
+      if (y > 260) { doc.addPage(); y = 20; }
+      doc.setFontSize(9); doc.setTextColor(200, 40, 40);
+      doc.text('Troca de layout NÃO incluída (local não selecionado): ' + trocasDeFora.map(t => machineLabel(t.maquina)).join(', '), 14, y, { maxWidth: 182 });
+      doc.setTextColor(0);
+      y += 8;
     }
 
     const frescosRetirar = (ultimoCalculoReposicao.ajusteLayout && ultimoCalculoReposicao.ajusteLayout.frescosRetirar) || [];
@@ -3415,7 +3433,7 @@
       totalPorProduto.set(i.produto, (totalPorProduto.get(i.produto) || 0) + i.qtd);
       locaisPorProduto.set(i.produto, (locaisPorProduto.get(i.produto) || 0) + 1);
     }
-    const resumoOrdenado = Array.from(totalPorProduto.entries()).sort((a, b) => b[1] - a[1]);
+    const resumoOrdenado = Array.from(totalPorProduto.entries()).filter(([, q]) => q > 0).sort((a, b) => b[1] - a[1]);
     doc.autoTable({
       startY: y,
       head: [['Produto', 'Total a levar', 'Nº locais']],
@@ -3425,6 +3443,28 @@
       headStyles: { fillColor: [27, 31, 39] },
       margin: { left: 14, right: 14 },
     });
+
+    // produtos que faziam falta mas o armazém 7 não tem (ou não chega): passar do 3 ou comprar
+    const faltas = new Map();
+    for (const { lista } of locaisOrdenados) for (const it of lista) {
+      if (it.aLevar >= it.precisava) continue;
+      const f = faltas.get(it.produto) || { falta: 0, arm3: it.arm3 || 0, maquinas: new Set() };
+      f.falta += it.precisava - it.aLevar; f.maquinas.add(machineLabel(it.maquina)); faltas.set(it.produto, f);
+    }
+    if (faltas.size) {
+      let y3 = doc.lastAutoTable.finalY + 8;
+      if (y3 > 240) { doc.addPage(); y3 = 20; }
+      doc.setFontSize(12); doc.setFont(undefined, 'bold');
+      doc.text('Falta no armazém 7 (não vai na carrinha)', 14, y3);
+      doc.setFont(undefined, 'normal');
+      doc.autoTable({
+        startY: y3 + 4,
+        head: [['Produto', 'Faltam', 'Há no arm. 3', 'Máquinas']],
+        body: Array.from(faltas.entries()).sort((a, b) => b[1].falta - a[1].falta)
+          .map(([p, f]) => [p, fmtInt(f.falta), f.arm3 > 0 ? fmtInt(f.arm3) + ' — passar para o 7' : '0 — comprar', Array.from(f.maquinas).join(', ')]),
+        theme: 'grid', styles: { fontSize: 8 }, headStyles: { fillColor: [224, 49, 49] }, margin: { left: 14, right: 14 },
+      });
+    }
 
     if (semStockTotal.size) {
       let y2 = doc.lastAutoTable.finalY + 8;
@@ -3813,7 +3853,8 @@
   // Produtos Smartcake para a grelha de reposição: Frescos + Sandes + alguns nomes que o catálogo classifica de outra forma
   function isSmartcakeProd(produto) {
     const sf = subfamiliaLabel(produto);
-    return sf === 'Frescos' || sf === 'Sandes' || /baguete|croissant simples|pizza/i.test(produto);
+    // "Pizza" só como nome completo do fresco: produtos secos como "Sante - Corn Waffers Pizza 22 Gr" não são Smartcake
+    return sf === 'Frescos' || sf === 'Sandes' || /baguete|croissant simples|^pizza$/i.test((produto || '').trim());
   }
 
   function isFresco(produto) {
