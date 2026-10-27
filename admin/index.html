@@ -469,6 +469,7 @@
 <div class="tabs">
   <button class="tab-btn active" data-view="diarias">Vendas Diárias</button>
   <button class="tab-btn" data-view="stocks">Stocks</button>
+  <button class="tab-btn" data-view="reposicao">Reposição e Layouts</button>
   <button class="tab-btn" data-view="financeiro">Financeiro</button>
   <button class="tab-btn" data-view="site">Site</button>
   <button class="tab-btn" data-view="resultados">Resultados</button>
@@ -562,82 +563,6 @@
       <div id="compraResumo" style="font-size:12px;color:var(--muted);margin-bottom:6px;"></div>
       <div id="compraMsg" style="font-size:12px;min-height:14px;"></div>
       <div class="table-wrap cards-mobile" id="compraWrap" style="max-height:640px;overflow-y:auto;"><div class="state small">a carregar…</div></div>
-    </div>
-
-    <div class="panel full">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-        <div>
-          <h2 style="margin:0 0 4px;">Lista de reposição para amanhã</h2>
-          <div style="font-size:12px;color:var(--muted);">
-            Gera um PDF com os produtos a repor por localização, com a quantidade a levar já limitada pelo stock do Armazém 7.
-          </div>
-        </div>
-        <div style="display:flex;align-items:end;gap:10px;flex-wrap:wrap;">
-          <div>
-            <label for="gerarPdfNrMaquinas" style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Nº de locais a visitar</label>
-            <input type="number" id="gerarPdfNrMaquinas" min="1" placeholder="Todos" style="border:1px solid var(--line);border-radius:4px;padding:8px;font-family:inherit;font-size:13px;width:90px;" />
-          </div>
-          <button type="button" id="gerarPdfBtn" style="background:var(--ink);color:#fff;border:none;border-radius:4px;padding:10px 18px;font-size:13px;cursor:pointer;white-space:nowrap;">
-            Calcular necessidades
-          </button>
-        </div>
-      </div>
-      <div id="gerarPdfMsg" style="font-size:12px;margin-top:8px;"></div>
-      <div id="reposicaoLayoutsWrap" style="display:none;margin-top:10px;padding:10px 12px;border:1px dashed var(--line);border-radius:4px;"></div>
-
-      <div id="checklistLocaisWrap" style="display:none;margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px;">
-          <div style="font-size:12px;color:var(--muted);">Desmarca os locais que não queres incluir desta vez:</div>
-          <div style="display:flex;gap:10px;">
-            <button type="button" id="checklistMarcarTodos" style="background:none;border:1px solid var(--line);border-radius:4px;padding:5px 10px;font-size:12px;cursor:pointer;">Marcar todos</button>
-            <button type="button" id="checklistDesmarcarTodos" style="background:none;border:1px solid var(--line);border-radius:4px;padding:5px 10px;font-size:12px;cursor:pointer;">Desmarcar todos</button>
-          </div>
-        </div>
-        <div id="checklistLocais" style="max-height:260px;overflow-y:auto;border:1px solid var(--line);border-radius:4px;padding:10px;"></div>
-        <div id="smartcakeGridWrap" style="display:none;margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px;">
-            <div style="font-weight:600;">Smartcake — divisão por máquina</div>
-            <button type="button" id="smartcakeGridLimpar" style="background:none;border:1px solid var(--line);border-radius:4px;padding:5px 10px;font-size:12px;cursor:pointer;">Limpar quantidades</button>
-          </div>
-          <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
-            Só aparece porque há produtos Smartcake no Armazém 7. Escreve quanto levas a cada máquina; o total por produto não passa do que há no armazém. Células a zero não vão para o PDF.
-          </div>
-          <div class="table-wrap cards-mobile" id="smartcakeGridTabela"></div>
-        </div>
-        <button type="button" id="gerarPdfFinalBtn" style="margin-top:12px;background:var(--ink);color:#fff;border:none;border-radius:4px;padding:10px 18px;font-size:13px;cursor:pointer;">
-          Gerar PDF com os locais selecionados
-        </button>
-      </div>
-    </div>
-
-    <div class="panel full" id="layoutsPanel">
-      <h2>Layouts das máquinas de snacks</h2>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">
-        Compara o layout atual (export de canais da Luope) com um layout planeado, canal a canal. A sugestão usa as vendas dos últimos 20 dias úteis e mexe no mínimo de canais.
-        O plano guardado fica partilhado e pode ser usado na lista de reposição numa visita pontual. Depois da troca, os canais têm de ser atualizados na Luope.
-      </div>
-      <div id="layoutsResumo"><div class="state small">a carregar…</div></div>
-      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:14px 0 4px;">
-        <div>
-          <label for="layoutMaquina" style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Máquina</label>
-          <select id="layoutMaquina" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;"></select>
-        </div>
-        <div>
-          <label for="layoutVisitas" style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Visitas por semana</label>
-          <input type="number" id="layoutVisitas" min="0.5" max="7" step="0.5" value="2" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;width:80px;" />
-        </div>
-        <button type="button" id="layoutSugerirBtn" style="background:none;border:1px solid var(--ink);border-radius:4px;padding:8px 12px;font-size:12.5px;cursor:pointer;">Sugerir pelas vendas</button>
-        <button type="button" id="layoutPropostaBtn" style="display:none;background:none;border:1px solid var(--line);border-radius:4px;padding:8px 12px;font-size:12.5px;cursor:pointer;">Carregar proposta</button>
-        <button type="button" id="layoutAtualBtn" style="background:none;border:1px solid var(--line);border-radius:4px;padding:8px 12px;font-size:12.5px;cursor:pointer;">Partir do layout atual</button>
-        <button type="button" id="layoutGuardarBtn" style="background:var(--ink);color:#fff;border:none;border-radius:4px;padding:9px 14px;font-size:12.5px;cursor:pointer;">Guardar plano</button>
-        <button type="button" id="layoutTrocaFeitaBtn" style="display:none;background:var(--accent);color:var(--ink);border:none;border-radius:4px;padding:9px 14px;font-size:12.5px;cursor:pointer;font-weight:600;">Marcar troca feita</button>
-        <button type="button" id="layoutApagarBtn" style="display:none;background:none;border:none;color:var(--negative);padding:8px 6px;font-size:12.5px;cursor:pointer;">Apagar plano</button>
-      </div>
-      <div id="layoutMsg" style="font-size:12px;min-height:16px;"></div>
-      <div id="layoutEstado"></div>
-      <div class="table-wrap cards-mobile" id="layoutTabelaWrap" style="max-height:620px;overflow-y:auto;"></div>
-      <h3 style="font-size:13.5px;margin:16px 0 6px;">Cobertura por produto</h3>
-      <div class="table-wrap cards-mobile" id="layoutCoberturaWrap"></div>
     </div>
 
     <div class="panel full">
@@ -736,6 +661,88 @@
       </div>
       <div class="table-wrap" id="vendasProdutoWrap"><div class="state small">a carregar…</div></div>
     </div>
+  </div>
+
+  <div id="view-reposicao" class="view">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
+      Lista de reposição para o repositor (PDF do dia seguinte) e planeamento dos layouts das máquinas de snacks. O stock e as compras ficam na aba Stocks.
+    </div>
+    <div class="panel full">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+        <div>
+          <h2 style="margin:0 0 4px;">Lista de reposição para amanhã</h2>
+          <div style="font-size:12px;color:var(--muted);">
+            Gera um PDF com os produtos a repor por localização, com a quantidade a levar já limitada pelo stock do Armazém 7.
+          </div>
+        </div>
+        <div style="display:flex;align-items:end;gap:10px;flex-wrap:wrap;">
+          <div>
+            <label for="gerarPdfNrMaquinas" style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Nº de locais a visitar</label>
+            <input type="number" id="gerarPdfNrMaquinas" min="1" placeholder="Todos" style="border:1px solid var(--line);border-radius:4px;padding:8px;font-family:inherit;font-size:13px;width:90px;" />
+          </div>
+          <button type="button" id="gerarPdfBtn" style="background:var(--ink);color:#fff;border:none;border-radius:4px;padding:10px 18px;font-size:13px;cursor:pointer;white-space:nowrap;">
+            Calcular necessidades
+          </button>
+        </div>
+      </div>
+      <div id="gerarPdfMsg" style="font-size:12px;margin-top:8px;"></div>
+      <div id="reposicaoLayoutsWrap" style="display:none;margin-top:10px;padding:10px 12px;border:1px dashed var(--line);border-radius:4px;"></div>
+
+      <div id="checklistLocaisWrap" style="display:none;margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px;">
+          <div style="font-size:12px;color:var(--muted);">Desmarca os locais que não queres incluir desta vez:</div>
+          <div style="display:flex;gap:10px;">
+            <button type="button" id="checklistMarcarTodos" style="background:none;border:1px solid var(--line);border-radius:4px;padding:5px 10px;font-size:12px;cursor:pointer;">Marcar todos</button>
+            <button type="button" id="checklistDesmarcarTodos" style="background:none;border:1px solid var(--line);border-radius:4px;padding:5px 10px;font-size:12px;cursor:pointer;">Desmarcar todos</button>
+          </div>
+        </div>
+        <div id="checklistLocais" style="max-height:260px;overflow-y:auto;border:1px solid var(--line);border-radius:4px;padding:10px;"></div>
+        <div id="smartcakeGridWrap" style="display:none;margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px;">
+            <div style="font-weight:600;">Smartcake — divisão por máquina</div>
+            <button type="button" id="smartcakeGridLimpar" style="background:none;border:1px solid var(--line);border-radius:4px;padding:5px 10px;font-size:12px;cursor:pointer;">Limpar quantidades</button>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
+            Só aparece porque há produtos Smartcake no Armazém 7. Escreve quanto levas a cada máquina; o total por produto não passa do que há no armazém. Células a zero não vão para o PDF.
+          </div>
+          <div class="table-wrap cards-mobile" id="smartcakeGridTabela"></div>
+        </div>
+        <button type="button" id="gerarPdfFinalBtn" style="margin-top:12px;background:var(--ink);color:#fff;border:none;border-radius:4px;padding:10px 18px;font-size:13px;cursor:pointer;">
+          Gerar PDF com os locais selecionados
+        </button>
+      </div>
+    </div>
+
+    <div class="panel full" id="layoutsPanel">
+      <h2>Layouts das máquinas de snacks</h2>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">
+        Compara o layout atual (export de canais da Luope) com um layout planeado, canal a canal. A sugestão usa as vendas dos últimos 20 dias úteis e mexe no mínimo de canais.
+        O plano guardado fica partilhado e pode ser usado na lista de reposição numa visita pontual. Depois da troca, os canais têm de ser atualizados na Luope.
+      </div>
+      <div id="layoutsResumo"><div class="state small">a carregar…</div></div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:14px 0 4px;">
+        <div>
+          <label for="layoutMaquina" style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Máquina</label>
+          <select id="layoutMaquina" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;"></select>
+        </div>
+        <div>
+          <label for="layoutVisitas" style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Visitas por semana</label>
+          <input type="number" id="layoutVisitas" min="0.5" max="7" step="0.5" value="2" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;width:80px;" />
+        </div>
+        <button type="button" id="layoutSugerirBtn" style="background:none;border:1px solid var(--ink);border-radius:4px;padding:8px 12px;font-size:12.5px;cursor:pointer;">Sugerir pelas vendas</button>
+        <button type="button" id="layoutPropostaBtn" style="display:none;background:none;border:1px solid var(--line);border-radius:4px;padding:8px 12px;font-size:12.5px;cursor:pointer;">Carregar proposta</button>
+        <button type="button" id="layoutAtualBtn" style="background:none;border:1px solid var(--line);border-radius:4px;padding:8px 12px;font-size:12.5px;cursor:pointer;">Partir do layout atual</button>
+        <button type="button" id="layoutGuardarBtn" style="background:var(--ink);color:#fff;border:none;border-radius:4px;padding:9px 14px;font-size:12.5px;cursor:pointer;">Guardar plano</button>
+        <button type="button" id="layoutTrocaFeitaBtn" style="display:none;background:var(--accent);color:var(--ink);border:none;border-radius:4px;padding:9px 14px;font-size:12.5px;cursor:pointer;font-weight:600;">Marcar troca feita</button>
+        <button type="button" id="layoutApagarBtn" style="display:none;background:none;border:none;color:var(--negative);padding:8px 6px;font-size:12.5px;cursor:pointer;">Apagar plano</button>
+      </div>
+      <div id="layoutMsg" style="font-size:12px;min-height:16px;"></div>
+      <div id="layoutEstado"></div>
+      <div class="table-wrap cards-mobile" id="layoutTabelaWrap" style="max-height:620px;overflow-y:auto;"></div>
+      <h3 style="font-size:13.5px;margin:16px 0 6px;">Cobertura por produto</h3>
+      <div class="table-wrap cards-mobile" id="layoutCoberturaWrap"></div>
+    </div>
+
   </div>
 
   <div id="view-financeiro" class="view">
@@ -2961,13 +2968,20 @@
     if (stocksLoaded) return;
     stocksLoaded = true;
     loadLayoutAndRender();
-    iniciarPainelLayouts();
     renderStockAComprar();
     await garantirMensalCompletoData();
     renderTop7Dias();
     renderPrevisaoCompra();
     renderVendasPorProduto();
     renderCoposMaquinas();
+  }
+
+  // ===== Aba "Reposição e Layouts" =====
+  let reposicaoLoaded = false;
+  function loadReposicaoView() {
+    if (reposicaoLoaded) return;
+    reposicaoLoaded = true;
+    iniciarPainelLayouts();
     document.getElementById('gerarPdfBtn').addEventListener('click', calcularNecessidadesReposicao);
     document.getElementById('gerarPdfFinalBtn').addEventListener('click', construirEGerarPDF);
     document.getElementById('checklistMarcarTodos').addEventListener('click', () => {
@@ -5609,6 +5623,7 @@
       btn.classList.add('active');
       document.getElementById('view-' + btn.dataset.view).classList.add('active');
       if (btn.dataset.view === 'stocks') loadStocksView();
+      if (btn.dataset.view === 'reposicao') loadReposicaoView();
       if (btn.dataset.view === 'financeiro') loadFinanceiroView();
       if (btn.dataset.view === 'site') loadSiteView();
       if (btn.dataset.view === 'resultados') loadResultadosView();
@@ -5676,6 +5691,18 @@
           porHoraCaptura[h] = (porHoraCaptura[h] || 0) + (Number(r.value) || 0);
         }
         lastSummary.porHora = porHoraCaptura;
+
+        // unidades por produto e hora (para a análise por hora do dia na aba Produtos): { produto: { hora: unidades } }
+        const porHoraProduto = {};
+        for (const r of lastVendasRows) {
+          if (!r.NOME_PRODUTO || (r.MATRICULA_MAQUINA && MAQUINAS_EXCLUIDAS.has(r.MATRICULA_MAQUINA))) continue;
+          const d = saleAtPT(r.sale_at);
+          if (isNaN(d)) continue;
+          const p = canonicalProduto(r.NOME_PRODUTO);
+          const h = d.getHours();
+          (porHoraProduto[p] = porHoraProduto[p] || {})[h] = (porHoraProduto[p][h] || 0) + (Number(r.count) || 1);
+        }
+        lastSummary.porHoraProduto = porHoraProduto;
 
         HISTORICO[lastSummary.date] = { ...HISTORICO[lastSummary.date], ...lastSummary };
       }
