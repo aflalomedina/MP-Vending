@@ -523,6 +523,101 @@ async function handleEncomendas(request, env) {
   return new Response("Método não suportado", { status: 405 });
 }
 
+// ===== Resumo diário automático (cron às 23:55 de Lisboa) =====
+// O admin guarda o resumo do dia quando alguém o abre; se ninguém o abrir ao fim do dia, o dia ficava incompleto.
+// Este cron calcula o mesmo resumo a partir do card "vendas-diarias" e grava-o na KV (snapshot:<data>), por cima do que lá estiver.
+// porPontoVenda e porCategoria dependem das tabelas de máquinas do admin: o admin deriva-os de porMaquina quando faltam.
+// Manter canonicalProduto igual ao do admin (admin/index.html).
+const GRUPOS_PRODUTO_WORKER = {
+  "Guarana Antartica lata 33cl": "Guaraná Brasil 33cl",
+  "Agua UP 0,5L": "Agua S. Martinho 50cl",
+  "Agua Rioba 50cl": "Agua S. Martinho 50cl",
+  "Bebida Energetica Hell Classic 25cl": "Bebida Energetica Hell Classic 250ml",
+  "Bebida Energetica Hell Zero 25cl": "Bebida Energetica Hell Classic 250ml",
+  "Coca Cola Original Lata Sleek": "Coca Cola Original Lata 33 Cl",
+  "Croissant Recheado com Cacau 60 Gr - Belino": "Bitee - Croissant Recheio Cacau 60g",
+  "7Up 33cl": "7Up Sleek 330ml",
+  "REF S/G FRESKY LAR TET 20CL": "REF S/G FRESKY F TROP TET 20CL",
+};
+function canonicalProdutoWorker(nome) {
+  const n = String(nome || "").replace(/\s*\(sdr\)\s*$/i, "").replace(/\s*-\s*sdr\s*$/i, "").trim();
+  return GRUPOS_PRODUTO_WORKER[n] || n;
+}
+const MAQUINAS_EXCLUIDAS_WORKER = new Set(["005"]);
+function horaLisboa(instante) {
+  const p = {};
+  new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Lisbon", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+    .formatToParts(instante).forEach((x) => { p[x.type] = x.value; });
+  return { data: `${p.year}-${p.month}-${p.day}`, hora: Number(p.hour), minuto: Number(p.minute) };
+}
+function horaDaVenda(saleAt) {
+  const str = String(saleAt == null ? "" : saleAt).trim();
+  const m = str.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?\s*(Z|[+-]\d{2}:?\d{2})?$/i);
+  if (m && !m[7]) return Number(m[4]); // sem fuso: já é hora de Portugal
+  const d = new Date(str);
+  return isNaN(d) ? null : horaLisboa(d).hora;
+}
+function calcularResumoDia(payload, data) {
+  const cols = payload.data.cols.map((c) => c.name);
+  const rows = payload.data.rows.map((row) => { const o = {}; cols.forEach((c, i) => { o[c] = row[i]; }); return o; });
+  const soma = (lista, chave, valor) => { const o = {}; for (const r of lista) { const k = chave(r); o[k] = (o[k] || 0) + valor(r); } return o; };
+  const receitaTotal = rows.reduce((s, r) => s + (Number(r.value) || 0), 0);
+  const transacoes = rows.reduce((s, r) => s + (Number(r.count) || 1), 0);
+  const validas = rows.filter((r) => r.MATRICULA_MAQUINA && !MAQUINAS_EXCLUIDAS_WORKER.has(r.MATRICULA_MAQUINA));
+  const comProduto = rows.filter((r) => r.NOME_PRODUTO);
+  const porProduto = {};
+  for (const r of comProduto) {
+    const p = canonicalProdutoWorker(r.NOME_PRODUTO);
+    const e = (porProduto[p] = porProduto[p] || { qtd: 0, valor: 0 });
+    e.qtd += Number(r.count) || 1; e.valor += Number(r.value) || 0;
+  }
+  const porMaquinaProduto = {}, porHoraProduto = {}, porHora = {};
+  for (const r of validas) {
+    if (!r.NOME_PRODUTO) continue;
+    const p = canonicalProdutoWorker(r.NOME_PRODUTO);
+    (porMaquinaProduto[r.MATRICULA_MAQUINA] = porMaquinaProduto[r.MATRICULA_MAQUINA] || {})[p] = ((porMaquinaProduto[r.MATRICULA_MAQUINA] || {})[p] || 0) + (Number(r.count) || 1);
+  }
+  for (const r of rows) {
+    const h = horaDaVenda(r.sale_at);
+    if (h == null) continue;
+    porHora[h] = (porHora[h] || 0) + (Number(r.value) || 0);
+    if (r.NOME_PRODUTO && !(r.MATRICULA_MAQUINA && MAQUINAS_EXCLUIDAS_WORKER.has(r.MATRICULA_MAQUINA))) {
+      const p = canonicalProdutoWorker(r.NOME_PRODUTO);
+      (porHoraProduto[p] = porHoraProduto[p] || {})[h] = ((porHoraProduto[p] || {})[h] || 0) + (Number(r.count) || 1);
+    }
+  }
+  return {
+    date: data,
+    receitaTotal,
+    transacoes,
+    ticketMedio: transacoes ? receitaTotal / transacoes : 0,
+    produtosDistintos: new Set(comProduto.map((r) => r.NOME_PRODUTO)).size,
+    porMaquina: soma(validas, (r) => r.MATRICULA_MAQUINA, (r) => Number(r.value) || 0),
+    porTipoPagamento: soma(rows.filter((r) => r.id !== undefined && r.id !== null && r.id !== "" && String(r.id) !== "4"), (r) => String(r.id), (r) => Number(r.value) || 0),
+    porProduto,
+    porMaquinaProduto,
+    porHora,
+    porHoraProduto,
+    capturadoPor: "cron",
+    capturadoEm: new Date().toISOString(),
+  };
+}
+async function guardarResumoDiario(env, forcar) {
+  const agora = horaLisboa(new Date());
+  // o cron corre às 22:55 e às 23:55 UTC (cobre hora de verão e de inverno); só grava quando em Lisboa são 23h
+  if (!forcar && agora.hora !== 23) return { ok: false, motivo: `em Lisboa são ${agora.hora}h` };
+  const vendas = await queryCard(env, CARDS["vendas-diarias"]);
+  const resumo = calcularResumoDia(vendas, agora.data);
+  const anterior = await env.HISTORY_KV.get(`snapshot:${agora.data}`);
+  let base = {};
+  try { base = anterior ? JSON.parse(anterior) : {}; } catch { base = {}; }
+  // mantém campos que só o admin calcula (porPontoVenda, porCategoria…) e substitui os números pelos do fim do dia
+  const final = { ...base, ...resumo };
+  delete final.porPontoVenda; delete final.porCategoria; // recalculados no admin a partir de porMaquina
+  await env.HISTORY_KV.put(`snapshot:${agora.data}`, JSON.stringify(final));
+  return { ok: true, date: agora.data, receitaTotal: resumo.receitaTotal, transacoes: resumo.transacoes };
+}
+
 // ===== Despesas mensais (Cloudflare KV) =====
 // ===== Tracking próprio (visitas + leads do formulário) via KV =====
 async function handleTrack(request, env) {
@@ -652,6 +747,11 @@ async function handleDespesas(request, env) {
 
 export default {
 
+  // cron (wrangler.jsonc → triggers.crons): grava o resumo do dia às 23:55 de Lisboa
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(guardarResumoDiario(env, false).catch((err) => console.error("Resumo diário falhou:", err.message)));
+  },
+
   async fetch(request, env) {
     const url = new URL(request.url);
 
@@ -694,6 +794,14 @@ export default {
           status: 500,
           headers: { "Content-Type": "application/json" },
         });
+      }
+    }
+
+    if (url.pathname === "/api/snapshot-agora" && request.method === "POST") {
+      try {
+        return jsonResponse(await guardarResumoDiario(env, true));
+      } catch (err) {
+        return jsonResponse({ error: err.message }, 502);
       }
     }
 

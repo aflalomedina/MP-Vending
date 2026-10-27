@@ -346,6 +346,30 @@
 
   /* ===== Telemóvel: tudo aqui dentro só se aplica a ecrãs estreitos — o desktop fica igual ===== */
   .compra-btn { background: none; border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; font-size: 11.5px; font-family: inherit; cursor: pointer; white-space: nowrap; }
+  /* ===== Aba Produtos ===== */
+  .prod-filtros label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+  .prod-filtros select, .prod-filtros input { border: 1px solid var(--line); border-radius: 4px; padding: 7px 8px; font-family: inherit; font-size: 13px; background: #fff; }
+  tr.prod-linha { cursor: pointer; }
+  tr.prod-linha:hover td { background: #FFF8EC; }
+  tr.prod-linha.sel td { background: #FFEFD5; }
+  .prod-cat { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 10px; white-space: nowrap; }
+  .prod-cat-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr); gap: 16px; align-items: start; }
+  .prod-heat th, .prod-heat td { padding: 5px 6px; font-size: 11.5px; }
+  .prod-heat td { border-radius: 2px; }
+  .prod-barras { display: flex; align-items: flex-end; gap: 3px; height: 92px; padding-bottom: 2px; overflow-x: auto; }
+  .prod-barras > div { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 18px; }
+  .prod-barras .b { width: 14px; background: var(--accent); border-radius: 2px 2px 0 0; }
+  .prod-barras span { font-size: 10px; color: var(--muted); }
+  .prod-alertas { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .prod-alerta { border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
+  .prod-alerta ul { margin: 0; padding-left: 16px; font-size: 12.5px; line-height: 1.6; }
+  .prod-alerta li span { color: var(--muted); font-size: 11.5px; }
+  .prod-link { color: var(--ink); text-decoration: underline; text-decoration-color: var(--line); }
+  @media (max-width: 640px) {
+    .prod-cat-grid { grid-template-columns: 1fr; }
+    .prod-filtros > div > div { flex: 1 1 140px; }
+    .prod-filtros select, .prod-filtros input { width: 100%; }
+  }
   /* ===== Notas rápidas (post-its) ===== */
   .nota-nova textarea {
     width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 6px;
@@ -470,6 +494,7 @@
   <button class="tab-btn active" data-view="diarias">Vendas Diárias</button>
   <button class="tab-btn" data-view="stocks">Stocks</button>
   <button class="tab-btn" data-view="reposicao">Reposição e Layouts</button>
+  <button class="tab-btn" data-view="produtos">Produtos</button>
   <button class="tab-btn" data-view="financeiro">Financeiro</button>
   <button class="tab-btn" data-view="site">Site</button>
   <button class="tab-btn" data-view="resultados">Resultados</button>
@@ -589,11 +614,6 @@
     </div>
 
     <div class="panel full">
-      <h2>Top produtos — últimos 7 dias</h2>
-      <canvas id="chartTop7" height="180"></canvas>
-    </div>
-
-    <div class="panel full">
       <h2>Stock atual — máquinas de snacks</h2>
       <div style="margin-bottom:12px;">
         <label for="snackMachineFilter" style="font-size:13px;color:var(--muted);margin-right:8px;">Filtrar por máquina:</label>
@@ -645,22 +665,6 @@
       <div class="table-wrap cards-mobile" id="previsaoCompraWrap"><div class="state small">a carregar…</div></div>
     </div>
 
-    <div class="panel full">
-      <h2>Vendas por produto — dia, mês e ano</h2>
-      <div style="margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
-        <div>
-          <label for="vendasProdutoCategoria" style="font-size:13px;color:var(--muted);margin-right:8px;">Categoria:</label>
-          <select id="vendasProdutoCategoria" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;">
-            <option value="">Todas</option>
-          </select>
-        </div>
-        <div>
-          <label for="vendasProdutoPesquisa" style="font-size:13px;color:var(--muted);margin-right:8px;">Procurar produto:</label>
-          <input type="text" id="vendasProdutoPesquisa" placeholder="ex: café, coca cola…" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;" />
-        </div>
-      </div>
-      <div class="table-wrap" id="vendasProdutoWrap"><div class="state small">a carregar…</div></div>
-    </div>
   </div>
 
   <div id="view-reposicao" class="view">
@@ -743,6 +747,89 @@
       <div class="table-wrap cards-mobile" id="layoutCoberturaWrap"></div>
     </div>
 
+  </div>
+
+  <div id="view-produtos" class="view">
+    <div class="panel full prod-filtros">
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:end;">
+        <div>
+          <label for="prodPeriodo">Período</label>
+          <select id="prodPeriodo">
+            <option value="hoje">Hoje</option>
+            <option value="ontem">Ontem</option>
+            <option value="7d" selected>Últimos 7 dias</option>
+            <option value="30d">Últimos 30 dias</option>
+            <option value="mes">Este mês</option>
+            <option value="mesAnterior">Mês anterior</option>
+            <option value="3m">Últimos 3 meses</option>
+            <option value="ano">Este ano</option>
+            <option value="personalizado">Datas à escolha…</option>
+          </select>
+        </div>
+        <div id="prodDatas" style="display:none;gap:8px;align-items:end;">
+          <div><label for="prodDe">De</label><input type="date" id="prodDe" /></div>
+          <div><label for="prodAte">Até</label><input type="date" id="prodAte" /></div>
+        </div>
+        <div><label for="prodCategoria">Categoria</label><select id="prodCategoria"></select></div>
+        <div><label for="prodLocal">Local</label><select id="prodLocal"></select></div>
+        <div>
+          <label for="prodMedida">Medir por</label>
+          <select id="prodMedida"><option value="valor">Receita (€)</option><option value="qtd">Unidades</option></select>
+        </div>
+        <div style="flex:1 1 180px;"><label for="prodPesquisa">Produto</label><input type="text" id="prodPesquisa" placeholder="procurar…" style="width:100%;" /></div>
+      </div>
+      <div id="prodPeriodoInfo" style="font-size:12px;color:var(--muted);margin-top:10px;"></div>
+    </div>
+
+    <div class="kpis" id="prodKpis"></div>
+
+    <div class="panel full" id="prodDetalhePanel" style="display:none;border-color:var(--accent);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;">
+        <h2 style="margin:0;" id="prodDetalheTitulo"></h2>
+        <button type="button" id="prodDetalheFechar" class="compra-btn">Fechar ✕</button>
+      </div>
+      <div class="kpis" id="prodDetalheKpis" style="margin-bottom:10px;"></div>
+      <div style="height:220px;"><canvas id="prodChartDetalhe"></canvas></div>
+      <div class="grid-2" style="margin-top:12px;">
+        <div><div style="font-weight:600;font-size:13px;margin-bottom:6px;">Por máquina</div><div class="table-wrap cards-mobile" id="prodDetalheMaquinas"></div></div>
+        <div><div style="font-weight:600;font-size:13px;margin-bottom:6px;">Por hora do dia</div><div id="prodDetalheHoras"></div></div>
+      </div>
+    </div>
+
+    <div class="panel full">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+        <h2 style="margin:0;">Ranking de produtos</h2>
+        <div>
+          <label for="prodOrdenar" style="font-size:12px;color:var(--muted);margin-right:6px;">Ordenar por</label>
+          <select id="prodOrdenar" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;">
+            <option value="valor">Receita</option><option value="qtd">Unidades</option><option value="margem">Margem estimada</option>
+            <option value="subida">Maior subida</option><option value="descida">Maior descida</option>
+          </select>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">Toca num produto para ver a evolução, as máquinas e as horas em que mais vende. Margem estimada = receita sem IVA − custo.</div>
+      <div class="table-wrap cards-mobile" id="prodRankingWrap"><div class="state small">a carregar…</div></div>
+    </div>
+
+    <div class="panel full">
+      <h2>Categorias ao longo do tempo</h2>
+      <div id="prodCategoriasInfo" style="font-size:12px;color:var(--muted);margin-bottom:8px;"></div>
+      <div class="prod-cat-grid">
+        <div style="height:280px;min-width:0;"><canvas id="prodChartCategorias"></canvas></div>
+        <div class="table-wrap" id="prodCategoriasTabela"></div>
+      </div>
+    </div>
+
+    <div class="panel full">
+      <h2>Hora do dia e dia da semana</h2>
+      <div id="prodHoraInfo" style="font-size:12px;color:var(--muted);margin-bottom:8px;"></div>
+      <div class="table-wrap" id="prodHoraWrap"></div>
+    </div>
+
+    <div class="panel full">
+      <h2>Alertas de produtos</h2>
+      <div id="prodAlertasWrap"><div class="state small">a carregar…</div></div>
+    </div>
   </div>
 
   <div id="view-financeiro" class="view">
@@ -2882,86 +2969,6 @@
     }
   }
 
-  async function renderTop7Dias() {
-    const canvas = document.getElementById('chartTop7');
-    try {
-      const res = await fetch('/admin/produtos_recentes.json');
-      const estatico = res.ok ? await res.json() : {};
-
-      const totais = new Map();
-      const qtds = new Map();
-      const porDiaProduto = new Map(); // nome -> [qtd dia mais antigo, ..., qtd hoje]
-      const hoje = agoraPT();
-      const diasOrdem = [];
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date(hoje);
-        d.setDate(d.getDate() - i);
-        diasOrdem.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
-      }
-      for (const dataStr of diasOrdem) {
-        // dados ao vivo (capturados na KV) têm prioridade; caem para o ficheiro estático nos dias mais antigos
-        const fonte = (HISTORICO[dataStr] && HISTORICO[dataStr].porProduto) || estatico[dataStr] || {};
-        for (const [nomeOriginal, v] of Object.entries(fonte)) {
-          const nome = displayProductName(nomeOriginal);
-          totais.set(nome, (totais.get(nome) || 0) + (v.valor || 0));
-          qtds.set(nome, (qtds.get(nome) || 0) + (v.qtd || 0));
-          if (!porDiaProduto.has(nome)) porDiaProduto.set(nome, new Array(7).fill(0));
-        }
-      }
-      // preenche a série diária de cada produto (já sabemos quais existem, agora alinhamos por dia)
-      diasOrdem.forEach((dataStr, i) => {
-        const fonte = (HISTORICO[dataStr] && HISTORICO[dataStr].porProduto) || estatico[dataStr] || {};
-        for (const [nomeOriginal, v] of Object.entries(fonte)) {
-          const nome = displayProductName(nomeOriginal);
-          porDiaProduto.get(nome)[i] += (v.qtd || 0);
-        }
-      });
-
-      function tendenciaIcone(nome) {
-        // só dias úteis: um fim de semana ou feriado na janela não deve parecer uma queda de vendas
-        const variacao = tendenciaDiasUteis(diasOrdem, porDiaProduto.get(nome) || []);
-        if (variacao === null) return '';
-        if (variacao === Infinity || variacao > 0.15) return '▲';
-        if (variacao < -0.15) return '▼';
-        return '▬';
-      }
-      function tendenciaCor(icone) {
-        return icone === '▲' ? 'var(--positive)' : icone === '▼' ? 'var(--negative)' : 'var(--muted)';
-      }
-
-      const top = Array.from(totais.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
-      new Chart(canvas, {
-        type: 'bar',
-        data: {
-          labels: top.map(t => {
-            const icone = tendenciaIcone(t[0]);
-            return `${truncar(t[0])} (${fmtInt(qtds.get(t[0]))} un.) ${icone}`;
-          }),
-          datasets: [{ label: 'Receita (€)', data: top.map(t => t[1]), backgroundColor: '#FF9F1C' }],
-        },
-        options: {
-          indexAxis: 'y',
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                title: (items) => top[items[0].dataIndex][0],
-                label: (ctx) => {
-                  const nome = top[ctx.dataIndex][0];
-                  const icone = tendenciaIcone(nome);
-                  const tendTexto = icone === '▲' ? 'a subir' : icone === '▼' ? 'a descer' : 'estável';
-                  return [`${fmtEUR(ctx.parsed.x)} · ${fmtInt(qtds.get(nome))} unidades`, `Tendência: ${tendTexto} (últimos 7 dias)`];
-                },
-              },
-            },
-          },
-          scales: { x: { beginAtZero: true } },
-        },
-      });
-    } catch (err) {
-      canvas.insertAdjacentHTML('afterend', `<div class="state small error">Erro: ${err.message}</div>`);
-    }
-  }
 
   let stocksLoaded = false;
   async function loadStocksView() {
@@ -2970,9 +2977,7 @@
     loadLayoutAndRender();
     renderStockAComprar();
     await garantirMensalCompletoData();
-    renderTop7Dias();
     renderPrevisaoCompra();
-    renderVendasPorProduto();
     renderCoposMaquinas();
   }
 
@@ -3586,76 +3591,7 @@
     return Array.from(finais);
   }
 
-  function paintVendasPorProduto(categoriaFiltro, termoPesquisa) {
-    const wrap = document.getElementById('vendasProdutoWrap');
-    if (!mensalCompletoData) return;
 
-    const termo = (termoPesquisa || '').trim().toLowerCase();
-    const mesAtual = todayStr().slice(0, 7);
-    const anoAtual = todayStr().slice(0, 4);
-
-    // "hoje" a partir dos dados ao vivo, com o mesmo critério combinado (cafés juntos, sem os excluídos)
-    const hojePorProduto = groupSum(
-      lastVendasRows.filter(r => r.NOME_PRODUTO && !PRODUTOS_EXCLUIDOS_STOCK.has(canonicalProduto(r.NOME_PRODUTO))),
-      r => combinedCanonical(r.NOME_PRODUTO),
-      r => Number(r.count) || 1
-    );
-
-    let linhas = todosOsProdutosConhecidos()
-      .filter(nome => !categoriaFiltro || subfamiliaLabel(nome) === categoriaFiltro)
-      .filter(nome => !termo || nome.toLowerCase().includes(termo))
-      .map(nome => ({
-        nome,
-        hoje: hojePorProduto.get(nome) || 0,
-        esteMs: totalProdutoPeriodoCombinado(nome, mesAtual),
-        esteAno: totalProdutoPeriodoCombinado(nome, anoAtual),
-      }))
-      .filter(l => l.hoje > 0 || l.esteMs > 0 || l.esteAno > 0)
-      .sort((a, b) => b.esteAno - a.esteAno);
-
-    if (!linhas.length) {
-      wrap.innerHTML = '<div class="state small">Sem produtos para este filtro.</div>';
-      return;
-    }
-
-    wrap.innerHTML = `
-      <table>
-        <thead>
-          <tr><th>Produto</th><th class="num">Hoje</th><th class="num">Este mês</th><th class="num">Este ano</th></tr>
-        </thead>
-        <tbody>
-          ${linhas.map(l => `
-            <tr>
-              <td>${l.nome}</td>
-              <td class="num">${fmtInt(l.hoje)}</td>
-              <td class="num">${fmtInt(l.esteMs)}</td>
-              <td class="num">${fmtInt(l.esteAno)}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    `;
-  }
-
-  async function renderVendasPorProduto() {
-    const wrap = document.getElementById('vendasProdutoWrap');
-    try {
-      await garantirMensalCompletoData();
-
-      const categorias = Array.from(new Set(todosOsProdutosConhecidos().map(subfamiliaLabel))).sort();
-      const selectCat = document.getElementById('vendasProdutoCategoria');
-      selectCat.innerHTML = '<option value="">Todas</option>' +
-        categorias.map(c => `<option value="${c}">${c}</option>`).join('');
-
-      const pesquisa = document.getElementById('vendasProdutoPesquisa');
-      const redesenhar = () => paintVendasPorProduto(selectCat.value, pesquisa.value);
-      selectCat.onchange = redesenhar;
-      pesquisa.oninput = redesenhar;
-      redesenhar();
-    } catch (err) {
-      wrap.innerHTML = `<div class="state small error">Erro: ${err.message}</div>`;
-    }
-  }
 
   let previsaoCompraData = null;
 
@@ -4661,6 +4597,483 @@
   }
   let smartcakeEncomendaTexto = '';
 
+  // ===== Aba Produtos: análise de vendas por produto e categoria =====
+  // Fontes: diário por produto = HISTORICO[d].porProduto (resumos capturados) ou admin/produtos_recentes.json (17/08 → 15/09);
+  // mensal por produto (unidades) = admin/produtos_mensal_completo.json (fev → 15/09); por máquina = porMaquinaProduto (desde ~20/09);
+  // por hora: receita total = porHora (desde 15/06); unidades por produto = porHoraProduto (desde 27/10/2026).
+  const PROD_CATEGORIAS = ['Bebidas', 'Chocolates', 'Bolachas', 'Snacks', 'Frescos', 'Cafetaria', 'Outros'];
+  const PROD_COR_CAT = { Bebidas: '#4C8BD6', Chocolates: '#8B5A2B', Bolachas: '#E0B43A', Snacks: '#FF9F1C', Frescos: '#2F9E44', Cafetaria: '#6B4E9B', Outros: '#9AA0A6' };
+  const PROD_DIA_SEMANA = ['Dom', '2ª', '3ª', '4ª', '5ª', '6ª', 'Sáb'];
+  const PROD_MES_ESTATICO_FIM = '2026-09'; // meses até aqui vêm do ficheiro mensal (unidades); depois, só dos resumos diários
+  let prodRecentes = null, prodPrecoMedio = {}, prodDadosProntos = null;
+  let prodCharts = {};
+  let prodSelecionado = null;
+  let prodMostrarTodos = false;
+
+  function categoriaProduto(p) {
+    const sf = subfamiliaLabel(p);
+    if (sf === 'Compostos' || PRODUCT_GROUP[p] === 'Cafés') return 'Cafetaria';
+    if (sf === 'Solúveis / Recipientes') return 'Outros';
+    const f = familiaLayout(p);
+    return PROD_CATEGORIAS.includes(f) ? f : 'Outros';
+  }
+  function ivaProduto(p) { return /\bagua\b|\bágua\b/i.test(p) ? 0.13 : 0.23; }
+  function margemEstimada(p, qtd, valor) {
+    const c = custoCanonico(p);
+    if (!c) return null;
+    return valor / (1 + ivaProduto(p)) - qtd * c;
+  }
+
+  async function carregarDadosProdutos() {
+    if (prodDadosProntos) return prodDadosProntos;
+    prodDadosProntos = (async () => {
+      const [rec, preco] = await Promise.all([
+        fetch('/admin/produtos_recentes.json').then(r => r.ok ? r.json() : {}).catch(() => ({})),
+        fetch('/admin/preco_medio_produto.json').then(r => r.ok ? r.json() : {}).catch(() => ({})),
+        garantirMensalCompletoData(),
+        carregarCatalogoProdutos(),
+      ]);
+      prodRecentes = rec || {};
+      prodPrecoMedio = {};
+      for (const [n, v] of Object.entries(preco || {})) prodPrecoMedio[canonicalProduto(n)] = v;
+    })();
+    return prodDadosProntos;
+  }
+
+  function dataMaisDias(dStr, n) { const d = new Date(dStr + 'T12:00:00'); d.setDate(d.getDate() + n); return formatarData(d); }
+  function diasEntre(a, b) { return Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 86400000) + 1; }
+  function listaDias(a, b) { const r = []; for (let d = a; d <= b; d = dataMaisDias(d, 1)) r.push(d); return r; }
+
+  // vendas de um dia por produto (nomes canónicos): { produto: { qtd, valor } } ou null se não há dados desse dia
+  function vendasProdutoDia(d) {
+    const h = HISTORICO[d];
+    const src = (h && h.porProduto) || (prodRecentes && prodRecentes[d]);
+    if (!src) return null;
+    const out = {};
+    for (const [n, v] of Object.entries(src)) {
+      const p = canonicalProduto(n);
+      const e = (out[p] = out[p] || { qtd: 0, valor: 0 });
+      e.qtd += Number(v.qtd) || 0; e.valor += Number(v.valor) || 0;
+    }
+    return out;
+  }
+  function precoUnitario(p, diaVendas) {
+    const e = diaVendas && diaVendas[p];
+    if (e && e.qtd) return e.valor / e.qtd;
+    return prodPrecoMedio[p] || 0;
+  }
+  // vendas de um dia num local (soma das máquinas do local), a partir de porMaquinaProduto; receita estimada pelo preço do dia
+  function vendasLocalDia(d, local) {
+    const h = HISTORICO[d];
+    if (!h || !h.porMaquinaProduto) return null;
+    const diaVendas = vendasProdutoDia(d);
+    const out = {};
+    for (const [m, prods] of Object.entries(h.porMaquinaProduto)) {
+      if (pdvLabel(m) !== local || MAQUINAS_EXCLUIDAS.has(m)) continue;
+      for (const [n, q] of Object.entries(prods)) {
+        const p = canonicalProduto(n);
+        const e = (out[p] = out[p] || { qtd: 0, valor: 0 });
+        e.qtd += Number(q) || 0; e.valor += (Number(q) || 0) * precoUnitario(p, diaVendas);
+      }
+    }
+    return out;
+  }
+
+  function periodoProdutos() {
+    const hoje = todayStr();
+    const tipo = document.getElementById('prodPeriodo').value;
+    const d = agoraPT();
+    let ini = hoje, fim = hoje;
+    if (tipo === 'ontem') ini = fim = dataMaisDias(hoje, -1);
+    else if (tipo === '7d') ini = dataMaisDias(hoje, -6);
+    else if (tipo === '30d') ini = dataMaisDias(hoje, -29);
+    else if (tipo === 'mes') ini = hoje.slice(0, 8) + '01';
+    else if (tipo === 'mesAnterior') { const p = new Date(d.getFullYear(), d.getMonth() - 1, 1); ini = formatarData(p); fim = formatarData(new Date(d.getFullYear(), d.getMonth(), 0)); }
+    else if (tipo === '3m') ini = formatarData(new Date(d.getFullYear(), d.getMonth() - 2, 1));
+    else if (tipo === 'ano') ini = `${d.getFullYear()}-01-01`;
+    else if (tipo === 'personalizado') {
+      ini = document.getElementById('prodDe').value || hoje; fim = document.getElementById('prodAte').value || hoje;
+      if (ini > fim) [ini, fim] = [fim, ini];
+    }
+    return { ini, fim, tipo };
+  }
+
+  // dados agregados de um período: modo diário (dias com dados) ou mensal (para períodos que começam antes do histórico diário)
+  function agregarProdutos(ini, fim, local) {
+    const primeiroDiario = (() => {
+      const ds = [...Object.keys(prodRecentes || {}), ...Object.keys(HISTORICO).filter(d => HISTORICO[d].porProduto)].sort();
+      return ds[0] || todayStr();
+    })();
+    const modo = (!local && ini < primeiroDiario) ? 'mensal' : 'diario';
+    const porProduto = {}; const porBalde = {}; let diasComDados = 0, diasSemDados = 0;
+    const add = (alvo, p, qtd, valor) => { const e = (alvo[p] = alvo[p] || { qtd: 0, valor: 0 }); e.qtd += qtd; e.valor += valor; };
+    if (modo === 'diario') {
+      for (const d of listaDias(ini, fim)) {
+        const v = local ? vendasLocalDia(d, local) : vendasProdutoDia(d);
+        if (!v) { diasSemDados++; continue; }
+        diasComDados++;
+        porBalde[d] = {};
+        for (const [p, e] of Object.entries(v)) { add(porProduto, p, e.qtd, e.valor); add(porBalde[d], p, e.qtd, e.valor); }
+      }
+    } else {
+      // mensal: meses até setembro do ficheiro mensal (+ dias depois do corte estático); depois, soma dos dias
+      const meses = []; for (let m = ini.slice(0, 7); m <= fim.slice(0, 7); m = formatarData(new Date(+m.slice(0, 4), +m.slice(5, 7), 1)).slice(0, 7)) meses.push(m);
+      const mensal = {};
+      for (const [n, porMes] of Object.entries(mensalCompletoData || {})) {
+        const p = canonicalProduto(n);
+        for (const [m, q] of Object.entries(porMes)) (mensal[m] = mensal[m] || {})[p] = ((mensal[m] || {})[p] || 0) + (Number(q) || 0);
+      }
+      for (const m of meses) {
+        porBalde[m] = {};
+        if (m <= PROD_MES_ESTATICO_FIM) {
+          for (const [p, q] of Object.entries(mensal[m] || {})) { add(porProduto, p, q, q * (prodPrecoMedio[p] || 0)); add(porBalde[m], p, q, q * (prodPrecoMedio[p] || 0)); }
+          if (m === CORTE_DADOS_ESTATICOS.slice(0, 7)) {
+            for (const d of listaDias(dataMaisDias(CORTE_DADOS_ESTATICOS, 1), m + '-31').filter(x => x.startsWith(m) && x <= fim)) {
+              const v = vendasProdutoDia(d); if (!v) continue;
+              for (const [p, e] of Object.entries(v)) { add(porProduto, p, e.qtd, e.valor); add(porBalde[m], p, e.qtd, e.valor); }
+            }
+          }
+          diasComDados += 30;
+        } else {
+          for (const d of listaDias(m + '-01', m + '-31').filter(x => x.startsWith(m) && x <= fim)) {
+            const v = vendasProdutoDia(d); if (!v) { diasSemDados++; continue; }
+            diasComDados++;
+            for (const [p, e] of Object.entries(v)) { add(porProduto, p, e.qtd, e.valor); add(porBalde[m], p, e.qtd, e.valor); }
+          }
+        }
+      }
+    }
+    return { modo, porProduto, porBalde, diasComDados, diasSemDados, primeiroDiario };
+  }
+
+  function filtrarProdutos(porProduto) {
+    const cat = document.getElementById('prodCategoria').value;
+    const termo = semAcentos(document.getElementById('prodPesquisa').value.trim());
+    const out = {};
+    for (const [p, e] of Object.entries(porProduto)) {
+      if (!p || (e.qtd <= 0 && e.valor <= 0)) continue;
+      if (cat && categoriaProduto(p) !== cat) continue;
+      if (termo && !semAcentos(p).includes(termo)) continue;
+      out[p] = e;
+    }
+    return out;
+  }
+
+  function totaisProdutos(porProduto) {
+    let qtd = 0, valor = 0, margem = 0, valorComCusto = 0;
+    for (const [p, e] of Object.entries(porProduto)) {
+      qtd += e.qtd; valor += e.valor;
+      const m = margemEstimada(p, e.qtd, e.valor);
+      if (m != null) { margem += m; valorComCusto += e.valor; }
+    }
+    return { qtd, valor, margem, valorComCusto, distintos: Object.keys(porProduto).length };
+  }
+
+  function deltaPct(atual, anterior) {
+    if (!anterior) return '';
+    const pct = (atual - anterior) / anterior * 100;
+    return `<div class="delta ${pct >= 0 ? 'up' : 'down'}">${pct >= 0 ? '+' : ''}${pct.toFixed(0)}% vs anterior</div>`;
+  }
+
+  function desenharGrafico(id, config) {
+    if (typeof Chart === 'undefined') return;
+    if (prodCharts[id]) { try { prodCharts[id].destroy(); } catch {} }
+    prodCharts[id] = new Chart(document.getElementById(id), config);
+  }
+
+  function baldeDe(d, nDias) {
+    if (nDias <= 31) return d;
+    if (nDias <= 120) { const x = new Date(d + 'T12:00:00'); const seg = new Date(x); seg.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return 'sem. ' + formatarData(seg).slice(5).split('-').reverse().join('/'); }
+    return d.slice(0, 7);
+  }
+  function rotuloBalde(b) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(b)) return b.slice(5).split('-').reverse().join('/');
+    if (/^\d{4}-\d{2}$/.test(b)) return ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'][+b.slice(5) - 1] + ' ' + b.slice(2, 4);
+    return b;
+  }
+
+  function renderProdutos() {
+    if (!prodDadosProntos) return;
+    const { ini, fim, tipo } = periodoProdutos();
+    document.getElementById('prodDatas').style.display = tipo === 'personalizado' ? 'flex' : 'none';
+    const local = document.getElementById('prodLocal').value;
+    const medida = document.getElementById('prodMedida').value; // valor | qtd
+    const ag = agregarProdutos(ini, fim, local);
+    const dados = filtrarProdutos(ag.porProduto);
+    const tot = totaisProdutos(dados);
+    // período anterior com o mesmo número de dias (só em modo diário)
+    const n = diasEntre(ini, fim);
+    let totAnt = null, dadosAnt = {};
+    if (ag.modo === 'diario') {
+      const agAnt = agregarProdutos(dataMaisDias(ini, -n), dataMaisDias(ini, -1), local);
+      if (agAnt.modo === 'diario' && agAnt.diasComDados >= Math.max(1, Math.round(n * 0.7)) && agAnt.diasSemDados <= n * 0.3) { dadosAnt = filtrarProdutos(agAnt.porProduto); totAnt = totaisProdutos(dadosAnt); }
+    }
+    // cabeçalho do período e avisos de cobertura
+    const fmtD = (x) => x.split('-').reverse().join('/');
+    const avisos = [];
+    if (ag.modo === 'mensal') avisos.push(`Antes de ${fmtD(ag.primeiroDiario)} só há totais mensais por produto: valores agrupados por mês e receita/margem estimadas pelo preço médio.`);
+    if (ag.diasSemDados) avisos.push(`${ag.diasSemDados} dia(s) do período sem dados${local ? ' por máquina (os dados por local começam em ~20/09)' : ''}.`);
+    if (local && ag.modo === 'diario') avisos.push('Por local: unidades das máquinas do local; receita estimada pelo preço médio do dia.');
+    document.getElementById('prodPeriodoInfo').innerHTML = `<b>${fmtD(ini)}${ini !== fim ? ' a ' + fmtD(fim) : ''}</b>${local ? ' · ' + escapeHtml(local) : ''}${avisos.length ? '<br>' + avisos.map(escapeHtml).join(' ') : ''}`;
+
+    // KPIs
+    const diasMedia = ag.modo === 'diario' ? Math.max(1, ag.diasComDados) : Math.max(1, n);
+    document.getElementById('prodKpis').innerHTML = [
+      ['Unidades', fmtInt(tot.qtd), totAnt && deltaPct(tot.qtd, totAnt.qtd)],
+      ['Receita', fmtEUR(tot.valor), totAnt && deltaPct(tot.valor, totAnt.valor)],
+      ['Margem estimada', tot.valorComCusto ? fmtEUR(tot.margem) : '—', tot.valorComCusto ? `<div class="delta" style="color:var(--muted);">${(tot.margem / tot.valorComCusto * 100).toFixed(0)}% da receita s/ IVA incl.</div>` : ''],
+      ['Receita média por dia', fmtEUR(tot.valor / diasMedia), totAnt && deltaPct(tot.valor / diasMedia, totAnt.valor / Math.max(1, n))],
+      ['Produtos vendidos', fmtInt(tot.distintos), ''],
+    ].map(([l, v, dlt]) => `<div class="kpi"><div class="value">${v}</div><div class="label">${l}</div>${dlt || ''}</div>`).join('');
+
+    // ranking
+    const ordem = document.getElementById('prodOrdenar').value;
+    const linhas = Object.entries(dados).map(([p, e]) => {
+      const ant = dadosAnt[p];
+      const m = margemEstimada(p, e.qtd, e.valor);
+      return { p, cat: categoriaProduto(p), qtd: e.qtd, valor: e.valor, margem: m, preco: e.qtd ? e.valor / e.qtd : 0,
+        pct: tot.valor ? e.valor / tot.valor * 100 : 0, delta: totAnt ? (ant && ant[medida] ? (e[medida] - ant[medida]) / ant[medida] * 100 : (e[medida] > 0 ? Infinity : null)) : null };
+    }).sort((a, b) => ordem === 'qtd' ? b.qtd - a.qtd : ordem === 'margem' ? (b.margem ?? -1e9) - (a.margem ?? -1e9) : ordem === 'subida' ? (b.delta ?? -1e9) - (a.delta ?? -1e9) : ordem === 'descida' ? (a.delta ?? 1e9) - (b.delta ?? 1e9) : b.valor - a.valor);
+    const visiveis = prodMostrarTodos ? linhas : linhas.slice(0, 25);
+    const fmtDelta = (x) => x == null ? '—' : x === Infinity ? '<span style="color:var(--positive);">novo</span>' : `<span style="color:${x >= 0 ? 'var(--positive)' : 'var(--negative)'};">${x >= 0 ? '+' : ''}${x.toFixed(0)}%</span>`;
+    document.getElementById('prodRankingWrap').innerHTML = linhas.length ? `<table><thead><tr><th>#</th><th>Produto</th><th>Categoria</th><th class="num">Unidades</th><th class="num">Receita</th><th class="num">Preço médio</th><th class="num">Margem est.</th><th class="num">% receita</th><th class="num">vs anterior</th></tr></thead><tbody>
+      ${visiveis.map((l, i) => `<tr class="prod-linha${prodSelecionado === l.p ? ' sel' : ''}" data-p="${escapeHtml(l.p)}"><td>${i + 1}</td><td><span class="prod-nome">${escapeHtml(l.p)}</span></td>
+        <td><span class="prod-cat" style="background:${PROD_COR_CAT[l.cat]}22;color:${PROD_COR_CAT[l.cat]};">${l.cat}</span></td>
+        <td class="num">${fmtInt(l.qtd)}</td><td class="num">${fmtEUR(l.valor)}</td><td class="num">${l.preco ? fmtEUR(l.preco) : '—'}</td>
+        <td class="num">${l.margem == null ? '—' : fmtEUR(l.margem)}</td><td class="num">${l.pct.toFixed(1)}%</td><td class="num">${fmtDelta(l.delta)}</td></tr>`).join('')}
+      </tbody></table>
+      ${linhas.length > 25 ? `<button type="button" id="prodMostrarTodosBtn" class="compra-btn" style="margin-top:8px;">${prodMostrarTodos ? 'Mostrar só os 25 primeiros' : `Mostrar todos (${linhas.length})`}</button>` : ''}`
+      : '<div class="state small">Sem vendas para estes filtros.</div>';
+    const btnTodos = document.getElementById('prodMostrarTodosBtn');
+    if (btnTodos) btnTodos.onclick = () => { prodMostrarTodos = !prodMostrarTodos; renderProdutos(); };
+
+    // categorias ao longo do tempo
+    const baldes = {};
+    const nB = ag.modo === 'mensal' ? 999 : n;
+    for (const [d, prods] of Object.entries(ag.porBalde)) {
+      const b = ag.modo === 'mensal' ? d : baldeDe(d, nB);
+      for (const [p, e] of Object.entries(filtrarProdutos(prods))) {
+        const c = categoriaProduto(p);
+        ((baldes[b] = baldes[b] || {})[c] = (baldes[b][c] || 0) + e[medida]);
+      }
+    }
+    const chavesB = Object.keys(baldes).sort((a, b) => (a.startsWith('sem.') ? a.slice(5).split('/').reverse().join('') : a).localeCompare(b.startsWith('sem.') ? b.slice(5).split('/').reverse().join('') : b));
+    const cats = PROD_CATEGORIAS.filter(c => chavesB.some(b => baldes[b][c]));
+    document.getElementById('prodCategoriasInfo').textContent = `${medida === 'valor' ? 'Receita' : 'Unidades'} por ${ag.modo === 'mensal' || n > 120 ? 'mês' : n > 31 ? 'semana' : 'dia'} e categoria.`;
+    desenharGrafico('prodChartCategorias', {
+      type: 'bar',
+      data: { labels: chavesB.map(rotuloBalde), datasets: cats.map(c => ({ label: c, data: chavesB.map(b => baldes[b][c] || 0), backgroundColor: PROD_COR_CAT[c], stack: 's' })) },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, tooltip: { mode: 'index', intersect: false, callbacks: { label: (ctx) => `${ctx.dataset.label}: ${medida === 'valor' ? fmtEUR(ctx.parsed.y) : fmtInt(ctx.parsed.y)}` } } },
+        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } },
+    });
+    // partilha por categoria (tabela pequena ao lado)
+    const porCat = {};
+    for (const [p, e] of Object.entries(dados)) { const c = categoriaProduto(p); const x = (porCat[c] = porCat[c] || { qtd: 0, valor: 0 }); x.qtd += e.qtd; x.valor += e.valor; }
+    document.getElementById('prodCategoriasTabela').innerHTML = `<table><thead><tr><th>Categoria</th><th class="num">Unid.</th><th class="num">Receita</th><th class="num">%</th></tr></thead><tbody>
+      ${PROD_CATEGORIAS.filter(c => porCat[c]).sort((a, b) => porCat[b].valor - porCat[a].valor).map(c => `<tr><td><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${PROD_COR_CAT[c]};margin-right:6px;"></span>${c}</td><td class="num">${fmtInt(porCat[c].qtd)}</td><td class="num">${fmtEUR(porCat[c].valor)}</td><td class="num">${tot.valor ? (porCat[c].valor / tot.valor * 100).toFixed(0) : 0}%</td></tr>`).join('')}
+      </tbody></table>`;
+
+    renderHoraDiaSemana(ini, fim, local, medida, ag);
+    renderDetalheProduto(ini, fim, local, ag);
+  }
+
+  // mapa de calor: dia da semana × hora + média por dia da semana
+  function renderHoraDiaSemana(ini, fim, local, medida, ag) {
+    const wrap = document.getElementById('prodHoraWrap');
+    const info = document.getElementById('prodHoraInfo');
+    const cat = document.getElementById('prodCategoria').value;
+    const termo = semAcentos(document.getElementById('prodPesquisa').value.trim());
+    const filtrado = !!(cat || termo);
+    // o dia de hoje ainda vai a meio: não entra nas médias por hora/dia da semana (a não ser que o período seja só hoje)
+    const dias = listaDias(ini, fim).filter(d => ini === fim || d !== todayStr());
+    const soma = {}; const nDias = {}; const totalDia = {}; const nDiasTot = {};
+    let fonte = '';
+    if (local) {
+      info.textContent = 'A distribuição por hora não existe por local: mostra-se só a média por dia da semana.';
+    } else if (!filtrado && medida === 'valor') {
+      fonte = 'receita de todos os produtos (dados por hora desde 15/06)';
+      for (const d of dias) { const h = HISTORICO[d] && HISTORICO[d].porHora; if (!h) continue; const w = new Date(d + 'T12:00:00').getDay(); nDias[w] = (nDias[w] || 0) + 1; for (const [hr, v] of Object.entries(h)) (soma[w] = soma[w] || {})[+hr] = ((soma[w] || {})[+hr] || 0) + (Number(v) || 0); }
+    } else {
+      fonte = `unidades${filtrado ? ' dos produtos filtrados' : ''} (dados por produto e hora desde 27/10/2026)`;
+      for (const d of dias) {
+        const h = HISTORICO[d] && HISTORICO[d].porHoraProduto; if (!h) continue;
+        const w = new Date(d + 'T12:00:00').getDay(); nDias[w] = (nDias[w] || 0) + 1;
+        for (const [n0, horas] of Object.entries(h)) {
+          const p = canonicalProduto(n0);
+          if (cat && categoriaProduto(p) !== cat) continue;
+          if (termo && !semAcentos(p).includes(termo)) continue;
+          for (const [hr, q] of Object.entries(horas)) (soma[w] = soma[w] || {})[+hr] = ((soma[w] || {})[+hr] || 0) + (Number(q) || 0);
+        }
+      }
+    }
+    // média por dia da semana a partir dos dados diários (cobertura maior que os dados por hora)
+    for (const d of dias) {
+      const v = local ? vendasLocalDia(d, local) : vendasProdutoDia(d);
+      if (!v) continue;
+      const w = new Date(d + 'T12:00:00').getDay();
+      const t = Object.values(filtrarProdutos(v)).reduce((s, e) => s + e[medida], 0);
+      totalDia[w] = (totalDia[w] || 0) + t; nDiasTot[w] = (nDiasTot[w] || 0) + 1;
+    }
+    const ordemDias = [1, 2, 3, 4, 5, 6, 0];
+    const emEuros = !filtrado && medida === 'valor'; // por hora, com filtros, só há unidades
+    const fmtV = (v) => emEuros ? fmtEUR(v) : fmt1(v);
+    const temHora = Object.keys(nDias).length > 0 && !local;
+    const horas = [];
+    if (temHora) {
+      const hs = new Set(); Object.values(soma).forEach(o => Object.keys(o).forEach(h => hs.add(+h)));
+      const mn = Math.min(7, ...hs), mx = Math.max(19, ...hs); for (let h = mn; h <= mx; h++) horas.push(h);
+    }
+    let maxCel = 0;
+    const cel = (w, h) => nDias[w] ? (((soma[w] || {})[h]) || 0) / nDias[w] : null;
+    if (temHora) ordemDias.forEach(w => horas.forEach(h => { const v = cel(w, h); if (v > maxCel) maxCel = v; }));
+    if (!local) info.textContent = temHora ? `Média por hora em cada dia da semana: ${fonte}. Mais escuro = vende mais.` : `Sem dados por hora para este período${filtrado || medida === 'qtd' ? ' (por produto e hora só existe a partir de 27/10/2026)' : ''}.`;
+    const maxDia = Math.max(0, ...ordemDias.map(w => nDiasTot[w] ? totalDia[w] / nDiasTot[w] : 0));
+    wrap.innerHTML = `<table class="prod-heat"><thead><tr><th>Dia</th>${horas.map(h => `<th class="num">${h}h</th>`).join('')}<th class="num">Média do dia</th></tr></thead><tbody>
+      ${ordemDias.map(w => {
+        const md = nDiasTot[w] ? totalDia[w] / nDiasTot[w] : null;
+        return `<tr><td><b>${PROD_DIA_SEMANA[w]}</b></td>${horas.map(h => { const v = cel(w, h); const a = v && maxCel ? 0.08 + 0.85 * v / maxCel : 0; return `<td class="num" style="background:rgba(255,159,28,${a.toFixed(2)});${a > 0.55 ? 'color:#fff;' : ''}">${v ? fmtV(v) : ''}</td>`; }).join('')}
+          <td class="num" style="font-weight:600;"><div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;">${md == null ? '—' : (medida === 'valor' ? fmtEUR(md) : fmt1(md))}<span style="display:inline-block;height:8px;width:${md && maxDia ? Math.round(60 * md / maxDia) : 0}px;background:var(--accent);border-radius:2px;"></span></div></td></tr>`;
+      }).join('')}</tbody></table>`;
+  }
+
+  // detalhe do produto escolhido no ranking
+  function renderDetalheProduto(ini, fim, local, ag) {
+    const panel = document.getElementById('prodDetalhePanel');
+    const p = prodSelecionado;
+    if (!p) { panel.style.display = 'none'; return; }
+    panel.style.display = 'block';
+    document.getElementById('prodDetalheTitulo').textContent = p;
+    const e = ag.porProduto[p] || { qtd: 0, valor: 0 };
+    const m = margemEstimada(p, e.qtd, e.valor);
+    const custo = custoCanonico(p);
+    const preco = e.qtd ? e.valor / e.qtd : prodPrecoMedio[p] || 0;
+    // por máquina (porMaquinaProduto)
+    const porMaq = {}; let diasMaq = 0;
+    for (const d of listaDias(ini, fim)) {
+      const h = HISTORICO[d] && HISTORICO[d].porMaquinaProduto; if (!h) continue; diasMaq++;
+      for (const [mq, prods] of Object.entries(h)) {
+        if (MAQUINAS_EXCLUIDAS.has(mq) || (local && pdvLabel(mq) !== local)) continue;
+        let q = 0; for (const [n0, v] of Object.entries(prods)) if (canonicalProduto(n0) === p) q += Number(v) || 0;
+        if (q) porMaq[mq] = (porMaq[mq] || 0) + q;
+      }
+    }
+    // por hora (porHoraProduto)
+    const porHora = {}; let diasHora = 0;
+    for (const d of listaDias(ini, fim)) {
+      const h = HISTORICO[d] && HISTORICO[d].porHoraProduto; if (!h) continue; diasHora++;
+      for (const [n0, horas] of Object.entries(h)) if (canonicalProduto(n0) === p) for (const [hr, q] of Object.entries(horas)) porHora[+hr] = (porHora[+hr] || 0) + (Number(q) || 0);
+    }
+    const horaPico = Object.entries(porHora).sort((a, b) => b[1] - a[1])[0];
+    // evolução
+    const n = diasEntre(ini, fim);
+    const evol = {};
+    for (const [d, prods] of Object.entries(ag.porBalde)) {
+      const b = ag.modo === 'mensal' ? d : baldeDe(d, n);
+      evol[b] = (evol[b] || 0) + ((prods[p] && prods[p].qtd) || 0);
+    }
+    const chaves = Object.keys(evol).sort((a, b) => (a.startsWith('sem.') ? a.slice(5).split('/').reverse().join('') : a).localeCompare(b.startsWith('sem.') ? b.slice(5).split('/').reverse().join('') : b));
+    document.getElementById('prodDetalheKpis').innerHTML = [
+      ['Unidades', fmtInt(e.qtd)], ['Receita', fmtEUR(e.valor)], ['Preço médio', preco ? fmtEUR(preco) : '—'],
+      ['Custo unit.', custo ? fmtEUR(custo) : '—'], ['Margem est.', m == null ? '—' : `${fmtEUR(m)}${e.valor ? ` <span style="font-size:12px;color:var(--muted);">(${(m / (e.valor / (1 + ivaProduto(p))) * 100).toFixed(0)}%)</span>` : ''}`],
+      ['Hora de pico', horaPico ? `${horaPico[0]}h` : '—'],
+    ].map(([l, v]) => `<div class="kpi"><div class="value" style="font-size:20px;">${v}</div><div class="label">${l}</div></div>`).join('');
+    desenharGrafico('prodChartDetalhe', {
+      type: chaves.length > 1 ? 'line' : 'bar',
+      data: { labels: chaves.map(rotuloBalde), datasets: [{ label: 'Unidades', data: chaves.map(b => evol[b]), borderColor: '#C7710A', backgroundColor: 'rgba(255,159,28,0.25)', fill: true, tension: 0.25, pointRadius: 2 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+    });
+    const maqs = Object.entries(porMaq).sort((a, b) => b[1] - a[1]);
+    const totMaq = maqs.reduce((s, x) => s + x[1], 0);
+    document.getElementById('prodDetalheMaquinas').innerHTML = maqs.length
+      ? `<table><thead><tr><th>Máquina</th><th class="num">Unidades</th><th class="num">%</th><th class="num">Por dia</th></tr></thead><tbody>${maqs.map(([mq, q]) => `<tr><td>${escapeHtml(machineLabel(mq))}</td><td class="num">${fmtInt(q)}</td><td class="num">${(q / totMaq * 100).toFixed(0)}%</td><td class="num">${fmt1(q / Math.max(1, diasMaq))}</td></tr>`).join('')}</tbody></table>`
+      : '<div class="state small">Sem dados por máquina neste período (existem desde ~20/09).</div>';
+    const hs = Object.keys(porHora).map(Number).sort((a, b) => a - b);
+    document.getElementById('prodDetalheHoras').innerHTML = hs.length
+      ? `<div class="prod-barras">${hs.map(h => { const mx = Math.max(...Object.values(porHora)); return `<div title="${h}h: ${porHora[h]} un."><div class="b" style="height:${Math.round(70 * porHora[h] / mx)}px;"></div><span>${h}</span></div>`; }).join('')}</div><div style="font-size:11px;color:var(--muted);">Unidades por hora em ${diasHora} dia(s) com dados por hora.</div>`
+      : '<div class="state small">Ainda sem dados por hora para este produto (registados a partir de 27/10/2026).</div>';
+  }
+
+  // alertas: janelas fixas (últimos 28 dias vs 28 anteriores; parados há 14 dias); não dependem dos filtros
+  async function renderAlertasProdutos() {
+    const wrap = document.getElementById('prodAlertasWrap');
+    const hoje = todayStr();
+    const fimA = dataMaisDias(hoje, -1), iniA = dataMaisDias(fimA, -27), fimB = dataMaisDias(iniA, -1), iniB = dataMaisDias(fimB, -27);
+    const a = agregarProdutos(iniA, fimA), b = agregarProdutos(iniB, fimB);
+    const cobertura = b.diasComDados >= 20 && a.diasComDados >= 20;
+    const queda = [], subida = [];
+    if (cobertura) {
+      const nomes = new Set([...Object.keys(a.porProduto), ...Object.keys(b.porProduto)]);
+      for (const p of nomes) {
+        if (categoriaProduto(p) === 'Outros') continue;
+        const qa = Math.round(((a.porProduto[p] || {}).qtd || 0) / a.diasComDados * 28), qb = Math.round(((b.porProduto[p] || {}).qtd || 0) / b.diasComDados * 28);
+        if (qb >= 10 && qa <= qb * 0.7) queda.push({ p, qa, qb, pct: (qa - qb) / qb * 100 });
+        if (qa >= 10 && qa >= qb * 1.3) subida.push({ p, qa, qb, pct: qb ? (qa - qb) / qb * 100 : Infinity });
+      }
+    }
+    queda.sort((x, y) => x.pct - y.pct); subida.sort((x, y) => y.pct - x.pct);
+    // parados: no layout atual de uma máquina de snacks, sem vendas nessa máquina nos últimos 14 dias úteis com dados por máquina
+    const parados = [];
+    try {
+      await carregarDadosLayouts();
+      const diasM = Object.keys(HISTORICO).filter(d => d < hoje && HISTORICO[d].porMaquinaProduto && !isFimDeSemana(d) && !isFeriado(d)).sort().slice(-14);
+      if (diasM.length >= 10) {
+        const vistos = new Set();
+        for (const r of layoutExportRows) {
+          const m = r.MATRICULA_MAQUINA, p = canonicalProduto(r.NOME_PRODUTO || '');
+          if (!p || isSmartcakeProd(p) || vistos.has(m + '|' + p)) continue;
+          vistos.add(m + '|' + p);
+          const vendidas = diasM.reduce((s, d) => { const x = HISTORICO[d].porMaquinaProduto[m] || {}; let q = 0; for (const [n0, v] of Object.entries(x)) if (canonicalProduto(n0) === p) q += Number(v) || 0; return s + q; }, 0);
+          if (vendidas === 0) parados.push({ m, p, stock: layoutExportRows.filter(x => x.MATRICULA_MAQUINA === m && canonicalProduto(x.NOME_PRODUTO || '') === p).reduce((s, x) => s + Math.max(0, Number(x.sum) || 0), 0) });
+        }
+      }
+    } catch { /* sem layout: fica sem a lista de parados */ }
+    const testes = [];
+    for (const pl of Object.values(layoutsPlaneados || {})) avaliarTestes(pl).forEach(t => testes.push({ maquina: pl.maquina, ...t }));
+    const bloco = (titulo, cor, itens, linha) => `<div class="prod-alerta"><div style="font-weight:600;color:${cor};margin-bottom:6px;">${titulo} <span style="color:var(--muted);font-weight:400;">(${itens.length})</span></div>${itens.length ? `<ul>${itens.slice(0, 12).map(linha).join('')}</ul>${itens.length > 12 ? `<div style="font-size:11px;color:var(--muted);">+ ${itens.length - 12} outros</div>` : ''}` : '<div style="font-size:12px;color:var(--muted);">Nenhum.</div>'}</div>`;
+    const linkP = (p) => `<a href="#" class="prod-link" data-p="${escapeHtml(p)}">${escapeHtml(p)}</a>`;
+    wrap.innerHTML = (cobertura ? '' : '<div class="state small" style="margin-bottom:8px;">Ainda não há 8 semanas seguidas de dados diários para comparar subidas e descidas.</div>') + `<div class="prod-alertas">
+      ${bloco('A cair (−30% ou mais)', 'var(--negative)', queda, x => `<li>${linkP(x.p)} <span>${fmtInt(x.qb)} → ${fmtInt(x.qa)} un. (${x.pct.toFixed(0)}%)</span></li>`)}
+      ${bloco('A crescer (+30% ou mais)', 'var(--positive)', subida, x => `<li>${linkP(x.p)} <span>${fmtInt(x.qb)} → ${fmtInt(x.qa)} un. (${x.pct === Infinity ? 'novo' : '+' + x.pct.toFixed(0) + '%'})</span></li>`)}
+      ${bloco('Parados há 14 dias úteis (estão numa máquina)', '#C7710A', parados, x => `<li>${linkP(x.p)} <span>${escapeHtml(machineLabel(x.m))} · ${x.stock} em stock</span></li>`)}
+      ${bloco('Em teste (layouts)', 'var(--ink)', testes, x => `<li>${linkP(x.produto)} <span>${escapeHtml(machineLabel(x.maquina))} · ${x.porSemana == null ? '—' : fmt1(x.porSemana) + '/semana'} · ${x.estado}</span></li>`)}
+    </div><div style="font-size:11.5px;color:var(--muted);margin-top:6px;">Comparação: últimos 28 dias contra os 28 anteriores (unidades). Toca num produto para ver o detalhe.</div>`;
+  }
+
+  let produtosLoaded = false;
+  async function loadProdutosView() {
+    if (produtosLoaded) { renderProdutos(); return; }
+    produtosLoaded = true;
+    try {
+      await carregarDadosProdutos();
+    } catch (err) {
+      document.getElementById('prodRankingWrap').innerHTML = `<div class="state small error">Erro: ${escapeHtml(err.message)}</div>`;
+      return;
+    }
+    // locais com máquinas
+    const locais = Array.from(new Set(Object.keys(MACHINES).filter(m => !MAQUINAS_EXCLUIDAS.has(m)).map(pdvLabel))).sort((a, b) => a.localeCompare(b, 'pt'));
+    document.getElementById('prodLocal').innerHTML = '<option value="">Todos os locais</option>' + locais.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
+    document.getElementById('prodCategoria').innerHTML = '<option value="">Todas as categorias</option>' + PROD_CATEGORIAS.filter(c => c !== 'Outros').map(c => `<option value="${c}">${c}</option>`).join('');
+    const hoje = todayStr();
+    document.getElementById('prodDe').value = dataMaisDias(hoje, -6); document.getElementById('prodAte').value = hoje;
+    ['prodPeriodo', 'prodCategoria', 'prodLocal', 'prodMedida', 'prodOrdenar', 'prodDe', 'prodAte'].forEach(id => document.getElementById(id).addEventListener('change', () => { prodMostrarTodos = false; renderProdutos(); }));
+    let t = null;
+    document.getElementById('prodPesquisa').addEventListener('input', () => { clearTimeout(t); t = setTimeout(renderProdutos, 200); });
+    document.getElementById('prodRankingWrap').addEventListener('click', (e) => {
+      const tr = e.target.closest('tr.prod-linha'); if (!tr) return;
+      prodSelecionado = prodSelecionado === tr.dataset.p ? null : tr.dataset.p;
+      renderProdutos();
+      if (prodSelecionado) document.getElementById('prodDetalhePanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    document.getElementById('prodAlertasWrap').addEventListener('click', (e) => {
+      const a = e.target.closest('.prod-link'); if (!a) return;
+      e.preventDefault(); prodSelecionado = a.dataset.p; renderProdutos();
+      document.getElementById('prodDetalhePanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    document.getElementById('prodDetalheFechar').addEventListener('click', () => { prodSelecionado = null; renderProdutos(); });
+    renderProdutos();
+    renderAlertasProdutos();
+  }
+
   let smartcakeLoaded = false;
   async function loadSmartcakeView() {
     if (smartcakeLoaded) return;
@@ -5624,6 +6037,7 @@
       document.getElementById('view-' + btn.dataset.view).classList.add('active');
       if (btn.dataset.view === 'stocks') loadStocksView();
       if (btn.dataset.view === 'reposicao') loadReposicaoView();
+      if (btn.dataset.view === 'produtos') loadProdutosView();
       if (btn.dataset.view === 'financeiro') loadFinanceiroView();
       if (btn.dataset.view === 'site') loadSiteView();
       if (btn.dataset.view === 'resultados') loadResultadosView();
@@ -5647,6 +6061,17 @@
       const todasAsDatas = new Set([...Object.keys(historicoRaw || {}), ...Object.keys(liveSnapshots || {})]);
       for (const d of todasAsDatas) {
         HISTORICO[d] = { ...((historicoRaw && historicoRaw[d]) || {}), ...((liveSnapshots && liveSnapshots[d]) || {}) };
+        // o resumo gravado pelo cron do servidor às 23:55 não traz porPontoVenda/porCategoria: derivam-se de porMaquina
+        const r = HISTORICO[d];
+        if (r.porMaquina && !r.porPontoVenda) {
+          r.porPontoVenda = {};
+          r.porCategoria = r.porCategoria || {};
+          for (const [m, v] of Object.entries(r.porMaquina)) {
+            if (MAQUINAS_EXCLUIDAS.has(m)) continue;
+            r.porPontoVenda[pdvLabel(m)] = (r.porPontoVenda[pdvLabel(m)] || 0) + v;
+            r.porCategoria[tipoMaquinaLabel(m)] = (r.porCategoria[tipoMaquinaLabel(m)] || 0) + v;
+          }
+        }
       }
       renderVendas(toObjects(vendasRaw));
       if (lastSummary) {
