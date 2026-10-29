@@ -1047,19 +1047,15 @@
     <div class="panel full" id="smartcakeEncomendaPanel">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
         <div>
-          <h2 style="margin:0 0 4px;">Sugestão de encomenda Smartcake</h2>
+          <h2 style="margin:0 0 4px;">Sugestão de encomenda Smartcake (semana)</h2>
           <div style="font-size:12px;color:var(--muted);max-width:680px;" id="smartcakeEncomendaInfo"></div>
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
           <div>
-            <label for="smartcakeEncomendaEntrega" style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Entrega</label>
-            <select id="smartcakeEncomendaEntrega" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;"></select>
-          </div>
-          <div>
             <label for="smartcakeEncomendaMargem" style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Margem</label>
             <select id="smartcakeEncomendaMargem" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;">
-              <option value="0">0%</option>
-              <option value="10" selected>+10%</option>
+              <option value="0" selected>0%</option>
+              <option value="10">+10%</option>
               <option value="20">+20%</option>
             </select>
           </div>
@@ -1067,6 +1063,9 @@
         </div>
       </div>
       <div id="smartcakeEncomendaMsg" style="font-size:12px;min-height:14px;margin-top:6px;"></div>
+      <div style="font-weight:600;font-size:13px;margin:6px 0;">Esta semana</div>
+      <div class="table-wrap cards-mobile" id="smartcakeSemanaResumoWrap"></div>
+      <div style="font-weight:600;font-size:13px;margin:14px 0 6px;">Encomenda por máquina</div>
       <div class="table-wrap cards-mobile" id="smartcakeEncomendaWrap"><div class="state small">a carregar…</div></div>
     </div>
 
@@ -4513,89 +4512,132 @@
     document.getElementById('compraPdfBtn').addEventListener('click', pdfListaCompras);
   }
 
-  // ===== Smartcake: sugestão de encomenda (entregas às 2ªs e 4ªs, validade de 5 dias) =====
-  // A entrega de 2ª tem de chegar até 4ª (2 dias úteis); a de 4ª até à 2ª seguinte (3 dias úteis: 4ª, 5ª e 6ª).
-  // Na entrega de 2ª o que está nas máquinas já passou a validade (veio na 4ª anterior), por isso não se desconta;
-  // na de 4ª desconta-se o que ainda deve sobrar da entrega de 2ª.
-  const SMARTCAKE_DIAS_ENTREGA = { 1: 2, 3: 3 }; // dia da semana da entrega -> dias úteis que tem de cobrir
+  // ===== Smartcake: sugestão de encomenda semanal (encomenda à 6ª, uma entrega à 2ª que tem de chegar até 6ª) =====
+  // Para cada máquina e fresco olha para a semana da última entrega (2ª até hoje):
+  //  - vendido = soma de porMaquinaProduto desde 2ª; sobra = stock atual no export de canais;
+  //  - se esgotou (sobra 0), o ritmo conta só os dias até ao último dia com vendas: a procura real foi maior do que o vendido;
+  //  - procura semanal = ritmo × 5 dias úteis; se esgotou fica pelo maior entre esta semana e o histórico,
+  //    se sobrou mistura esta semana (60%) com o histórico das 4 semanas anteriores (40%);
+  //  - nunca passa da capacidade dos canais desse produto na máquina (tem de caber numa só carga à 2ª).
+  const SMARTCAKE_DIAS_SEMANA = 5;
+  let smartcakeEncomendaTexto = '';
 
-  function proximasEntregasSmartcake() {
-    const res = [];
+  function segundaDaSemanaEntrega() {
     const d = agoraPT(); d.setHours(12, 0, 0, 0);
-    for (let i = 1; i <= 9 && res.length < 2; i++) {
-      const x = new Date(d); x.setDate(d.getDate() + i);
-      if (SMARTCAKE_DIAS_ENTREGA[x.getDay()]) res.push(x);
-    }
-    return res;
+    const dow = d.getDay(); // 0=domingo
+    const seg = new Date(d); seg.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1));
+    if (dow === 1) seg.setDate(seg.getDate() - 7); // à 2ª a entrega de hoje ainda agora chegou: analisa a semana anterior
+    return seg;
+  }
+  function proximaSegunda() {
+    const d = agoraPT(); d.setHours(12, 0, 0, 0);
+    const x = new Date(d); x.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7));
+    return x;
   }
 
   async function renderSugestaoSmartcake() {
     const wrap = document.getElementById('smartcakeEncomendaWrap');
-    const sel = document.getElementById('smartcakeEncomendaEntrega');
+    const resumoWrap = document.getElementById('smartcakeSemanaResumoWrap');
     const margemEl = document.getElementById('smartcakeEncomendaMargem');
     try {
-      const [vel, layoutRaw] = await Promise.all([velocidadesDiaUtil(), fetchJSON('/api/layout-maquinas'), carregarCatalogoProdutos()]);
-      const layout = toObjects(layoutRaw);
-      const entregas = proximasEntregasSmartcake();
-      if (!sel.options.length) {
-        sel.innerHTML = entregas.map((d, i) => `<option value="${i}">${d.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'numeric' })}</option>`).join('');
-        sel.onchange = () => renderSugestaoSmartcake();
-        margemEl.onchange = () => renderSugestaoSmartcake();
-      }
-      const entrega = entregas[Number(sel.value) || 0];
-      const diasCobrir = SMARTCAKE_DIAS_ENTREGA[entrega.getDay()];
+      const [layoutRaw] = await Promise.all([fetchJSON('/api/layout-maquinas'), carregarCatalogoProdutos()]);
+      if (!margemEl.dataset.ligado) { margemEl.dataset.ligado = '1'; margemEl.onchange = () => renderSugestaoSmartcake(); }
       const margem = 1 + (Number(margemEl.value) || 0) / 100;
-      // stock e capacidade atuais por máquina+produto (frescos)
+      const hoje = todayStr();
+      const seg = segundaDaSemanaEntrega();
+      const segStr = formatarData(seg);
+      const fimSemana = formatarData(new Date(seg.getFullYear(), seg.getMonth(), seg.getDate() + 4));
+      // dias úteis da semana analisada já fechados (até ontem)
+      const diasSemana = [];
+      for (let i = 0; i < 5; i++) { const x = formatarData(new Date(seg.getFullYear(), seg.getMonth(), seg.getDate() + i)); if (x < hoje && !isFeriado(x) && HISTORICO[x] && HISTORICO[x].porMaquinaProduto) diasSemana.push(x); } // só dias completos com vendas registadas (hoje ainda vai a meio)
+      // histórico: 20 dias úteis antes da 2ª da entrega
+      const diasHist = Object.keys(HISTORICO).filter(d => d < segStr && HISTORICO[d].porMaquinaProduto && !isFimDeSemana(d) && !isFeriado(d)).sort().slice(-20);
+      const vendasDia = (d, m) => {
+        const x = (HISTORICO[d] && HISTORICO[d].porMaquinaProduto && HISTORICO[d].porMaquinaProduto[m]) || {};
+        const o = {}; for (const [n, q] of Object.entries(x)) { const p = canonicalProduto(n); o[p] = (o[p] || 0) + (Number(q) || 0); } return o;
+      };
+      // stock e capacidade atuais por máquina+fresco
       const atual = {};
-      for (const r of layout) {
+      for (const r of toObjects(layoutRaw)) {
         if (!r.NOME_PRODUTO || !r.MATRICULA_MAQUINA || MAQUINAS_EXCLUIDAS.has(r.MATRICULA_MAQUINA) || !MACHINES[r.MATRICULA_MAQUINA]) continue;
         const p = canonicalProduto(r.NOME_PRODUTO);
         if (!isSmartcakeProd(p)) continue;
-        const k = r.MATRICULA_MAQUINA + '|' + p;
-        const a = (atual[k] = atual[k] || { stock: 0, cap: 0 });
+        const a = (atual[r.MATRICULA_MAQUINA + '|' + p] = atual[r.MATRICULA_MAQUINA + '|' + p] || { stock: 0, cap: 0 });
         a.stock += Math.max(0, Number(r.sum) || 0); a.cap += Number(r.CAPACIDADE_SELETOR) || 0;
       }
-      // dias úteis até à entrega (para estimar o que sobra na máquina na entrega de 4ª)
-      const hoje = agoraPT(); hoje.setHours(12, 0, 0, 0);
-      let diasAteEntrega = 0;
-      for (let x = new Date(hoje); x < entrega; x.setDate(x.getDate() + 1)) if (x.getDay() >= 1 && x.getDay() <= 5) diasAteEntrega++;
-      // só na entrega de 4ª e se a de 2ª desta semana já chegou (o stock atual é dessa entrega); antes disso o que está na máquina já terá passado a validade
-      const descontaStock = entrega.getDay() === 3 && hoje.getDay() >= 1 && hoje.getDay() <= 3;
-      const grelha = {}; const maquinas = new Set();
-      for (const [m, prods] of Object.entries(vel.porMaquina)) {
-        if (!isSnackMachine(m) || !MACHINES[m]) continue;
-        for (const [p, vd] of Object.entries(prods)) {
-          if (!isSmartcakeProd(p) || vd <= 0) continue;
-          const a = atual[m + '|' + p] || { stock: 0, cap: 0 };
-          const previsto = vd * diasCobrir * margem;
-          if (previsto < 0.5) continue; // vende tão pouco que a unidade quase de certeza passava a validade
-          let q = Math.round(previsto);
-          if (descontaStock) q -= Math.max(0, Math.floor(a.stock - vd * diasAteEntrega));
-          if (a.cap > 0) q = Math.min(q, a.cap);
-          q = Math.max(0, q);
-          if (!q) continue;
-          (grelha[p] = grelha[p] || {})[m] = { q, vd, cap: a.cap };
-          maquinas.add(m);
-        }
+      // todas as combinações máquina+fresco com capacidade agora ou vendas recentes
+      const chaves = new Set(Object.keys(atual));
+      for (const d of [...diasHist, ...diasSemana]) for (const m of Object.keys((HISTORICO[d] && HISTORICO[d].porMaquinaProduto) || {})) {
+        if (!isSnackMachine(m) || !MACHINES[m] || MAQUINAS_EXCLUIDAS.has(m)) continue;
+        for (const p of Object.keys(vendasDia(d, m))) if (isSmartcakeProd(p)) chaves.add(m + '|' + p);
       }
-      const ms = Array.from(maquinas).sort();
-      const produtos = Object.keys(grelha).sort((a, b) => Object.values(grelha[b]).reduce((s, x) => s + x.q, 0) - Object.values(grelha[a]).reduce((s, x) => s + x.q, 0));
-      document.getElementById('smartcakeEncomendaInfo').textContent =
-        `Entrega de ${entrega.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'numeric' })}: tem de chegar para ${diasCobrir} dias úteis até à entrega seguinte, dentro dos 5 dias de validade. ` +
-        (descontaStock ? 'Desconta o que deve sobrar nas máquinas da entrega de segunda. ' : entrega.getDay() === 3 ? 'Conta que a entrega de segunda chega à justa até quarta, por isso não desconta nada. ' : 'O que está nas máquinas não conta (já terá passado a validade). ') +
-        `Vendas: média dos últimos ${vel.nDias || 0} dias úteis por máquina; produtos que venderiam menos de meia unidade no período ficam de fora. Nunca passa da capacidade dos canais. Se um fresco esgota muitas vezes, as vendas subestimam a procura: sobe a margem.`;
-      if (!produtos.length) { wrap.innerHTML = '<div class="state small">Sem vendas de frescos suficientes para sugerir uma encomenda.</div>'; smartcakeEncomendaTexto = ''; return; }
-      const totProd = (p) => Object.values(grelha[p]).reduce((s, x) => s + x.q, 0);
+      const linhas = [];
+      for (const k of chaves) {
+        const [m, p] = k.split('|');
+        const a = atual[k] || { stock: 0, cap: 0 };
+        let vendido = 0, ultimoDiaVenda = null;
+        diasSemana.forEach((d, i) => { const q = vendasDia(d, m)[p] || 0; vendido += q; if (q > 0) ultimoDiaVenda = i; });
+        const histDia = diasHist.length ? diasHist.reduce((s, d) => s + (vendasDia(d, m)[p] || 0), 0) / diasHist.length : 0;
+        const esgotou = vendido > 0 && a.stock === 0;
+        const diasDisponivel = esgotou ? ultimoDiaVenda + 1 : diasSemana.length;
+        const ritmo = diasDisponivel ? vendido / diasDisponivel : 0;
+        let semanal;
+        if (vendido === 0 && a.stock === 0) semanal = histDia * SMARTCAKE_DIAS_SEMANA;               // não houve entrega esta semana
+        else if (esgotou) semanal = Math.max(ritmo, histDia) * SMARTCAKE_DIAS_SEMANA;
+        else semanal = (diasHist.length ? 0.6 * ritmo + 0.4 * histDia : ritmo) * SMARTCAKE_DIAS_SEMANA;
+        let q = Math.round(semanal * margem);
+        if (semanal * margem < 0.5) q = 0;
+        const limitado = a.cap > 0 && q > a.cap;
+        if (a.cap > 0) q = Math.min(q, a.cap);
+        else q = 0; // fora do layout: não há canal onde carregar
+        linhas.push({ m, p, q, vendido, sobra: a.stock, cap: a.cap, esgotou, diaEsgotou: esgotou ? diasSemana[ultimoDiaVenda] : null, histSemana: histDia * SMARTCAKE_DIAS_SEMANA, limitado, foraLayout: a.cap === 0 });
+      }
+      // ---- resumo da semana por produto ----
+      const porProd = {};
+      for (const l of linhas) {
+        const x = (porProd[l.p] = porProd[l.p] || { vendido: 0, sobra: 0, esgotou: [], q: 0, limitado: 0 });
+        x.vendido += l.vendido; x.sobra += l.sobra; x.q += l.q; if (l.limitado) x.limitado++;
+        if (l.esgotou) x.esgotou.push(`${machineLabel(l.m)} (${PROD_DIA_SEMANA[new Date(l.diaEsgotou + 'T12:00:00').getDay()]})`);
+      }
+      const produtos = Object.keys(porProd).filter(p => porProd[p].q > 0 || porProd[p].vendido > 0).sort((a, b) => porProd[b].q - porProd[a].q || porProd[b].vendido - porProd[a].vendido);
+      const fmtD = (x) => x.split('-').reverse().join('/').slice(0, 5);
+      const entrega = proximaSegunda();
+      const entregaStr = formatarData(entrega);
+      const ateStr = formatarData(new Date(entrega.getFullYear(), entrega.getMonth(), entrega.getDate() + 4));
+      document.getElementById('smartcakeEncomendaInfo').innerHTML =
+        `Encomenda para a entrega de <b>2ª ${fmtD(entregaStr)}</b>, que tem de chegar até 6ª ${fmtD(ateStr)} (5 dias de validade). ` +
+        `Baseada nas vendas de ${fmtD(segStr)} a ${fmtD(diasSemana[diasSemana.length - 1] || segStr)} (${diasSemana.length} dia(s) úteis completos), no stock que sobra agora e nas 4 semanas anteriores. ` +
+        `Quem esgotou conta pelo ritmo até esgotar; quem sobrou mistura esta semana com o histórico. Nunca passa da capacidade dos canais.`;
+      resumoWrap.innerHTML = produtos.length ? `<table><thead><tr><th>Produto</th><th class="num">Vendido esta semana</th><th class="num">Sobra agora</th><th>Esgotou em</th><th class="num">Encomendar</th></tr></thead><tbody>
+        ${produtos.map(p => { const x = porProd[p]; return `<tr><td>${escapeHtml(p)}</td><td class="num">${fmtInt(x.vendido)}</td><td class="num" style="${x.sobra > 0 && fimSemana >= hoje ? 'color:var(--accent-deep);font-weight:600;' : ''}">${fmtInt(x.sobra)}</td>
+          <td style="font-size:12px;color:${x.esgotou.length ? 'var(--negative)' : 'var(--muted)'};">${x.esgotou.length ? escapeHtml(x.esgotou.join(', ')) : '—'}</td><td class="num"><b>${fmtInt(x.q)}</b></td></tr>`; }).join('')}
+        <tr style="font-weight:600;"><td>Total</td><td class="num">${fmtInt(produtos.reduce((s, p) => s + porProd[p].vendido, 0))}</td><td class="num">${fmtInt(produtos.reduce((s, p) => s + porProd[p].sobra, 0))}</td><td></td><td class="num">${fmtInt(produtos.reduce((s, p) => s + porProd[p].q, 0))}</td></tr>
+        </tbody></table>` : '<div class="state small">Sem vendas de frescos registadas esta semana.</div>';
+      // ---- grelha produto × máquina ----
+      const ms = Array.from(new Set(linhas.filter(l => l.q > 0).map(l => l.m))).sort();
+      const cel = {}; linhas.forEach(l => { cel[l.p + '|' + l.m] = l; });
+      const prodsGrelha = produtos.filter(p => porProd[p].q > 0);
+      if (!prodsGrelha.length) { wrap.innerHTML = '<div class="state small">Sem dados suficientes para sugerir uma encomenda.</div>'; smartcakeEncomendaTexto = ''; return; }
+      const nota = (l) => {
+        if (!l) return '';
+        const bits = [];
+        if (l.esgotou) bits.push(`<span style="color:var(--negative);">esgotou ${PROD_DIA_SEMANA[new Date(l.diaEsgotou + 'T12:00:00').getDay()]}</span>`);
+        else if (l.vendido || l.sobra) bits.push(`vendeu ${l.vendido}${l.sobra ? `, sobra ${l.sobra}` : ''}`);
+        else bits.push('sem entrega esta semana');
+        if (l.histSemana >= 0.5) bits.push(`hist. ${fmt1(l.histSemana)}/sem.`);
+        bits.push(`cap. ${l.cap}${l.limitado ? ' (no máximo)' : ''}`);
+        return `<div style="font-size:10.5px;color:var(--muted);line-height:1.3;">${bits.join(' · ')}</div>`;
+      };
       wrap.innerHTML = `<table><thead><tr><th>Produto</th>${ms.map(m => `<th class="num">${escapeHtml(machineLabel(m))}</th>`).join('')}<th class="num">Total</th></tr></thead><tbody>
-        ${produtos.map(p => `<tr><td>${escapeHtml(p)}</td>${ms.map(m => { const c = grelha[p][m]; return `<td class="num">${c ? `<b>${c.q}</b><div style="font-size:10.5px;color:var(--muted);">${fmt1(c.vd)}/dia${c.cap ? ' · cap. ' + c.cap : ''}</div>` : '—'}</td>`; }).join('')}<td class="num"><b>${totProd(p)}</b></td></tr>`).join('')}
-        <tr style="font-weight:600;"><td>Total</td>${ms.map(m => `<td class="num">${produtos.reduce((s, p) => s + ((grelha[p][m] || {}).q || 0), 0)}</td>`).join('')}<td class="num">${produtos.reduce((s, p) => s + totProd(p), 0)}</td></tr>
+        ${prodsGrelha.map(p => `<tr><td>${escapeHtml(p)}</td>${ms.map(m => { const l = cel[p + '|' + m]; return `<td class="num">${l && l.q ? `<b>${l.q}</b>${nota(l)}` : (l && !l.foraLayout && (l.vendido || l.histSemana >= 0.5) ? `0${nota(l)}` : '—')}</td>`; }).join('')}<td class="num"><b>${porProd[p].q}</b></td></tr>`).join('')}
+        <tr style="font-weight:600;"><td>Total</td>${ms.map(m => `<td class="num">${prodsGrelha.reduce((s, p) => s + ((cel[p + '|' + m] || {}).q || 0), 0)}</td>`).join('')}<td class="num">${prodsGrelha.reduce((s, p) => s + porProd[p].q, 0)}</td></tr>
       </tbody></table>`;
-      smartcakeEncomendaTexto = `Encomenda Smartcake — entrega ${entrega.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'numeric' })}\n` + produtos.map(p => `- ${p}: ${totProd(p)}`).join('\n');
+      smartcakeEncomendaTexto = `Encomenda Smartcake — entrega 2ª ${entrega.toLocaleDateString('pt-PT', { day: 'numeric', month: 'numeric' })}\n` +
+        prodsGrelha.map(p => `- ${p}: ${porProd[p].q}`).join('\n') + `\nTotal: ${prodsGrelha.reduce((s, p) => s + porProd[p].q, 0)}`;
     } catch (err) {
       wrap.innerHTML = `<div class="state small error">Erro: ${escapeHtml(err.message)}</div>`;
     }
   }
-  let smartcakeEncomendaTexto = '';
 
   // ===== Aba Produtos: análise de vendas por produto e categoria =====
   // Fontes: diário por produto = HISTORICO[d].porProduto (resumos capturados) ou admin/produtos_recentes.json (17/08 → 15/09);
