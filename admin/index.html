@@ -5986,11 +5986,15 @@
     wrap.innerHTML = `
       ${planos.length ? `<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Usar o layout planeado nesta visita (o PDF inclui a troca canal a canal):</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px 16px;">${planos.map(p => {
-        const marcado = primeiraVez ? p.estado === 'troca_feita' : marcadosAntes.has(p.maquina);
+        let guardado = null; try { guardado = JSON.parse(localStorage.getItem('repoUsarLayout') || 'null'); } catch {}
+        const marcado = primeiraVez ? (p.estado === 'troca_feita' || (guardado ? guardado.includes(p.maquina) : false)) : marcadosAntes.has(p.maquina);
         return `<label style="font-size:13px;display:flex;gap:6px;align-items:center;cursor:pointer;"><input type="checkbox" class="repo-usar-layout" value="${p.maquina}" ${marcado ? 'checked' : ''}/> ${escapeHtml(machineLabel(p.maquina))} <span style="font-size:11px;color:var(--muted);">(${p.estado === 'troca_feita' ? 'troca feita' : 'planeado'})</span></label>`;
       }).join('')}</div>` : ''}
       <label style="font-size:13px;display:flex;gap:6px;align-items:center;cursor:pointer;margin-top:6px;"><input type="checkbox" id="repoFrescosValidade" ${frescosMarcado ? 'checked' : ''}/> Frescos nas máquinas fora de validade (não contam como stock e saem no PDF para retirar)</label>`;
     wrap.dataset.pronto = '1';
+    wrap.querySelectorAll('.repo-usar-layout').forEach(el => el.addEventListener('change', () => {
+      try { localStorage.setItem('repoUsarLayout', JSON.stringify(Array.from(wrap.querySelectorAll('.repo-usar-layout:checked')).map(x => x.value))); } catch {}
+    }));
     wrap.style.display = 'block';
   }
 
@@ -6015,11 +6019,24 @@
       const plano = layoutsPlaneados[maq];
       if (!plano || !(plano.canais || []).length) continue;
       const atuais = linhas.filter(r => r.MATRICULA_MAQUINA === maq);
-      const porCanal = new Map(atuais.map(r => [String(r.CANAL_CONF), r]));
+      // canais comparados pelo número (S11, 11 e s11 são o mesmo canal)
+      const porCanal = new Map(atuais.map(r => [canalNum(r.CANAL_CONF), r]));
+      const feita = plano.estado === 'troca_feita'; // a troca física já foi feita, mas a Luope ainda tem o produto antigo
       const restante = {};
-      atuais.forEach(r => { const p = canonicalProduto(r.NOME_PRODUTO || ''); if (p) restante[p] = (restante[p] || 0) + Math.max(0, Number(r.sum) || 0); });
-      const canais = plano.canais.map(c => {
-        const a = porCanal.get(c.canal);
+      const planoCanais = (plano.canais || []).filter(c => c.canal);
+      // canais que existem na máquina mas não estão no plano ficam como estão (não desaparecem da reposição)
+      const noPlano = new Set(planoCanais.map(c => canalNum(c.canal)));
+      for (const r of atuais) if (!noPlano.has(canalNum(r.CANAL_CONF))) planoCanais.push({ canal: String(r.CANAL_CONF), seletor: String(r.CODIGO_SELETOR || ''), capacidade: Number(r.CAPACIDADE_SELETOR) || 0, produto: canonicalProduto(r.NOME_PRODUTO || '') });
+      planoCanais.sort((a, b) => canalNum(a.canal) - canalNum(b.canal));
+      atuais.forEach(r => {
+        const p = canonicalProduto(r.NOME_PRODUTO || '');
+        const c = planoCanais.find(x => canalNum(x.canal) === canalNum(r.CANAL_CONF));
+        // com a troca feita, o stock de um canal trocado já é do produto novo: não conta como produto antigo a retirar
+        if (feita && c && (c.produto || '') !== p) return;
+        if (p) restante[p] = (restante[p] || 0) + Math.max(0, Number(r.sum) || 0);
+      });
+      const canais = planoCanais.map(c => {
+        const a = porCanal.get(canalNum(c.canal));
         return {
           canal: c.canal, seletor: c.seletor || (a && String(a.CODIGO_SELETOR || '')) || '',
           capacidade: c.capacidade || (a && Number(a.CAPACIDADE_SELETOR)) || 0,
@@ -6027,6 +6044,7 @@
           depois: c.produto || '', teste: !!c.teste, nota: c.nota || '', stockDepois: 0,
         };
       });
+      if (feita) canais.filter(x => x.depois && x.depois !== x.antes && x.depois !== LAYOUT_SMARTCAKE).forEach(x => { x.stockDepois = Math.min(x.capacidade, x.stockAntes); });
       // o produto que já está no canal certo fica; o que sai de um canal pode entrar noutro canal do mesmo produto
       canais.filter(x => x.depois && x.depois === x.antes).forEach(x => {
         const q = Math.min(x.capacidade, x.stockAntes, restante[x.depois] || 0); x.stockDepois = q; restante[x.depois] -= q;
@@ -6035,7 +6053,7 @@
         const q = Math.min(x.capacidade - x.stockDepois, restante[x.depois] || 0); if (q > 0) { x.stockDepois += q; restante[x.depois] -= q; }
       });
       const retirar = Object.entries(restante).filter(([p, q]) => p && q > 0).map(([produto, qtd]) => ({ produto, qtd }));
-      trocas.push({ maquina: maq, canais, retirar, estado: plano.estado });
+      if (canais.some(x => x.antes !== x.depois)) trocas.push({ maquina: maq, canais, retirar, estado: plano.estado });
       linhas = linhas.filter(r => r.MATRICULA_MAQUINA !== maq).concat(
         canais.filter(x => x.depois && x.depois !== LAYOUT_SMARTCAKE).map(x => ({
           MATRICULA_MAQUINA: maq, NOME_PRODUTO: x.depois, CAPACIDADE_SELETOR: x.capacidade, CANAL_CONF: x.canal, CODIGO_SELETOR: x.seletor, sum: x.stockDepois,
@@ -6047,18 +6065,22 @@
   // PDF: tabela de troca de layout de uma máquina (canal a canal) + o que volta para o armazém
   function desenharTrocaLayoutPDF(doc, y, troca) {
     if (y > 225) { doc.addPage(); y = 20; }
-    const n = troca.canais.filter(c => c.antes !== c.depois).length;
+    const mudam = troca.canais.filter(c => c.antes !== c.depois);
+    const n = mudam.length;
+    const feita = troca.estado === 'troca_feita';
     doc.setFontSize(11.5); doc.setFont(undefined, 'bold');
-    doc.text(`Troca de layout — ${machineLabel(troca.maquina)} (${n} canais mudam)`, 14, y);
+    doc.text(`${feita ? 'Layout novo (troca já feita)' : 'Troca de layout'} — ${machineLabel(troca.maquina)} (${n} canais mudam)`, 14, y);
     doc.setFont(undefined, 'normal'); doc.setFontSize(8.5); doc.setTextColor(110);
-    doc.text(troca.estado === 'troca_feita' ? 'Troca já feita: conferir canal a canal.' : 'Primeiro retirar o que sai (guardar à parte), depois carregar canal a canal. O que sai de um canal pode ir para outro do mesmo produto.', 14, y + 4.5, { maxWidth: 182 });
+    doc.text(feita
+      ? 'A troca já foi feita na máquina, mas a Luope ainda tem os produtos antigos nestes canais. Os outros canais não mudam. Atualizar a Luope.'
+      : `Só aparecem os canais que mudam (os outros ${troca.canais.length - n} ficam como estão). Primeiro retirar o que sai, depois carregar canal a canal.`, 14, y + 4.5, { maxWidth: 182 });
     doc.setTextColor(0);
     doc.autoTable({
       startY: y + 9,
-      head: [['Canal', 'Espiral', 'Antes (stock)', 'Depois', 'Ação']],
-      body: troca.canais.map(c => {
+      head: [['Canal', 'Espiral', feita ? 'Na Luope (stock)' : 'Antes (stock)', 'Depois', 'Ação']],
+      body: mudam.map(c => {
         const muda = c.antes !== c.depois;
-        const acao = !muda ? 'Manter' : !c.depois ? 'Esvaziar (fica vazio)' : c.depois === LAYOUT_SMARTCAKE ? 'Esvaziar · frescos da entrega' : 'Esvaziar e carregar';
+        const acao = feita ? 'Atualizar na Luope' : !muda ? 'Manter' : !c.depois ? 'Esvaziar (fica vazio)' : c.depois === LAYOUT_SMARTCAKE ? 'Esvaziar · frescos da entrega' : 'Esvaziar e carregar';
         return [c.canal, `${c.seletor} · ${c.capacidade}`, `${c.antes || '—'} (${c.stockAntes})`, (c.depois || '— vazio —') + (c.teste ? ' (teste)' : ''), acao];
       }),
       theme: 'grid',
@@ -6068,8 +6090,8 @@
       margin: { left: 14, right: 14 },
       didParseCell: (d) => {
         if (d.section !== 'body') return;
-        const c = troca.canais[d.row.index];
-        if (c && c.antes !== c.depois) { d.cell.styles.fillColor = [255, 241, 214]; if (d.column.index === 3) d.cell.styles.fontStyle = 'bold'; }
+        const c = mudam[d.row.index];
+        if (c && !feita) { d.cell.styles.fillColor = [255, 241, 214]; if (d.column.index === 3) d.cell.styles.fontStyle = 'bold'; }
       },
     });
     y = doc.lastAutoTable.finalY + 4;
@@ -6081,7 +6103,7 @@
       y += 7.5 + 4 * Math.ceil(troca.retirar.map(r => `${r.qtd} × ${r.produto}`).join(' · ').length / 110);
     }
     doc.setFontSize(8); doc.setTextColor(110);
-    doc.text('Depois da troca: atualizar os canais na Luope e marcar "Troca feita" no admin.', 14, y + 4);
+    doc.text(feita ? 'Quando a Luope estiver atualizada, o admin dá a troca como concluída sozinho.' : 'Depois da troca: atualizar os canais na Luope e marcar "Troca feita" no admin.', 14, y + 4);
     doc.setTextColor(0);
     return y + 10;
   }
