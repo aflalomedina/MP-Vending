@@ -588,6 +588,7 @@
       <div id="compraResumo" style="font-size:12px;color:var(--muted);margin-bottom:6px;"></div>
       <div id="compraMsg" style="font-size:12px;min-height:14px;"></div>
       <div class="table-wrap cards-mobile" id="compraWrap" style="max-height:640px;overflow-y:auto;"><div class="state small">a carregar…</div></div>
+      <div id="compraSugestoesWrap"></div>
     </div>
 
     <div class="panel full">
@@ -1356,6 +1357,7 @@
     'Croissant Recheado com Cacau 60 Gr - Belino': 'Bitee - Croissant Recheio Cacau 60g',
     '7Up 33cl': '7Up Sleek 330ml',
     'REF S/G FRESKY LAR TET 20CL': 'REF S/G FRESKY F TROP TET 20CL',
+    'Chips de Taro Mediterrânicas 35g Bitee': 'Bitee - Chips Mediterranean Taro Snack 35g',
   };
   function canonicalProduto(nome) {
     const n = normalizarSDR(nome);
@@ -3051,6 +3053,7 @@
       // stock disponível por armazém, por nome de produto (7 = usado para repor; 3 = só para saber se existe noutro lado)
       const armazem7 = {};
       const armazem3 = {};
+      const descontinuados = await fetch('/api/descontinuados').then(r => r.ok ? r.json() : {}).then(d => d.descontinuados || {}).catch(() => ({}));
       await carregarCatalogoProdutos(); // sem o catálogo, produtos novos (ex.: Triângulo Creme) ficavam só com o código
       for (const r of stockRows) {
         const nome = canonicalProduto(r.NOME_PRODUTO || productLabel(r.CODIGO_PRODUTO));
@@ -3104,7 +3107,7 @@
         if (gridSC && isSmartcakeProd(it.produto)) return false; // Smartcake é dividido à mão na grelha
         if (it.capacidade <= 0 || it.stock >= it.capacidade) return false;
         const temNoArmazem = (armazem7[it.produto] || 0) > 0 || (armazem3[it.produto] || 0) > 0;
-        if (!temNoArmazem) { semStockTotal.add(it.produto); return false; }
+        if (!temNoArmazem) { if (!descontinuados[it.produto]) semStockTotal.add(it.produto); return false; } // descontinuado sem stock: sai sem aviso
         return true;
       });
 
@@ -4331,6 +4334,8 @@
   const COMPRA_FAMILIAS = new Set(['Bebidas', 'Snacks', 'Bolachas', 'Chocolates']); // frescos e cafetaria ficam de fora
   let compraDados = null;
   let compraEncomendas = {};
+  let compraDescontinuados = {};
+  const COMPRA_SUGERIR_SEMANA = 2; // sugere deixar de comprar o que vende menos de 2 por semana em toda a frota
 
   function grupoCompraLabel(g) {
     return { esgotado: 'Esgotado nos dois armazéns: comprar já', passar: 'Pouco ou nada no armazém 7: passar do armazém 3', curto: `Não chega para ${COMPRA_PRAZO_ENTREGA} dias úteis: comprar`, encomendado: 'Já encomendado' }[g];
@@ -4338,26 +4343,34 @@
   const COMPRA_COR = { esgotado: 'var(--negative)', passar: '#C7710A', curto: '#A07A00', encomendado: 'var(--muted)' };
 
   async function carregarCompras() {
-    const [stockRaw, layoutRaw, enc, vel] = await Promise.all([
+    const [stockRaw, layoutRaw, enc, vel, desc] = await Promise.all([
       fetchJSON('/api/stock-armazens'),
       fetchJSON('/api/layout-maquinas'),
       fetch('/api/encomendas').then(r => r.ok ? r.json() : { encomendas: {} }).catch(() => ({ encomendas: {} })),
       velocidadesDiaUtil(),
+      fetch('/api/descontinuados').then(r => r.ok ? r.json() : { descontinuados: {} }).catch(() => ({ descontinuados: {} })),
       carregarCatalogoProdutos(),
+      Object.keys(layoutsPlaneados).length ? null : recarregarPlanos().catch(() => {}), // testes e produtos novos dos planos de layout
     ]);
     compraEncomendas = enc.encomendas || {};
+    compraDescontinuados = (desc && desc.descontinuados) || {};
     const arm = {};
     const get = (p) => (arm[p] = arm[p] || { a7: 0, a3: 0 });
     for (const r of toObjects(stockRaw)) {
-      const p = canonicalProduto(productLabel(r.CODIGO_PRODUTO));
+      const p = canonicalProduto(r.NOME_PRODUTO || productLabel(r.CODIGO_PRODUTO));
       const q = Number(r.sum) || 0;
       if (String(r.CODIGO_ARMAZEM) === '7') get(p).a7 += q;
       else if (String(r.CODIGO_ARMAZEM) === '3') get(p).a3 += q;
     }
     const noLayout = new Set();
+    const canais = {}, maquinas = {}, stockMaq = {};
     for (const r of toObjects(layoutRaw)) {
       if (!r.NOME_PRODUTO || !r.MATRICULA_MAQUINA || MAQUINAS_EXCLUIDAS.has(r.MATRICULA_MAQUINA) || !MACHINES[r.MATRICULA_MAQUINA]) continue;
-      noLayout.add(canonicalProduto(r.NOME_PRODUTO));
+      const p = canonicalProduto(r.NOME_PRODUTO);
+      noLayout.add(p);
+      canais[p] = (canais[p] || 0) + 1;
+      (maquinas[p] = maquinas[p] || new Set()).add(r.MATRICULA_MAQUINA);
+      stockMaq[p] = (stockMaq[p] || 0) + Math.max(0, Number(r.sum) || 0);
     }
     const nomes = new Set([...Object.keys(arm), ...noLayout, ...Object.keys(vel.frota).filter(p => vel.frota[p] > 0)]);
     const linhas = [];
@@ -4367,7 +4380,8 @@
       const vd = vel.frota[p] || 0;
       const ativo = vd > 0 || noLayout.has(p);
       if (!ativo) continue; // produtos que já não se vendem nem estão em nenhuma máquina
-      linhas.push({ produto: p, a7: Math.max(0, s.a7), a3: Math.max(0, s.a3), vd, noLayout: noLayout.has(p), custo: custoCanonico(p) });
+      linhas.push({ produto: p, a7: Math.max(0, s.a7), a3: Math.max(0, s.a3), vd, noLayout: noLayout.has(p), custo: custoCanonico(p),
+        canais: canais[p] || 0, maquinas: maquinas[p] ? maquinas[p].size : 0, stockMaq: stockMaq[p] || 0 });
     }
     compraDados = { linhas, vel };
   }
@@ -4375,7 +4389,7 @@
   function calcularCompras(semanas) {
     const horizonte = semanas * 5; // dias úteis a cobrir depois de a encomenda chegar
     const hojeStr = todayStr();
-    return compraDados.linhas.map(l => {
+    return compraDados.linhas.filter(l => !compraDescontinuados[l.produto]).map(l => {
       const total = l.a7 + l.a3;
       const dias7 = l.vd > 0 ? l.a7 / l.vd : (l.a7 > 0 ? Infinity : 0);
       const diasTotal = l.vd > 0 ? total / l.vd : (total > 0 ? Infinity : 0);
@@ -4416,6 +4430,7 @@
       ? `A comprar (sem os já encomendados): ${fmtInt(todas.filter(l => l.grupo !== 'encomendado' && l.comprar > 0).length)} produtos · custo estimado ${fmtEUR(custoTotal)} s/ IVA. ` +
         `Vendas: média dos últimos ${compraDados.vel.nDias || 0} dias úteis em todas as máquinas.`
       : '';
+    renderSugestoesDescontinuar();
     if (!linhas.length) {
       wrap.innerHTML = `<div class="state small" style="color:var(--positive);">${termo ? 'Nenhum produto com esse nome na lista.' : 'Tudo com stock para mais de uma semana.'}</div>`;
       return;
@@ -4438,15 +4453,94 @@
         <td class="num">${l.passar ? `<b style="color:#C7710A;">${fmtInt(l.passar)}</b>` : '—'}</td>
         <td class="num"><b>${l.comprar == null ? '?' : l.comprar ? fmtInt(l.comprar) : '—'}</b></td>
         <td class="num">${l.comprar && l.custo ? fmtEUR(l.comprar * l.custo) : '—'}</td>
-        <td>${l.enc ? `<button type="button" class="compra-btn" data-acao="limpar">Recebido / limpar</button>` : `<button type="button" class="compra-btn" data-acao="encomendar">Marcar encomendado</button>`}</td>
+        <td style="white-space:nowrap;">${l.enc ? `<button type="button" class="compra-btn" data-acao="limpar">Recebido / limpar</button>` : `<button type="button" class="compra-btn" data-acao="encomendar">Marcar encomendado</button>`}
+          <button type="button" class="compra-btn" data-acao="descontinuar" title="Deixa de aparecer nesta lista" style="color:var(--muted);">Não comprar mais</button></td>
       </tr>`;
     }).join('');
     wrap.innerHTML = `<table><thead><tr><th>Produto</th><th class="num">Arm. 7</th><th class="num">Arm. 3</th><th class="num">Vende/dia útil</th><th class="num">Dias que dura (7+3)</th><th class="num">Passar 3→7</th><th class="num">Comprar</th><th class="num">Custo est.</th><th></th></tr></thead><tbody>${linhasHtml}</tbody></table>`;
   }
 
+  // produtos que vendem pouco: sugestão de deixar de comprar (não inclui os descontinuados nem os testes de layout a decorrer)
+  function sugestoesDescontinuar() {
+    const emTeste = new Set();
+    const hoje = todayStr();
+    for (const pl of Object.values(layoutsPlaneados || {})) for (const c of (pl.canais || [])) {
+      if (!c.teste || !c.produto) continue;
+      const dias = pl.trocaFeitaEm ? Math.round((new Date(hoje) - new Date(pl.trocaFeitaEm)) / 86400000) : 0;
+      if (dias < 21) emTeste.add(c.produto);
+    }
+    const nDias = (compraDados.vel && compraDados.vel.nDias) || 0;
+    // produtos novos: a média de 20 dias inclui dias em que ainda não estavam nas máquinas. Ficam de fora até terem
+    // 30 dias desde a primeira venda; os que nunca venderam só entram se já houver 30 dias de dados por máquina.
+    const primeiraVenda = {};
+    for (const d of Object.keys(HISTORICO).sort()) {
+      const pp = HISTORICO[d].porProduto; if (!pp) continue;
+      for (const n of Object.keys(pp)) { const c = canonicalProduto(n); if (!primeiraVenda[c]) primeiraVenda[c] = d; }
+    }
+    const limiteNovo = formatarData(new Date(new Date(hoje + 'T12:00:00').getTime() - 30 * 86400000));
+    const diasPorMaquina = Object.keys(HISTORICO).filter(d => HISTORICO[d].porMaquinaProduto).sort();
+    const historicoLongo = diasPorMaquina.length && diasPorMaquina[0] <= limiteNovo;
+    // produtos que entraram numa máquina por um plano de layout nos últimos 30 dias contam como novos
+    const novosEmPlano = new Set();
+    for (const pl of Object.values(layoutsPlaneados || {})) {
+      const quando = (pl.trocaFeitaEm || (pl.atualizadoEm || '').slice(0, 10));
+      if (quando && quando >= limiteNovo) for (const c of (pl.canais || [])) if (c.produto) novosEmPlano.add(c.produto);
+    }
+    const recente = (p) => primeiraVenda[p] ? primeiraVenda[p] > limiteNovo : (!historicoLongo || novosEmPlano.has(p));
+    return compraDados.linhas
+      .filter(l => !compraDescontinuados[l.produto] && !emTeste.has(l.produto) && nDias >= 10 && !recente(l.produto))
+      .map(l => {
+        const semana = l.vd * 5;
+        const porCanal = l.canais ? semana / l.canais : null;
+        let motivo = null;
+        if (semana < 1) motivo = `vende menos de 1 por semana em todas as máquinas`;
+        else if (semana < COMPRA_SUGERIR_SEMANA) motivo = `vende menos de ${COMPRA_SUGERIR_SEMANA} por semana em todas as máquinas`;
+        else if (porCanal != null && porCanal < 0.5 && semana < 4) motivo = `ocupa ${l.canais} canais e vende ${fmt1(semana)} por semana`;
+        return motivo ? { ...l, semana, porCanal, motivo } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.semana - b.semana);
+  }
+
+  function renderSugestoesDescontinuar() {
+    const wrap = document.getElementById('compraSugestoesWrap');
+    if (!wrap || !compraDados) return;
+    const sug = sugestoesDescontinuar();
+    const desc = Object.entries(compraDescontinuados).sort((a, b) => a[0].localeCompare(b[0], 'pt'));
+    const linhaSug = (l) => `<tr data-p="${escapeHtml(l.produto)}"><td>${escapeHtml(l.produto)}<div style="font-size:11px;color:var(--muted);">${escapeHtml(l.motivo)}</div></td>
+      <td class="num">${fmt1(l.semana)}</td><td class="num">${l.canais ? `${l.canais} em ${l.maquinas} máq.` : '—'}</td><td class="num">${fmtInt(l.stockMaq)}</td><td class="num">${fmtInt(l.a7 + l.a3)}</td>
+      <td style="white-space:nowrap;"><button type="button" class="compra-btn" data-acao="descontinuar">Não comprar mais</button></td></tr>`;
+    wrap.innerHTML = `
+      <details ${sug.length ? 'open' : ''} style="margin-top:16px;">
+        <summary style="cursor:pointer;font-weight:600;font-size:13.5px;">Sugestão: deixar de comprar (${sug.length})</summary>
+        <div style="font-size:12px;color:var(--muted);margin:6px 0;">Produtos que vendem pouco nos últimos ${compraDados.vel.nDias || 0} dias úteis (menos de ${COMPRA_SUGERIR_SEMANA} por semana em toda a frota, ou menos de meia unidade por semana por canal ocupado). Ficam de fora os produtos com menos de 30 dias desde a primeira venda e os testes de layout com menos de 3 semanas. O stock que ainda há pode ser vendido; só deixa de se comprar.</div>
+        ${sug.length ? `<div class="table-wrap cards-mobile"><table><thead><tr><th>Produto</th><th class="num">Vende/semana</th><th class="num">Canais</th><th class="num">Nas máquinas</th><th class="num">Armazéns 7+3</th><th></th></tr></thead><tbody>${sug.map(linhaSug).join('')}</tbody></table></div>` : '<div class="state small">Nenhum produto com vendas tão baixas.</div>'}
+      </details>
+      <details style="margin-top:10px;">
+        <summary style="cursor:pointer;font-weight:600;font-size:13.5px;">Não comprar mais (${desc.length})</summary>
+        ${desc.length ? `<div class="table-wrap cards-mobile"><table><thead><tr><th>Produto</th><th>Desde</th><th>Motivo</th><th></th></tr></thead><tbody>
+          ${desc.map(([p, d]) => `<tr data-p="${escapeHtml(p)}"><td>${escapeHtml(p)}</td><td>${escapeHtml((d.data || '').split('-').reverse().join('/'))}</td><td style="font-size:12px;color:var(--muted);">${escapeHtml(d.motivo || '—')}</td>
+            <td><button type="button" class="compra-btn" data-acao="reativar">Voltar a comprar</button></td></tr>`).join('')}</tbody></table></div>`
+          : '<div class="state small" style="margin-top:6px;">Nenhum produto marcado.</div>'}
+      </details>`;
+  }
+
   async function acaoCompra(produto, acao) {
     const msg = document.getElementById('compraMsg');
     try {
+      if (acao === 'descontinuar') {
+        const sug = sugestoesDescontinuar().find(l => l.produto === produto);
+        const motivo = prompt(`Deixar de comprar "${produto}"?\nSai da lista de compras e dos avisos de falta de stock. Motivo (opcional):`, sug ? sug.motivo : 'vendas baixas');
+        if (motivo === null) return;
+        const r = await fetch('/api/descontinuados', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ produto, motivo }) });
+        const d = await r.json(); if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+        compraDescontinuados = d.descontinuados || {};
+      }
+      if (acao === 'reativar') {
+        const r = await fetch(`/api/descontinuados?produto=${encodeURIComponent(produto)}`, { method: 'DELETE' });
+        const d = await r.json(); if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+        compraDescontinuados = d.descontinuados || {};
+      }
       if (acao === 'encomendar') {
         const linha = calcularCompras(Number(document.getElementById('compraHorizonte').value) || 1).find(l => l.produto === produto);
         const sugerido = linha && linha.comprar ? linha.comprar : '';
@@ -4515,10 +4609,10 @@
     comprasEventosLigados = true;
     document.getElementById('compraHorizonte').addEventListener('change', renderCompras);
     document.getElementById('compraPesquisa').addEventListener('input', renderCompras);
-    wrap.addEventListener('click', (e) => {
+    [wrap, document.getElementById('compraSugestoesWrap')].forEach(el => el.addEventListener('click', (e) => {
       const b = e.target.closest('.compra-btn'); const tr = e.target.closest('tr[data-p]');
       if (b && tr) acaoCompra(tr.dataset.p, b.dataset.acao);
-    });
+    }));
     document.getElementById('compraCopiarBtn').addEventListener('click', async () => {
       const { texto, linhas } = textoListaCompras();
       const msg = document.getElementById('compraMsg');
