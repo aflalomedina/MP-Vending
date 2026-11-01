@@ -618,6 +618,36 @@ async function guardarResumoDiario(env, forcar) {
   return { ok: true, date: agora.data, receitaTotal: resumo.receitaTotal, transacoes: resumo.transacoes };
 }
 
+// ===== Produtos que não se voltam a comprar (Cloudflare KV, chave única "descontinuados") =====
+// Mapa produto -> { data, motivo }. Saem da lista "Stock a comprar" e dos avisos de falta de stock.
+async function handleDescontinuados(request, env) {
+  const url = new URL(request.url);
+  const ler = async () => {
+    const raw = await env.HISTORY_KV.get("descontinuados");
+    try { return raw ? JSON.parse(raw) : {}; } catch { return {}; }
+  };
+  if (request.method === "GET") return jsonResponse({ descontinuados: await ler() });
+  if (request.method === "PUT") {
+    let payload;
+    try { payload = await request.json(); } catch { return jsonResponse({ error: "JSON inválido" }, 400); }
+    const produto = String((payload && payload.produto) || "").trim().slice(0, 120);
+    if (!produto) return jsonResponse({ error: "Falta o produto" }, 400);
+    const mapa = await ler();
+    mapa[produto] = { data: new Date().toISOString().slice(0, 10), motivo: String(payload.motivo || "").slice(0, 200) };
+    await env.HISTORY_KV.put("descontinuados", JSON.stringify(mapa));
+    return jsonResponse({ ok: true, descontinuados: mapa });
+  }
+  if (request.method === "DELETE") {
+    const produto = (url.searchParams.get("produto") || "").trim();
+    if (!produto) return jsonResponse({ error: "Falta o parâmetro produto" }, 400);
+    const mapa = await ler();
+    delete mapa[produto];
+    await env.HISTORY_KV.put("descontinuados", JSON.stringify(mapa));
+    return jsonResponse({ ok: true, descontinuados: mapa });
+  }
+  return new Response("Método não suportado", { status: 405 });
+}
+
 // ===== Despesas mensais (Cloudflare KV) =====
 // ===== Tracking próprio (visitas + leads do formulário) via KV =====
 async function handleTrack(request, env) {
@@ -827,6 +857,14 @@ export default {
           status: 502,
           headers: { "Content-Type": "application/json" },
         });
+      }
+    }
+
+    if (url.pathname === "/api/descontinuados") {
+      try {
+        return await handleDescontinuados(request, env);
+      } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
       }
     }
 
