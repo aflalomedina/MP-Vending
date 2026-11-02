@@ -1417,10 +1417,36 @@
     });
   }
 
+  // Pedidos aos relatórios da Spotside: tenta outra vez se o servidor falhar e avisa quando os dados vêm da última
+  // cópia guardada (o servidor devolve-a quando a Spotside/Metabase não responde)
+  const avisosDadosAntigos = new Map();
+  function mostrarAvisoDadosAntigos() {
+    let el = document.getElementById('avisoDadosAntigos');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'avisoDadosAntigos';
+      el.style.cssText = 'margin:10px 24px 0;padding:8px 12px;border:1px solid #F2B57A;background:#FFF4E3;border-radius:6px;font-size:12.5px;color:#7A4A0A;';
+      const tabs = document.querySelector('.tabs');
+      tabs.parentNode.insertBefore(el, tabs.nextSibling);
+    }
+    const lista = Array.from(avisosDadosAntigos.entries()).map(([p, em]) => `${p.replace('/api/', '')} (${paraHoraPT(new Date(em)).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })})`);
+    el.innerHTML = `A Spotside não respondeu agora. A mostrar a última cópia guardada de: ${lista.join(', ')}. <a href="#" onclick="location.reload();return false;">Tentar outra vez</a>`;
+  }
   async function fetchJSON(path) {
-    const res = await fetch(path);
-    if (!res.ok) throw new Error(`${path} → HTTP ${res.status}`);
-    return res.json();
+    let ultimo = null;
+    for (let tentativa = 0; tentativa < 2; tentativa++) {
+      if (tentativa) await new Promise(r => setTimeout(r, 1500));
+      let res;
+      try { res = await fetch(path); } catch (e) { ultimo = new Error(`${path} → sem ligação`); continue; }
+      if (res.ok) {
+        const em = res.headers.get('X-Dados-De');
+        if (em) { avisosDadosAntigos.set(path, em); mostrarAvisoDadosAntigos(); }
+        return res.json();
+      }
+      ultimo = new Error(`${path} → HTTP ${res.status}`);
+      if (res.status < 500) break; // erros 4xx não melhoram a tentar outra vez
+    }
+    throw ultimo;
   }
 
   function groupSum(rows, keyFn, valueFn) {
@@ -6225,7 +6251,7 @@
     try {
       const [vendasRaw, stockRaw, historicoRaw, liveSnapshots] = await Promise.all([
         fetchJSON('/api/vendas-diarias'),
-        fetchJSON('/api/stock-armazens'),
+        fetchJSON('/api/stock-armazens').catch(err => { console.error(err); return null; }), // sem stock, o resto do painel funciona
         fetch('/admin/historico.json').then(r => r.ok ? r.json() : {}).catch(() => ({})),
         fetch('/api/snapshot').then(r => r.ok ? r.json() : {}).catch(() => ({})),
         carregarCatalogoProdutos(), // ao vivo — produtos novos ficam disponíveis automaticamente
@@ -6306,7 +6332,8 @@
 
         HISTORICO[lastSummary.date] = { ...HISTORICO[lastSummary.date], ...lastSummary };
       }
-      renderStock(toObjects(stockRaw));
+      if (stockRaw) renderStock(toObjects(stockRaw));
+      else document.querySelectorAll('#stockTableWrap').forEach(el => { el.innerHTML = '<div class="state small error">Stock dos armazéns indisponível de momento (a Spotside não respondeu). Recarrega daqui a pouco.</div>'; });
       renderPagamentos('chartPagamentosDiarias', 'pagamentosTableWrapDiarias', 'pagamentosDataLabelDiarias');
       drawPDVTipoChart();
 

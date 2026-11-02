@@ -32,12 +32,12 @@ function extractCookies(res) {
   return cookies;
 }
 
-async function getSession(env) {
-  const now = Date.now();
-  if (cachedSession && now - cachedAt < SESSION_TTL_MS) {
-    return cachedSession;
-  }
+// A sessão é partilhada entre instâncias do Worker através da KV: antes, cada instância nova fazia login à parte
+// e, ao abrir o admin, vários pedidos em paralelo faziam vários logins seguidos. O portal pode invalidar a sessão
+// anterior a cada login novo, e os pedidos que estavam a usar essa sessão falhavam (502).
+let loginEmCurso = null;
 
+async function fazerLogin(env) {
   const loginUrl = `${env.PORTAL_URL}/app/index.php?r=user/login`;
 
   const getRes = await fetch(loginUrl, { redirect: "manual" });
@@ -68,15 +68,33 @@ async function getSession(env) {
   if (!metabaseSession) {
     throw new Error("Login falhou: não recebi cookie metabase.SESSION_ID do portal");
   }
-
+  const agora = Date.now();
   cachedSession = metabaseSession;
-  cachedAt = now;
-  return cachedSession;
+  cachedAt = agora;
+  try { await env.HISTORY_KV.put("metabase:sessao", JSON.stringify({ sessao: metabaseSession, em: agora }), { expirationTtl: Math.floor(SESSION_TTL_MS / 1000) }); } catch {}
+  return metabaseSession;
 }
 
-async function queryCard(env, cardId) {
-  let session = await getSession(env);
+// sessaoRecusada: a sessão que acabou de dar 401/403 (para não a voltar a usar)
+async function getSession(env, sessaoRecusada) {
+  const now = Date.now();
+  if (cachedSession && cachedSession !== sessaoRecusada && now - cachedAt < SESSION_TTL_MS) return cachedSession;
+  // outra instância pode já ter feito login
+  try {
+    const raw = await env.HISTORY_KV.get("metabase:sessao");
+    if (raw) {
+      const { sessao, em } = JSON.parse(raw);
+      if (sessao && sessao !== sessaoRecusada && now - em < SESSION_TTL_MS) { cachedSession = sessao; cachedAt = em; return sessao; }
+    }
+  } catch {}
+  // um só login de cada vez nesta instância: os pedidos em paralelo esperam pelo mesmo login
+  if (!loginEmCurso) loginEmCurso = fazerLogin(env).finally(() => { loginEmCurso = null; });
+  return loginEmCurso;
+}
 
+const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function queryCard(env, cardId) {
   async function doQuery(sess) {
     return fetch(`${env.METABASE_URL}/api/card/${cardId}/query`, {
       method: "POST",
@@ -88,18 +106,30 @@ async function queryCard(env, cardId) {
     });
   }
 
-  let res = await doQuery(session);
-
-  if (res.status === 401 || res.status === 403) {
-    cachedSession = null;
-    session = await getSession(env);
-    res = await doQuery(session);
+  let ultimoErro = null;
+  let recusada = null;
+  for (let tentativa = 0; tentativa < 3; tentativa++) {
+    if (tentativa > 0) await esperar(400 * tentativa);
+    try {
+      const session = await getSession(env, recusada);
+      const res = await doQuery(session);
+      if (res.status === 401 || res.status === 403) {
+        recusada = session; // sessão expirada ou substituída: próxima tentativa usa outra
+        if (cachedSession === session) cachedSession = null;
+        ultimoErro = new Error(`Metabase respondeu ${res.status} (sessão)`);
+        continue;
+      }
+      if (!res.ok) { ultimoErro = new Error(`Metabase respondeu ${res.status}`); continue; }
+      const data = await res.json();
+      // o Metabase às vezes responde 200/202 com a consulta falhada
+      if (data && data.status === "failed") { ultimoErro = new Error("Consulta falhou no Metabase: " + String(data.error || "").slice(0, 120)); continue; }
+      if (!data || !data.data || !Array.isArray(data.data.rows)) { ultimoErro = new Error("Resposta inesperada do Metabase"); continue; }
+      return data;
+    } catch (err) {
+      ultimoErro = err;
+    }
   }
-
-  if (!res.ok) {
-    throw new Error(`Metabase respondeu ${res.status}`);
-  }
-  return res.json();
+  throw ultimoErro || new Error("Metabase indisponível");
 }
 
 // mapeia nomes amigáveis -> ID do card no Metabase
@@ -782,7 +812,7 @@ export default {
     ctx.waitUntil(guardarResumoDiario(env, false).catch((err) => console.error("Resumo diário falhou:", err.message)));
   },
 
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     // /api/track fica público (chamado por visitantes anónimos do site) — sem password
@@ -936,10 +966,19 @@ export default {
 
       try {
         const data = await queryCard(env, cardId);
-        return new Response(JSON.stringify(data), {
-          headers: { "Content-Type": "application/json" },
-        });
+        const corpo = JSON.stringify(data);
+        // guarda a última resposta boa (até ~20 MB por chave na KV) para usar se o Metabase falhar
+        if (corpo.length < 20_000_000) ctx.waitUntil(env.HISTORY_KV.put(`card:${key}`, JSON.stringify({ em: new Date().toISOString(), corpo })).catch(() => {}));
+        return new Response(corpo, { headers: { "Content-Type": "application/json" } });
       } catch (err) {
+        // Metabase em baixo: devolve a última resposta boa, marcada como antiga
+        try {
+          const raw = await env.HISTORY_KV.get(`card:${key}`);
+          if (raw) {
+            const { em, corpo } = JSON.parse(raw);
+            return new Response(corpo, { headers: { "Content-Type": "application/json", "X-Dados-De": em, "X-Erro-Metabase": String(err.message).slice(0, 200) } });
+          }
+        } catch {}
         return new Response(JSON.stringify({ error: err.message }), {
           status: 502,
           headers: { "Content-Type": "application/json" },
