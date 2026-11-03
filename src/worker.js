@@ -678,6 +678,81 @@ async function handleDescontinuados(request, env) {
   return new Response("Método não suportado", { status: 405 });
 }
 
+// ===== Rota sugerida para a reposição =====
+// POST /api/rota { pontos: [{ id, morada, lat, lon }] } (o primeiro é o início/fim, normalmente o armazém 7)
+// 1) coordenadas: as que vierem no pedido; senão as guardadas na KV (geo:<id>); senão pede ao Nominatim (OpenStreetMap)
+//    pela morada e guarda. 2) distâncias e tempos de condução entre todos os pontos pelo OSRM (servidor público).
+// Se o OSRM falhar, estima pela distância em linha reta × 1,35 a 40 km/h. A ordem é calculada no admin.
+const UA_ROTAS = "MPVending-Admin/1.0 (https://mpvending.pt)";
+function distLinhaReta(a, b) {
+  const R = 6371, rad = (x) => (x * Math.PI) / 180;
+  const dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+async function geocodificar(env, p) {
+  if (Number.isFinite(p.lat) && Number.isFinite(p.lon)) return { lat: p.lat, lon: p.lon, fonte: "manual" };
+  if (!p.morada) return null;
+  const chave = `geo:${p.id}`;
+  try {
+    const raw = await env.HISTORY_KV.get(chave);
+    if (raw) { const g = JSON.parse(raw); if (g.morada === p.morada) return g; }
+  } catch {}
+  // tenta a morada completa e depois só código postal + localidade
+  const tentativas = [p.morada];
+  const cp = String(p.morada).match(/\d{4}-\d{3}[^,]*/);
+  if (cp) tentativas.push(cp[0] + ", Portugal");
+  for (const q of tentativas) {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=pt&q=${encodeURIComponent(q)}`;
+    const r = await fetch(url, { headers: { "User-Agent": UA_ROTAS, "Accept-Language": "pt" } });
+    if (r.ok) {
+      const lista = await r.json();
+      if (lista && lista[0]) {
+        const g = { lat: Number(lista[0].lat), lon: Number(lista[0].lon), morada: p.morada, encontrado: lista[0].display_name, aproximado: q !== p.morada, fonte: "osm" };
+        await env.HISTORY_KV.put(chave, JSON.stringify(g));
+        return g;
+      }
+    }
+    await esperar(1100); // regra do Nominatim: no máximo 1 pedido por segundo
+  }
+  return null;
+}
+async function handleRota(request, env) {
+  if (request.method !== "POST") return new Response("Método não suportado", { status: 405 });
+  let payload;
+  try { payload = await request.json(); } catch { return jsonResponse({ error: "JSON inválido" }, 400); }
+  const pontos = Array.isArray(payload && payload.pontos) ? payload.pontos.slice(0, 25) : [];
+  if (pontos.length < 2) return jsonResponse({ error: "São precisos pelo menos 2 pontos" }, 400);
+  const coords = [];
+  const semCoordenadas = [];
+  for (const p of pontos) {
+    const g = await geocodificar(env, p);
+    if (!g) semCoordenadas.push(p.id);
+    coords.push(g);
+  }
+  const validos = coords.map((c, i) => (c ? i : -1)).filter((i) => i >= 0);
+  const n = validos.length;
+  let distancias = null, duracoes = null, fonte = "osrm";
+  if (n >= 2) {
+    try {
+      const lista = validos.map((i) => `${coords[i].lon},${coords[i].lat}`).join(";");
+      const r = await fetch(`https://router.project-osrm.org/table/v1/driving/${lista}?annotations=duration,distance`, { headers: { "User-Agent": UA_ROTAS } });
+      const d = r.ok ? await r.json() : null;
+      if (!d || d.code !== "Ok") throw new Error("OSRM " + (d && d.code || r.status));
+      distancias = d.distances.map((l) => l.map((x) => x / 1000)); // km
+      duracoes = d.durations.map((l) => l.map((x) => x / 60)); // minutos
+    } catch {
+      fonte = "estimativa";
+      distancias = validos.map((i) => validos.map((j) => distLinhaReta(coords[i], coords[j]) * 1.35));
+      duracoes = distancias.map((l) => l.map((km) => (km / 40) * 60));
+    }
+  }
+  return jsonResponse({
+    pontos: pontos.map((p, i) => ({ id: p.id, ...(coords[i] || {}), ok: !!coords[i] })),
+    indices: validos, distancias, duracoes, fonte, semCoordenadas,
+  });
+}
+
 // ===== Despesas mensais (Cloudflare KV) =====
 // ===== Tracking próprio (visitas + leads do formulário) via KV =====
 async function handleTrack(request, env) {
@@ -887,6 +962,14 @@ export default {
           status: 502,
           headers: { "Content-Type": "application/json" },
         });
+      }
+    }
+
+    if (url.pathname === "/api/rota") {
+      try {
+        return await handleRota(request, env);
+      } catch (err) {
+        return jsonResponse({ error: err.message }, 502);
       }
     }
 
