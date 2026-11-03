@@ -1,0 +1,21 @@
+{
+  "nota": "Moradas dos locais para a rota sugerida. lat/lon ficam a null e o servidor obtém-nas pela morada (e guarda-as). Se um ponto ficar no sítio errado, preencher lat/lon à mão (botão direito no Google Maps → copiar coordenadas).",
+  "inicio": { "id": "armazem7", "nome": "Armazém principal (armazém 7)", "morada": "R. Florbela Espanca 232, 4435-305 Rio Tinto, Portugal", "lat": null, "lon": null },
+  "armazemSecundario": { "id": "armazem3", "nome": "Armazém secundário (armazém 3)", "morada": "R. 5 de Outubro 91, 4485-010 Aveleda, Portugal", "lat": null, "lon": null },
+  "locais": [
+    { "id": "crossfit-foz", "nome": "Recepção (Cross Fit Foz)", "maquinas": ["001"], "morada": "Rua de Aleixo da Mota, 4150-044 Porto, Portugal", "lat": null, "lon": null },
+    { "id": "central-park", "nome": "Central Park", "maquinas": ["002", "002-S"], "morada": "R. Conselheiro Costa Braga 39, 4450-122 Matosinhos, Portugal", "lat": null, "lon": null },
+    { "id": "gondomar-premium", "nome": "Gondomar Premium", "maquinas": ["003", "003-S"], "morada": "R. Padre António Vieira 12, 4510-492 Fânzeres, Portugal", "lat": null, "lon": null },
+    { "id": "guifoes", "nome": "Guifões - Green Park", "maquinas": ["004"], "morada": "Travessa Monte da Terra 67, Guifões, Matosinhos, Portugal", "lat": null, "lon": null },
+    { "id": "bosque", "nome": "Bosque - Adopthouse", "maquinas": ["006", "006-S"], "morada": "Travessa de Manuel José da Silva Correia 110, 4425-177 Águas Santas, Portugal", "lat": null, "lon": null },
+    { "id": "house-factory", "nome": "House Factory", "maquinas": ["007", "007-S"], "morada": "R. Coronel Almeida Valente 379, 4200-030 Porto, Portugal", "lat": null, "lon": null },
+    { "id": "oasis", "nome": "Oasis - Edinorte", "maquinas": ["008", "008-S"], "morada": "Rua Chão Verde, 4435-503 Rio Tinto, Portugal", "lat": null, "lon": null },
+    { "id": "dcasa", "nome": "D'Casa Gondomar", "maquinas": ["009", "009-S"], "morada": "Av. Dr. Mário Soares 526, 4420 Gondomar, Portugal", "lat": null, "lon": null },
+    { "id": "blue-sky", "nome": "Blue Sky Gondomar", "maquinas": ["010", "014"], "morada": "Av. Dr. Mário Soares 75, 4420 Gondomar, Portugal", "lat": null, "lon": null },
+    { "id": "jardins-oriente", "nome": "Jardins do Oriente", "maquinas": ["011", "013"], "morada": null, "lat": null, "lon": null },
+    { "id": "aguas-santas", "nome": "Águas Santas", "maquinas": ["012"], "morada": "Travessa Nossa Senhora de Fátima, 4425-057 Águas Santas, Portugal", "lat": null, "lon": null },
+    { "id": "nogueira", "nome": "Nogueira - Perafita", "maquinas": ["015", "016"], "morada": "R. Silva Aroso 630, 4455-559 Matosinhos, Portugal", "lat": null, "lon": null },
+    { "id": "divmac", "nome": "Divmac", "maquinas": ["017", "018", "019", "020"], "morada": "Rua 1º de Maio, Zona Industrial, 3700-541 Arrifana, Santa Maria da Feira, Portugal", "lat": null, "lon": null },
+    { "id": "melt", "nome": "Melt Porto", "maquinas": ["021"], "morada": "R. Conde de Avranches 413, 4200-072 Porto, Portugal", "lat": null, "lon": null }
+  ]
+}
