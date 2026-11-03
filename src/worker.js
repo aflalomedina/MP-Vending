@@ -690,31 +690,38 @@ function distLinhaReta(a, b) {
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
 }
+// Zona onde estão todos os locais (Grande Porto até Santa Maria da Feira): resultados fora desta caixa são ignorados.
+// Antes, a procura pelo código postal da Divmac devolvia um ponto a ~140 km.
+const ZONA_ROTAS = { oeste: -8.85, este: -8.30, sul: 40.80, norte: 41.40 };
+const GEO_VERSAO = 2; // localizações guardadas por versões anteriores (sem a caixa) são recalculadas
 async function geocodificar(env, p) {
   if (Number.isFinite(p.lat) && Number.isFinite(p.lon)) return { lat: p.lat, lon: p.lon, fonte: "manual" };
   if (!p.morada) return null;
   const chave = `geo:${p.id}`;
   try {
     const raw = await env.HISTORY_KV.get(chave);
-    // localização corrigida à mão no admin vale sempre; a obtida pela morada só enquanto a morada for a mesma
-    if (raw) { const g = JSON.parse(raw); if (g.fonte === "manual" || g.morada === p.morada) return g; }
+    // localização corrigida à mão no admin vale sempre; a obtida pela morada só enquanto a morada e a versão forem as mesmas
+    if (raw) { const g = JSON.parse(raw); if (g.fonte === "manual" || (g.morada === p.morada && g.v === GEO_VERSAO)) return g; }
   } catch {}
-  // tenta a morada completa e depois só código postal + localidade
-  // morada completa → rua sem número + localidade → só código postal (este último fica marcado como aproximado)
-  const tentativas = [p.morada];
+  // morada completa → rua sem número + localidade → código postal → só a localidade (os dois últimos ficam "aproximados")
   const partes = String(p.morada).split(",").map((x) => x.trim());
   const semNumero = partes[0].replace(/\s+\d+[A-Za-z]?(-\d+)?$/, "");
   const localidade = partes.slice(1).map((x) => x.replace(/\d{4}-\d{3}\s*/, "")).filter((x) => x && x !== "Portugal").join(", ");
-  if (localidade) tentativas.push(`${semNumero}, ${localidade}, Portugal`);
-  const cp = String(p.morada).match(/\d{4}-\d{3}[^,]*/);
-  if (cp) tentativas.push(cp[0] + ", Portugal");
-  for (const q of tentativas) {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=pt&q=${encodeURIComponent(q)}`;
+  const cp = (String(p.morada).match(/\d{4}-\d{3}/) || [])[0];
+  const tentativas = [{ q: p.morada }];
+  if (localidade) tentativas.push({ q: `${semNumero}, ${localidade}, Portugal` });
+  if (cp) tentativas.push({ q: cp, aproximado: true, postal: true });
+  if (localidade) tentativas.push({ q: `${localidade}, Portugal`, aproximado: true });
+  const viewbox = `${ZONA_ROTAS.oeste},${ZONA_ROTAS.norte},${ZONA_ROTAS.este},${ZONA_ROTAS.sul}`;
+  for (const t of tentativas) {
+    const base = `https://nominatim.openstreetmap.org/search?format=json&limit=3&countrycodes=pt&viewbox=${viewbox}&bounded=1`;
+    const url = t.postal ? `${base}&postalcode=${encodeURIComponent(t.q)}` : `${base}&q=${encodeURIComponent(t.q)}`;
     const r = await fetch(url, { headers: { "User-Agent": UA_ROTAS, "Accept-Language": "pt" } });
     if (r.ok) {
-      const lista = await r.json();
-      if (lista && lista[0]) {
-        const g = { lat: Number(lista[0].lat), lon: Number(lista[0].lon), morada: p.morada, encontrado: lista[0].display_name, aproximado: q === tentativas[tentativas.length - 1] && tentativas.length > 1, fonte: "osm" };
+      const lista = (await r.json()) || [];
+      const ok = lista.find((x) => { const lat = Number(x.lat), lon = Number(x.lon); return lat > ZONA_ROTAS.sul && lat < ZONA_ROTAS.norte && lon > ZONA_ROTAS.oeste && lon < ZONA_ROTAS.este; });
+      if (ok) {
+        const g = { lat: Number(ok.lat), lon: Number(ok.lon), morada: p.morada, encontrado: ok.display_name, procura: t.q, aproximado: !!t.aproximado, fonte: "osm", v: GEO_VERSAO };
         await env.HISTORY_KV.put(chave, JSON.stringify(g));
         return g;
       }
