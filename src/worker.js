@@ -696,10 +696,16 @@ async function geocodificar(env, p) {
   const chave = `geo:${p.id}`;
   try {
     const raw = await env.HISTORY_KV.get(chave);
-    if (raw) { const g = JSON.parse(raw); if (g.morada === p.morada) return g; }
+    // localização corrigida à mão no admin vale sempre; a obtida pela morada só enquanto a morada for a mesma
+    if (raw) { const g = JSON.parse(raw); if (g.fonte === "manual" || g.morada === p.morada) return g; }
   } catch {}
   // tenta a morada completa e depois só código postal + localidade
+  // morada completa → rua sem número + localidade → só código postal (este último fica marcado como aproximado)
   const tentativas = [p.morada];
+  const partes = String(p.morada).split(",").map((x) => x.trim());
+  const semNumero = partes[0].replace(/\s+\d+[A-Za-z]?(-\d+)?$/, "");
+  const localidade = partes.slice(1).map((x) => x.replace(/\d{4}-\d{3}\s*/, "")).filter((x) => x && x !== "Portugal").join(", ");
+  if (localidade) tentativas.push(`${semNumero}, ${localidade}, Portugal`);
   const cp = String(p.morada).match(/\d{4}-\d{3}[^,]*/);
   if (cp) tentativas.push(cp[0] + ", Portugal");
   for (const q of tentativas) {
@@ -708,7 +714,7 @@ async function geocodificar(env, p) {
     if (r.ok) {
       const lista = await r.json();
       if (lista && lista[0]) {
-        const g = { lat: Number(lista[0].lat), lon: Number(lista[0].lon), morada: p.morada, encontrado: lista[0].display_name, aproximado: q !== p.morada, fonte: "osm" };
+        const g = { lat: Number(lista[0].lat), lon: Number(lista[0].lon), morada: p.morada, encontrado: lista[0].display_name, aproximado: q === tentativas[tentativas.length - 1] && tentativas.length > 1, fonte: "osm" };
         await env.HISTORY_KV.put(chave, JSON.stringify(g));
         return g;
       }
@@ -717,7 +723,22 @@ async function geocodificar(env, p) {
   }
   return null;
 }
+// PUT /api/rota?local=<id> { lat, lon } → corrige a localização de um local (DELETE volta a usar a morada)
+async function handleRotaLocal(request, env) {
+  const url = new URL(request.url);
+  const id = (url.searchParams.get("local") || "").trim();
+  if (!/^[a-z0-9-]{1,40}$/.test(id)) return jsonResponse({ error: "Local inválido" }, 400);
+  if (request.method === "DELETE") { await env.HISTORY_KV.delete(`geo:${id}`); return jsonResponse({ ok: true }); }
+  let payload;
+  try { payload = await request.json(); } catch { return jsonResponse({ error: "JSON inválido" }, 400); }
+  const lat = Number(payload.lat), lon = Number(payload.lon);
+  if (!(lat > 36 && lat < 43 && lon > -10 && lon < -6)) return jsonResponse({ error: "Coordenadas fora de Portugal continental" }, 400);
+  const g = { lat, lon, fonte: "manual", em: new Date().toISOString() };
+  await env.HISTORY_KV.put(`geo:${id}`, JSON.stringify(g));
+  return jsonResponse({ ok: true, local: id, ...g });
+}
 async function handleRota(request, env) {
+  if (request.method === "PUT" || request.method === "DELETE") return handleRotaLocal(request, env);
   if (request.method !== "POST") return new Response("Método não suportado", { status: 405 });
   let payload;
   try { payload = await request.json(); } catch { return jsonResponse({ error: "JSON inválido" }, 400); }

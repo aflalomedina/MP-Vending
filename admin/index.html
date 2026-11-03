@@ -718,9 +718,11 @@
             <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;font-size:12px;">
               <label>Saída <input type="time" id="rotaSaida" value="08:30" style="border:1px solid var(--line);border-radius:4px;padding:5px;font-family:inherit;" /></label>
               <label>Min. por paragem <input type="number" id="rotaServico" value="20" min="5" max="90" step="5" style="width:60px;border:1px solid var(--line);border-radius:4px;padding:5px;font-family:inherit;" /></label>
+              <label>+ min. por máquina de café <input type="number" id="rotaServicoCafe" value="15" min="0" max="90" step="5" style="width:60px;border:1px solid var(--line);border-radius:4px;padding:5px;font-family:inherit;" /></label>
               <label style="display:flex;gap:5px;align-items:center;"><input type="checkbox" id="rotaVoltar" checked /> Voltar ao armazém</label>
             </div>
           </div>
+          <div id="rotaCafes" style="font-size:12.5px;margin:4px 0 10px;"></div>
           <div class="table-wrap cards-mobile" id="rotaWrap"><div class="state small">Marca os locais a visitar para ver a rota sugerida.</div></div>
         </div>
         <button type="button" id="gerarPdfFinalBtn" style="margin-top:12px;background:var(--ink);color:#fff;border:none;border-radius:4px;padding:10px 18px;font-size:13px;cursor:pointer;">
@@ -3038,7 +3040,8 @@
     // a rota é recalculada quando muda a seleção de locais, a grelha Smartcake ou as opções da rota
     document.getElementById('checklistLocais').addEventListener('change', agendarRota);
     document.getElementById('smartcakeGridTabela').addEventListener('input', agendarRota);
-    ['rotaSaida', 'rotaServico', 'rotaVoltar'].forEach(id => document.getElementById(id).addEventListener('change', agendarRota));
+    ['rotaSaida', 'rotaServico', 'rotaServicoCafe', 'rotaVoltar'].forEach(id => document.getElementById(id).addEventListener('change', agendarRota));
+    montarCafesRota();
   }
 
   // ===== Rota sugerida para a reposição =====
@@ -3061,13 +3064,14 @@
   // máquinas que vão ser visitadas: locais marcados + máquinas com frescos na grelha Smartcake
   function maquinasDaVisita() {
     const calc = ultimoCalculoReposicao;
-    if (!calc) return [];
-    const ms = new Set();
+    const ms = new Set(Array.from(document.querySelectorAll('.rota-cafe:checked')).map(el => el.value));
+    if (!calc) return Array.from(ms);
     const marcados = Array.from(document.querySelectorAll('.checklist-local:checked')).map(el => calc.locaisOrdenados[Number(el.value)]).filter(Boolean);
     const locaisMarcados = new Set(marcados.map(l => l.local));
     for (const l of marcados) for (const it of l.lista) ms.add(it.maquina);
     for (const t of ((calc.ajusteLayout && calc.ajusteLayout.trocas) || [])) if (locaisMarcados.has(pdvLabel(t.maquina))) ms.add(t.maquina);
     try { for (const m of lerGridSmartcake()) ms.add(m.maquina); } catch {}
+    for (const el of document.querySelectorAll('.rota-cafe:checked')) ms.add(el.value);
     return Array.from(ms);
   }
 
@@ -3144,6 +3148,10 @@
     const nM = idx.length;
     const ordemM = ordemOtima(res.duracoes, nM, voltar);
     const servico = Number(document.getElementById('rotaServico').value) || 20;
+    const servicoCafe = Number(document.getElementById('rotaServicoCafe').value) || 0;
+    const cafesSel = new Set(Array.from(document.querySelectorAll('.rota-cafe:checked')).map(el => el.value));
+    const maqsPorLocal = {};
+    for (const m of maqs) { const l = rotaPorMatricula[m]; if (l) (maqsPorLocal[l.id] = maqsPorLocal[l.id] || []).push(m); }
     const [hh, mm] = (document.getElementById('rotaSaida').value || '08:30').split(':').map(Number);
     let t = hh * 60 + mm, km = 0, conducao = 0, ant = 0;
     const fmtH = (min) => `${String(Math.floor(min / 60) % 24).padStart(2, '0')}:${String(Math.round(min % 60)).padStart(2, '0')}`;
@@ -3151,8 +3159,14 @@
       const d = res.distancias[ant][iM], du = res.duracoes[ant][iM];
       km += d; conducao += du; t += du;
       const p = todosPontos[idx[iM]];
-      const chegada = t; t += servico; ant = iM;
-      return { n: k + 1, id: p.id, nome: p.nome, morada: p.morada, lat: res.pontos[idx[iM]].lat, lon: res.pontos[idx[iM]].lon, km: d, min: du, chegada: fmtH(chegada), aproximado: !!res.pontos[idx[iM]].aproximado };
+      const ms = (maqsPorLocal[p.id] || []).sort();
+      const cafes = ms.filter(m => cafesSel.has(m)), snacks = ms.filter(m => !cafesSel.has(m));
+      const tempo = (snacks.length || !cafes.length ? servico : 0) + cafes.length * servicoCafe;
+      const chegada = t; t += tempo; ant = iM;
+      const g = res.pontos[idx[iM]];
+      return { n: k + 1, id: p.id, nome: p.nome, morada: p.morada, lat: g.lat, lon: g.lon, km: d, min: du, chegada: fmtH(chegada), tempo,
+        maquinas: [snacks.length ? 'snacks ' + snacks.join(', ') : '', cafes.length ? 'café ' + cafes.join(', ') : ''].filter(Boolean).join(' · '),
+        aproximado: !!g.aproximado, manual: g.fonte === 'manual' };
     });
     let regresso = null;
     if (voltar) { const d = res.distancias[ant][0], du = res.duracoes[ant][0]; km += d; conducao += du; t += du; regresso = { km: d, min: du, hora: fmtH(t) }; }
@@ -3163,19 +3177,58 @@
     wrap.innerHTML = `
       <table><thead><tr><th>#</th><th>Local</th><th class="num">Km</th><th class="num">Condução</th><th class="num">Chegada</th></tr></thead><tbody>
         <tr><td>—</td><td>Saída: ${escapeHtml(rotaMoradas.inicio.nome)}</td><td class="num"></td><td class="num"></td><td class="num">${ultimaRota.saida}</td></tr>
-        ${paragens.map(p => `<tr><td><b>${p.n}</b></td><td>${escapeHtml(p.nome)}<div style="font-size:11px;color:var(--muted);">${escapeHtml(p.morada || '')}${p.aproximado ? ' · localização aproximada (só pelo código postal)' : ''}</div></td><td class="num">${fmt1(p.km)}</td><td class="num">${Math.round(p.min)} min</td><td class="num">${p.chegada}</td></tr>`).join('')}
+        ${paragens.map(p => `<tr><td><b>${p.n}</b></td><td>${escapeHtml(p.nome)}<div style="font-size:11px;color:var(--muted);">${escapeHtml(p.maquinas)}${p.maquinas ? ' · ' : ''}${p.tempo} min no local</div>
+          <div style="font-size:11px;color:var(--muted);">${escapeHtml(p.morada || '')}${p.manual ? ' · localização corrigida à mão' : ''}${p.aproximado ? ' · <span style="color:var(--negative);font-weight:600;">localização aproximada (só pelo código postal): confirmar</span>' : ''}
+            · <a href="https://www.google.com/maps?q=${p.lat},${p.lon}" target="_blank" rel="noopener">ver no mapa</a> · <a href="#" class="rota-corrigir" data-id="${p.id}" data-nome="${escapeHtml(p.nome)}">corrigir</a></div></td>
+          <td class="num">${fmt1(p.km)}</td><td class="num">${Math.round(p.min)} min</td><td class="num">${p.chegada}</td></tr>`).join('')}
         ${regresso ? `<tr><td>—</td><td>Regresso ao armazém</td><td class="num">${fmt1(regresso.km)}</td><td class="num">${Math.round(regresso.min)} min</td><td class="num">${regresso.hora}</td></tr>` : ''}
         <tr style="font-weight:600;"><td></td><td>Total</td><td class="num">${fmt1(km)} km</td><td class="num">${Math.round(conducao)} min</td><td class="num">${ultimaRota.fim}</td></tr>
       </tbody></table>
       <div style="font-size:11.5px;color:var(--muted);margin-top:6px;">
-        Ordem com menos tempo de condução, por estrada, ${res.fonte === 'osrm' ? 'sem contar com trânsito' : '<b>estimada pela distância em linha reta</b> (o serviço de mapas não respondeu)'}; ${servico} min por paragem.
+        Ordem com menos tempo de condução, por estrada, ${res.fonte === 'osrm' ? 'sem contar com trânsito' : '<b>estimada pela distância em linha reta</b> (o serviço de mapas não respondeu)'}; ${servico} min por paragem${servicoCafe ? ` + ${servicoCafe} min por máquina de café` : ''}.
         Portagens não são calculadas: trajetos longos (ex.: Divmac) podem passar por autoestrada com portagem.
         ${ultimaRota.semMorada.length ? `<br><span style="color:var(--negative);">Fora da rota (sem morada ou morada não encontrada): ${escapeHtml(ultimaRota.semMorada.join(', '))}.</span>` : ''}
         <br>${ultimaRota.links.map((l, i) => `<a href="${l}" target="_blank" rel="noopener">Abrir no Google Maps${ultimaRota.links.length > 1 ? ' (parte ' + (i + 1) + ')' : ''}</a>`).join(' · ')}
       </div>`;
+    wrap.querySelectorAll('.rota-corrigir').forEach(a => a.addEventListener('click', (e) => { e.preventDefault(); corrigirLocalRota(a.dataset.id, a.dataset.nome); }));
   }
 
   function agendarRota() { clearTimeout(rotaTimer); rotaTimer = setTimeout(atualizarRota, 500); }
+
+  // máquinas de café (não entram na lista de reposição de snacks): escolhem-se aqui para a visita do dia
+  async function montarCafesRota() {
+    const wrap = document.getElementById('rotaCafes');
+    if (!wrap || wrap.dataset.pronto) return;
+    await carregarMoradasRota();
+    const cafes = Object.keys(MACHINES).filter(m => !isSnackMachine(m) && !MAQUINAS_EXCLUIDAS.has(m) && rotaPorMatricula[m]).sort();
+    let guardado = [];
+    try { guardado = JSON.parse(localStorage.getItem('rotaCafes') || '[]'); } catch {}
+    wrap.innerHTML = `<span style="color:var(--muted);margin-right:6px;">Máquinas de café a visitar:</span>` + cafes.map(m =>
+      `<label style="display:inline-flex;gap:4px;align-items:center;margin:2px 10px 2px 0;cursor:pointer;white-space:nowrap;"><input type="checkbox" class="rota-cafe" value="${m}" ${guardado.includes(m) ? 'checked' : ''}/> ${escapeHtml(machineLabel(m))}</label>`).join('');
+    wrap.addEventListener('change', () => {
+      try { localStorage.setItem('rotaCafes', JSON.stringify(Array.from(wrap.querySelectorAll('.rota-cafe:checked')).map(x => x.value))); } catch {}
+      agendarRota();
+    });
+    wrap.dataset.pronto = '1';
+  }
+
+  async function corrigirLocalRota(id, nome) {
+    const txt = prompt(`Coordenadas certas de "${nome}"\n(no Google Maps: botão direito no local → copiar as coordenadas, ex.: 40.9201, -8.4963).\nDeixa vazio para voltar a usar a morada.`, '');
+    if (txt === null) return;
+    const msg = document.getElementById('gerarPdfMsg');
+    try {
+      let r;
+      if (!txt.trim()) r = await fetch(`/api/rota?local=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      else {
+        const m = txt.match(/(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)/);
+        if (!m) throw new Error('não percebi as coordenadas');
+        r = await fetch(`/api/rota?local=${encodeURIComponent(id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lat: Number(m[1]), lon: Number(m[2]) }) });
+      }
+      const d = await r.json(); if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+      rotaCache.clear();
+      atualizarRota();
+    } catch (err) { msg.style.color = 'var(--negative)'; msg.textContent = 'Erro ao corrigir a localização: ' + err.message; }
+  }
 
   // PDF: secção "Rota sugerida" no topo
   function desenharRotaPDF(doc, y) {
@@ -3186,13 +3239,13 @@
     doc.setFont(undefined, 'normal');
     doc.autoTable({
       startY: y + 3,
-      head: [['#', 'Local', 'Morada', 'Km', 'Chegada']],
+      head: [['#', 'Local', 'Máquinas', 'Morada', 'Km', 'Chegada']],
       body: [
-        ...r.paragens.map(p => [String(p.n), p.nome, p.morada || '', fmt1(p.km), p.chegada]),
-        ...(r.regresso ? [['', 'Regresso ao armazém', '', fmt1(r.regresso.km), r.regresso.hora]] : []),
+        ...r.paragens.map(p => [String(p.n), p.nome, `${p.maquinas}${p.maquinas ? '\n' : ''}${p.tempo} min`, p.morada || '', fmt1(p.km), p.chegada]),
+        ...(r.regresso ? [['', 'Regresso ao armazém', '', '', fmt1(r.regresso.km), r.regresso.hora]] : []),
       ],
       theme: 'grid', styles: { fontSize: 8, cellPadding: 1.4 }, headStyles: { fillColor: [27, 31, 39] },
-      columnStyles: { 0: { cellWidth: 8, halign: 'center', fontStyle: 'bold' }, 3: { cellWidth: 14, halign: 'right' }, 4: { cellWidth: 18, halign: 'center' } },
+      columnStyles: { 0: { cellWidth: 8, halign: 'center', fontStyle: 'bold' }, 2: { cellWidth: 38 }, 4: { cellWidth: 14, halign: 'right' }, 5: { cellWidth: 18, halign: 'center' } },
       margin: { left: 14, right: 14 },
     });
     y = doc.lastAutoTable.finalY + 5;
@@ -3203,7 +3256,7 @@
       y += 5;
     });
     doc.setTextColor(110); doc.setFontSize(7.5);
-    doc.text(`Tempos sem trânsito e ${r.servico} min por paragem. Portagens não incluídas.${r.semMorada.length ? ' Fora da rota: ' + r.semMorada.join(', ') + '.' : ''}`, 14, y, { maxWidth: 182 });
+    doc.text(`Tempos sem trânsito. Portagens não incluídas.${r.semMorada.length ? ' Fora da rota: ' + r.semMorada.join(', ') + '.' : ''}`, 14, y, { maxWidth: 182 });
     doc.setTextColor(0);
     return y + 8;
   }
