@@ -3166,7 +3166,7 @@
       const g = res.pontos[idx[iM]];
       return { n: k + 1, id: p.id, nome: p.nome, morada: p.morada, lat: g.lat, lon: g.lon, km: d, min: du, chegada: fmtH(chegada), tempo,
         maquinas: [snacks.length ? 'snacks ' + snacks.join(', ') : '', cafes.length ? 'café ' + cafes.join(', ') : ''].filter(Boolean).join(' · '),
-        aproximado: !!g.aproximado, manual: g.fonte === 'manual' };
+        aproximado: !!g.aproximado, encontrado: g.encontrado || '', manual: g.fonte === 'manual' };
     });
     let regresso = null;
     if (voltar) { const d = res.distancias[ant][0], du = res.duracoes[ant][0]; km += d; conducao += du; t += du; regresso = { km: d, min: du, hora: fmtH(t) }; }
@@ -3178,7 +3178,7 @@
       <table><thead><tr><th>#</th><th>Local</th><th class="num">Km</th><th class="num">Condução</th><th class="num">Chegada</th></tr></thead><tbody>
         <tr><td>—</td><td>Saída: ${escapeHtml(rotaMoradas.inicio.nome)}</td><td class="num"></td><td class="num"></td><td class="num">${ultimaRota.saida}</td></tr>
         ${paragens.map(p => `<tr><td><b>${p.n}</b></td><td>${escapeHtml(p.nome)}<div style="font-size:11px;color:var(--muted);">${escapeHtml(p.maquinas)}${p.maquinas ? ' · ' : ''}${p.tempo} min no local</div>
-          <div style="font-size:11px;color:var(--muted);">${escapeHtml(p.morada || '')}${p.manual ? ' · localização corrigida à mão' : ''}${p.aproximado ? ' · <span style="color:var(--negative);font-weight:600;">localização aproximada (só pelo código postal): confirmar</span>' : ''}
+          <div style="font-size:11px;color:var(--muted);">${escapeHtml(p.morada || '')}${p.manual ? ' · localização corrigida à mão' : ''}${p.aproximado ? ` · <span style="color:var(--negative);font-weight:600;" title="${escapeHtml(p.encontrado || '')}">localização aproximada (morada exata não encontrada): confirmar ou corrigir</span>` : ''}
             · <a href="https://www.google.com/maps?q=${p.lat},${p.lon}" target="_blank" rel="noopener">ver no mapa</a> · <a href="#" class="rota-corrigir" data-id="${p.id}" data-nome="${escapeHtml(p.nome)}">corrigir</a></div></td>
           <td class="num">${fmt1(p.km)}</td><td class="num">${Math.round(p.min)} min</td><td class="num">${p.chegada}</td></tr>`).join('')}
         ${regresso ? `<tr><td>—</td><td>Regresso ao armazém</td><td class="num">${fmt1(regresso.km)}</td><td class="num">${Math.round(regresso.min)} min</td><td class="num">${regresso.hora}</td></tr>` : ''}
