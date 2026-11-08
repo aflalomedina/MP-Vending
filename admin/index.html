@@ -625,6 +625,22 @@
       <div class="table-wrap" id="snackStockWrap"><div class="state small">a carregar…</div></div>
     </div>
 
+    <div class="panel full" id="comparaStockPanel">
+      <h2>Comparar máquinas de snacks lado a lado — stock</h2>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">
+        Stock atual e capacidade por produto em duas máquinas (por defeito as duas Divmac, 017 e 018), para ver o que é complementar.
+      </div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:end;margin-bottom:10px;">
+        <div><label for="comparaStockA" style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Máquina A</label>
+          <select id="comparaStockA" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:14px;"></select></div>
+        <div><label for="comparaStockB" style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Máquina B</label>
+          <select id="comparaStockB" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:14px;"></select></div>
+        <label style="font-size:13px;display:flex;gap:6px;align-items:center;min-height:36px;"><input type="checkbox" id="comparaStockDif" /> Só diferenças</label>
+      </div>
+      <div id="comparaStockResumo" style="font-size:12.5px;margin-bottom:8px;"></div>
+      <div class="table-wrap cards-mobile" id="comparaStockWrap"><div class="state small">a carregar…</div></div>
+    </div>
+
     <div class="panel full">
       <h2>Stock por armazém</h2>
       <div style="margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap;">
@@ -759,6 +775,22 @@
       <div class="table-wrap cards-mobile" id="layoutTabelaWrap" style="max-height:620px;overflow-y:auto;"></div>
       <h3 style="font-size:13.5px;margin:16px 0 6px;">Cobertura por produto</h3>
       <div class="table-wrap cards-mobile" id="layoutCoberturaWrap"></div>
+    </div>
+
+    <div class="panel full" id="comparaLayoutPanel">
+      <h2>Comparar layouts lado a lado</h2>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">
+        Produtos e canais de duas máquinas (por defeito 017 e 018). Usa o layout que estás a editar, o plano guardado ou, se não houver, o layout atual.
+      </div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:end;margin-bottom:10px;">
+        <div><label for="comparaLayoutA" style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Máquina A</label>
+          <select id="comparaLayoutA" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:14px;"></select></div>
+        <div><label for="comparaLayoutB" style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Máquina B</label>
+          <select id="comparaLayoutB" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:14px;"></select></div>
+        <label style="font-size:13px;display:flex;gap:6px;align-items:center;min-height:36px;"><input type="checkbox" id="comparaLayoutDif" /> Só diferenças</label>
+      </div>
+      <div id="comparaLayoutResumo" style="font-size:12.5px;margin-bottom:8px;"></div>
+      <div class="table-wrap cards-mobile" id="comparaLayoutWrap"><div class="state small">a carregar…</div></div>
     </div>
 
   </div>
@@ -3003,6 +3035,7 @@
       };
 
       paintSnackStockTable(snackStockRows);
+      atualizarComparaStock();
     } catch (err) {
       alertsWrap.innerHTML = `<div class="state small error">Erro: ${err.message}</div>`;
       snackWrap.innerHTML = `<div class="state small error">Erro: ${err.message}</div>`;
@@ -6200,6 +6233,7 @@
   }
 
   function renderLayoutEditor() {
+    atualizarComparaLayout();
     const wrap = document.getElementById('layoutTabelaWrap');
     const estadoEl = document.getElementById('layoutEstado');
     const cobWrap = document.getElementById('layoutCoberturaWrap');
@@ -6277,6 +6311,85 @@
         <td class="num">${l.dias == null ? '—' : fmt1(l.dias)}</td><td class="num">${fmtInt(layoutStockArm7[l.p] || 0)}</td><td style="color:${l.cor};font-weight:600;">${l.aval}</td></tr>`).join('')}
       </tbody></table>
       <div style="font-size:11.5px;color:var(--muted);margin-top:4px;">Vendas: média dos últimos 20 dias úteis com dados. Visita a cada ${fmt1(diasCobrir)} dias úteis (${fmt1(visitas)} por semana).</div>`;
+  }
+
+  // ===== Comparação lado a lado de duas máquinas (stock e layout) =====
+  // itens: [{ produto, canal, stock (ou null), cap }]  ->  agrega por produto
+  function agregarItensComparacao(itens) {
+    const m = new Map();
+    for (const it of itens) {
+      if (!it.produto) continue;
+      const x = m.get(it.produto) || { canais: [], stock: 0, cap: 0, temStock: false };
+      x.canais.push(it.canal);
+      x.cap += Number(it.cap) || 0;
+      if (it.stock != null) { x.stock += Number(it.stock) || 0; x.temStock = true; }
+      m.set(it.produto, x);
+    }
+    return m;
+  }
+
+  function montarComparacao(prefixo, maquinas, getItens) {
+    const selA = document.getElementById(prefixo + 'A');
+    const selB = document.getElementById(prefixo + 'B');
+    const dif = document.getElementById(prefixo + 'Dif');
+    const resumo = document.getElementById(prefixo + 'Resumo');
+    const wrap = document.getElementById(prefixo + 'Wrap');
+    if (!selA || !selB || !wrap) return;
+    if (!maquinas.length) { wrap.innerHTML = '<div class="state small">Sem máquinas de snacks.</div>'; return; }
+    if (!selA.options.length) {
+      const opts = maquinas.map(m => `<option value="${m}">${escapeHtml(machineLabel(m))}</option>`).join('');
+      selA.innerHTML = opts; selB.innerHTML = opts;
+      selA.value = maquinas.includes('017') ? '017' : maquinas[0];
+      selB.value = maquinas.includes('018') ? '018' : (maquinas[1] || maquinas[0]);
+      selA.onchange = selB.onchange = dif.onchange = () => montarComparacao(prefixo, maquinas, getItens);
+    }
+    const A = getItens(selA.value), B = getItens(selB.value);
+    const ma = agregarItensComparacao(A.itens), mb = agregarItensComparacao(B.itens);
+    const produtos = Array.from(new Set([...ma.keys(), ...mb.keys()]));
+    const nomeA = machineLabel(selA.value), nomeB = machineLabel(selB.value);
+    const soA = produtos.filter(p => ma.has(p) && !mb.has(p)).length;
+    const soB = produtos.filter(p => mb.has(p) && !ma.has(p)).length;
+    const comuns = produtos.length - soA - soB;
+    resumo.innerHTML = `<b>${comuns}</b> produtos em comum · <b>${soA}</b> só na ${escapeHtml(nomeA)} · <b>${soB}</b> só na ${escapeHtml(nomeB)}`
+      + (A.desc || B.desc ? `<div style="font-size:11.5px;color:var(--muted);">${escapeHtml(nomeA)}: ${escapeHtml(A.desc || '')} · ${escapeHtml(nomeB)}: ${escapeHtml(B.desc || '')}</div>` : '');
+    const cel = (x) => {
+      if (!x) return '<span style="color:var(--muted);">—</span>';
+      const canais = `${x.canais.length} ${x.canais.length === 1 ? 'canal' : 'canais'}`;
+      return `<span>${x.temStock ? `${canais} · stock <b>${fmtInt(x.stock)}</b>/${fmtInt(x.cap)}` : `${canais} (${x.canais.join(', ')}) · cap. ${fmtInt(x.cap)}`}</span>`;
+    };
+    let lista = produtos.sort((p, q) =>
+      LAYOUT_ORDEM_FAMILIAS.indexOf(familiaLayout(p)) - LAYOUT_ORDEM_FAMILIAS.indexOf(familiaLayout(q)) || String(p).localeCompare(String(q), 'pt'));
+    if (dif.checked) lista = lista.filter(p => !(ma.has(p) && mb.has(p)));
+    if (!lista.length) { wrap.innerHTML = '<div class="state small">Sem produtos para mostrar.</div>'; return; }
+    wrap.innerHTML = `<table><thead><tr><th>Produto</th><th>${escapeHtml(nomeA)}</th><th>${escapeHtml(nomeB)}</th><th>Nota</th></tr></thead><tbody>
+      ${lista.map(p => {
+        const a = ma.get(p), b = mb.get(p);
+        const nota = a && b ? 'Em ambas' : a ? `Só na ${nomeA}` : `Só na ${nomeB}`;
+        return `<tr style="background:${LAYOUT_COR_FAMILIA[familiaLayout(p)]};">
+          <td style="font-weight:${a && b ? 400 : 600};">${escapeHtml(p)}</td><td>${cel(a)}</td><td>${cel(b)}</td>
+          <td style="font-weight:${a && b ? 400 : 600};color:${a && b ? 'var(--muted)' : 'var(--accent-deep)'};">${escapeHtml(nota)}</td></tr>`;
+      }).join('')}</tbody></table>`;
+  }
+
+  function atualizarComparaStock() {
+    const matriculas = Array.from(new Set(snackStockRows.map(r => r.MATRICULA_MAQUINA))).sort();
+    montarComparacao('comparaStock', matriculas, (m) => ({
+      desc: 'stock ao vivo',
+      itens: snackStockRows.filter(r => r.MATRICULA_MAQUINA === m).map(r => ({
+        produto: canonicalProduto(r.NOME_PRODUTO || ''), canal: r.CODIGO_SELETOR, stock: Math.max(0, Number(r.sum) || 0), cap: r.CAPACIDADE_SELETOR,
+      })),
+    }));
+  }
+
+  function atualizarComparaLayout() {
+    if (!layoutExportRows.length) return;
+    montarComparacao('comparaLayout', maquinasSnackLayout(), (m) => {
+      let canais, desc;
+      if (layoutEditor && layoutEditor.maquina === m) { canais = layoutEditor.canais; desc = layoutEditor.alterado ? 'em edição (não guardado)' : (layoutEditor.desc || 'em edição'); }
+      else if (layoutsPlaneados[m] && layoutsPlaneados[m].canais) { canais = layoutsPlaneados[m].canais; desc = 'plano guardado'; }
+      else { canais = canaisAtuais(m); desc = 'layout atual'; }
+      return { desc, itens: canais.map(c => ({ produto: c.produto, canal: c.canal, stock: null, cap: c.capacidade })) };
+    });
   }
 
   async function guardarLayout(extra) {
