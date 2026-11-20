@@ -471,6 +471,32 @@
     .tarefas-mobile td:nth-child(6)::before { content: attr(data-label) ": "; color: var(--muted); font-weight: 400; }
     .tarefas-mobile td:nth-child(7) { margin-left: auto; }
   }
+  /* ===== Separador Máquinas (cartões ao vivo) ===== */
+  .maq-resumo { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; font-size: 13px; }
+  .maq-resumo span { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 5px 12px; }
+  .maq-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  .maq-card { background: var(--panel); border: 1px solid var(--line); border-top: 4px solid var(--c); border-radius: 8px; padding: 14px 16px; min-width: 0; }
+  .maq-card.offline { background: #FFF7F7; border-color: #F3C4C4; border-top-color: var(--negative); }
+  .maq-card .topo { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .maq-card h3 { margin: 0; font-size: 14.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .maq-card .sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .maq-estado { font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+  .maq-estado.on { color: #1E6B30; } .maq-estado.off { color: var(--negative); } .maq-estado.na { color: var(--muted); }
+  .maq-card dl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin: 12px 0 0; }
+  .maq-card dt { font-size: 11px; color: var(--muted); }
+  .maq-card dd { margin: 2px 0 0; font-size: 15px; font-weight: 600; font-family: 'IBM Plex Mono', monospace; }
+  .maq-card .barra { height: 7px; background: #EEEBE4; border-radius: 4px; overflow: hidden; margin-top: 5px; }
+  .maq-card .barra > span { display: block; height: 100%; border-radius: 4px; }
+  .maq-aviso { margin-top: 10px; font-size: 12px; font-weight: 600; color: #8A5A00; background: #FFF3CD; border-radius: 4px; padding: 4px 8px; }
+  .maq-card.offline .maq-aviso { color: #B42318; background: #FCE0E0; }
+  @media (max-width: 640px) {
+    .maq-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .maq-card { padding: 10px 10px 12px; }
+    .maq-card h3 { font-size: 13px; white-space: normal; }
+    .maq-card dl { grid-template-columns: 1fr; gap: 6px; margin-top: 8px; }
+    .maq-card dd { font-size: 13.5px; }
+    .maq-card .esconder-mob { display: none; }
+  }
 </style>
 </head>
 <body data-view="diarias">
@@ -492,6 +518,7 @@
 
 <div class="tabs">
   <button class="tab-btn active" data-view="diarias">Vendas Diárias</button>
+  <button class="tab-btn" data-view="maquinas">Máquinas</button>
   <button class="tab-btn" data-view="stocks">Stocks</button>
   <button class="tab-btn" data-view="reposicao">Reposição e Layouts</button>
   <button class="tab-btn" data-view="produtos">Produtos</button>
@@ -556,6 +583,20 @@
       <canvas id="chartPagamentosDiarias" height="140"></canvas>
       <div class="table-wrap" id="pagamentosTableWrapDiarias" style="margin-top:12px;"></div>
     </div>
+  </div>
+
+  <div id="view-maquinas" class="view">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+      <div class="maq-resumo" id="maqResumo"></div>
+      <div style="display:flex;gap:10px;align-items:center;font-size:12.5px;color:var(--muted);">
+        <span id="maqAtualizado"></span>
+        <select id="maqFiltro" style="border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-family:inherit;font-size:13px;">
+          <option value="">Todas</option><option value="atencao">Precisam de atenção</option><option value="cafe">Bebidas quentes</option><option value="snacks">Snacks</option>
+        </select>
+      </div>
+    </div>
+    <div class="maq-grid" id="maqGrid"><div class="state small">a carregar…</div></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:12px;line-height:1.5;">Online/offline vem da Spotside (card 68). Stock: snacks pelo stock dos canais, bebidas quentes pelos copos. Atualiza sozinho a cada 2 minutos enquanto este separador está aberto.</div>
   </div>
 
   <div id="view-stocks" class="view">
@@ -6744,6 +6785,156 @@
     });
   }
 
+
+  // ===== Separador Máquinas: um cartão por máquina com dados reais =====
+  const COR_TIPO_MAQ = { cafe: '#2F6FDE', snacks: '#8B5CD6' };
+  let maqDados = null, maqTimer = null, maqEventosLigados = false;
+
+  // tenta reconhecer a matrícula seja qual for o formato (ex: "017", "MPV-017", "017-S")
+  function maqMatricula(valor) {
+    const v = String(valor == null ? '' : valor).trim();
+    if (MACHINES[v]) return v;
+    const m = v.match(/(\d{3})(-?S)?\s*$/i);
+    if (m) { const k = m[1] + (m[2] ? '-S' : ''); if (MACHINES[k]) return k; }
+    return v;
+  }
+  const maqBool = v => {
+    if (typeof v === 'boolean') return v;
+    const t = String(v == null ? '' : v).trim().toLowerCase();
+    if (['true', '1', 'online', 'sim', 'yes', 't'].includes(t)) return true;
+    if (['false', '0', 'offline', 'não', 'nao', 'no', 'f'].includes(t)) return false;
+    return null;
+  };
+  // card 68: descobre sozinho as colunas da matrícula, do estado (true/false) e da data, se houver
+  function lerEstadoOnline(raw) {
+    const rows = toObjects(raw);
+    if (!rows.length) return {};
+    const cols = Object.keys(rows[0]);
+    const colMaq = cols.find(c => /matric/i.test(c)) || cols.find(c => /maquina|machine/i.test(c)) || cols[0];
+    const colEstado = cols.find(c => c !== colMaq && /online|estado|status|ligad|connect/i.test(c) && rows.some(r => maqBool(r[c]) !== null))
+      || cols.find(c => c !== colMaq && rows.every(r => r[c] == null || maqBool(r[c]) !== null));
+    const colData = cols.find(c => c !== colMaq && c !== colEstado && /data|date|ultim|last|_at$|hora|time/i.test(c));
+    const mapa = {};
+    rows.forEach(r => {
+      const mat = maqMatricula(r[colMaq]);
+      if (!mat || !colEstado) return;
+      mapa[mat] = { online: maqBool(r[colEstado]), desde: colData ? r[colData] : null };
+    });
+    return mapa;
+  }
+
+  async function carregarMaquinas() {
+    const hoje = todayStr();
+    const [vendasRaw, layoutRaw, coposRaw, onlineRaw] = await Promise.all([
+      fetchJSON('/api/vendas-diarias'),
+      fetchJSON('/api/layout-maquinas').catch(() => null),
+      fetchJSON('/api/copos-maquinas').catch(() => null),
+      fetchJSON('/api/maquinas-online').catch(err => { console.error(err); return null; }),
+    ]);
+    const vendas = {};
+    toObjects(vendasRaw).forEach(r => {
+      const mat = r.MATRICULA_MAQUINA; if (!mat) return;
+      const d = saleAtPT(r.sale_at);
+      if (isNaN(d) || formatarData(d) !== hoje) return;
+      const v = vendas[mat] || (vendas[mat] = { receita: 0, qtd: 0, ultima: null });
+      v.receita += Number(r.value) || 0; v.qtd += Number(r.count) || 1;
+      if (!v.ultima || d > v.ultima) v.ultima = d;
+    });
+    const stock = {};
+    if (layoutRaw) toObjects(layoutRaw).forEach(r => {
+      if (!r.MATRICULA_MAQUINA || subfamiliaLabel(r.NOME_PRODUTO) === 'Compostos') return;
+      const cap = Number(r.CAPACIDADE_SELETOR) || 0; if (!cap) return;
+      const s = stock[r.MATRICULA_MAQUINA] || (stock[r.MATRICULA_MAQUINA] = { atual: 0, cap: 0, vazios: 0 });
+      s.atual += Math.max(0, Number(r.sum) || 0); s.cap += cap; if ((Number(r.sum) || 0) <= 0) s.vazios++;
+    });
+    const copos = {};
+    if (coposRaw) toObjects(coposRaw).forEach(r => {
+      const cap = Number(r.CAPACIDADE_DR) || 0;
+      if (r.MATRICULA_MAQUINA && cap) copos[r.MATRICULA_MAQUINA] = { atual: Number(r.SALDO_ATUAL) || 0, cap };
+    });
+    maqDados = { vendas, stock, copos, online: onlineRaw ? lerEstadoOnline(onlineRaw) : null, em: agoraPT() };
+  }
+
+  function maqHaQuanto(d) {
+    const min = Math.max(0, Math.round((agoraPT() - d) / 60000));
+    if (min < 1) return 'agora';
+    if (min < 60) return `há ${min} min`;
+    const h = Math.floor(min / 60);
+    return `há ${h} h${min % 60 ? ' ' + String(min % 60).padStart(2, '0') : ''}`;
+  }
+
+  function renderMaquinas() {
+    if (!maqDados) return;
+    const { vendas, stock, copos, online, em } = maqDados;
+    const hora = em.getHours();
+    const mats = Array.from(new Set([...Object.keys(MACHINES), ...Object.keys(vendas)]))
+      .filter(m => !MAQUINAS_EXCLUIDAS.has(m)).sort();
+    const cartoes = mats.map(mat => {
+      const tipo = isSnackMachine(mat) ? 'snacks' : 'cafe';
+      const v = vendas[mat] || { receita: 0, qtd: 0, ultima: null };
+      const est = online ? online[mat] : undefined;
+      const on = est ? est.online : null;
+      let nivel = null, nivelTxt = '';
+      if (tipo === 'snacks' && stock[mat]) { nivel = stock[mat].atual / stock[mat].cap; nivelTxt = stock[mat].vazios === 1 ? '1 canal vazio' : stock[mat].vazios ? `${stock[mat].vazios} canais vazios` : 'sem vazios'; }
+      if (tipo === 'cafe' && copos[mat]) { nivel = copos[mat].atual / copos[mat].cap; nivelTxt = `${fmtInt(copos[mat].atual)} copos`; }
+      const avisos = [];
+      if (on === false) { const d = est.desde ? saleAtPT(est.desde) : null;
+        avisos.push('Offline' + (d && !isNaN(d) ? (formatarData(d) === formatarData(em) ? ` desde as ${d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}` : ` desde ${d.toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`) : '')); }
+      if (nivel !== null && nivel < 0.25) avisos.push(tipo === 'snacks' ? 'Stock baixo' : 'Poucos copos');
+      const semVendasH = v.ultima ? (em - v.ultima) / 3600000 : null;
+      if (on !== false && hora >= 10 && hora < 21 && (semVendasH === null || semVendasH >= 3)) avisos.push(v.ultima ? `Sem vendas há ${Math.floor(semVendasH)} h` : 'Sem vendas hoje');
+      const prioridade = on === false ? 0 : avisos.length ? 1 : 2;
+      return { mat, tipo, v, on, nivel, nivelTxt, avisos, prioridade };
+    }).sort((a, b) => a.prioridade - b.prioridade || b.v.receita - a.v.receita);
+
+    const nOn = cartoes.filter(c => c.on === true).length, nOff = cartoes.filter(c => c.on === false).length;
+    const nAtencao = cartoes.filter(c => c.avisos.length).length;
+    const total = cartoes.reduce((a, c) => a + c.v.receita, 0), qtd = cartoes.reduce((a, c) => a + c.v.qtd, 0);
+    document.getElementById('maqResumo').innerHTML = `
+      ${online ? `<span><b style="color:#1E6B30;">● ${nOn}</b> online</span><span><b style="color:var(--negative);">● ${nOff}</b> offline</span>` : '<span style="color:var(--muted);">estado online indisponível</span>'}
+      <span><b>${nAtencao}</b> precisam de atenção</span>
+      <span>Hoje: <b>${fmtEUR(total)}</b> · ${fmtInt(qtd)} vendas</span>`;
+    document.getElementById('maqAtualizado').textContent = 'atualizado às ' + em.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+
+    const filtro = document.getElementById('maqFiltro').value;
+    const visiveis = cartoes.filter(c => !filtro || (filtro === 'atencao' ? c.avisos.length : c.tipo === filtro));
+    document.getElementById('maqGrid').innerHTML = visiveis.length ? visiveis.map(c => {
+      const corNivel = c.nivel === null ? 'var(--line)' : c.nivel < 0.25 ? 'var(--negative)' : c.nivel < 0.45 ? '#C7710A' : 'var(--ink)';
+      const estado = c.on === true ? '<span class="maq-estado on">● Online</span>' : c.on === false ? '<span class="maq-estado off">● Offline</span>' : '<span class="maq-estado na">● —</span>';
+      return `<div class="maq-card${c.on === false ? ' offline' : ''}" style="--c:${COR_TIPO_MAQ[c.tipo]}">
+        <div class="topo"><h3 title="${escapeHtml(pdvLabel(c.mat))}">${escapeHtml(pdvLabel(c.mat))}</h3>${estado}</div>
+        <div class="sub">${escapeHtml(c.mat)} · ${c.tipo === 'snacks' ? 'Snacks' : 'Bebidas quentes'}</div>
+        <dl>
+          <div><dt>Receita hoje</dt><dd>${fmtEUR(c.v.receita)}</dd></div>
+          <div class="esconder-mob"><dt>Vendas hoje</dt><dd>${fmtInt(c.v.qtd)}</dd></div>
+          <div><dt>Última venda</dt><dd style="font-size:13px;">${c.v.ultima ? maqHaQuanto(c.v.ultima) : '—'}</dd></div>
+          <div class="esconder-mob"><dt>${c.tipo === 'snacks' ? 'Stock' : 'Copos'}</dt><dd style="font-size:13px;">${c.nivelTxt || '—'}</dd></div>
+        </dl>
+        <div style="margin-top:10px;font-size:11px;color:var(--muted);display:flex;justify-content:space-between;"><span>${c.tipo === 'snacks' ? 'Stock geral' : 'Nível de copos'}</span><span>${c.nivel === null ? 'sem dados' : Math.round(c.nivel * 100) + '%'}</span></div>
+        <div class="barra"><span style="width:${c.nivel === null ? 0 : Math.min(100, c.nivel * 100)}%;background:${corNivel}"></span></div>
+        ${c.avisos.length ? `<div class="maq-aviso">⚠ ${c.avisos.map(escapeHtml).join(' · ')}</div>` : ''}
+      </div>`;
+    }).join('') : '<div class="state small">Nenhuma máquina neste filtro.</div>';
+  }
+
+  async function loadMaquinasView() {
+    if (!maqEventosLigados) {
+      maqEventosLigados = true;
+      document.getElementById('maqFiltro').addEventListener('change', renderMaquinas);
+    }
+    try {
+      await carregarMaquinas();
+      renderMaquinas();
+    } catch (err) {
+      document.getElementById('maqGrid').innerHTML = `<div class="state small error">Erro: ${escapeHtml(err.message)}</div>`;
+    }
+    clearInterval(maqTimer);
+    maqTimer = setInterval(() => {
+      if (document.body.dataset.view !== 'maquinas' || document.hidden) return;
+      carregarMaquinas().then(renderMaquinas).catch(err => console.error(err));
+    }, 120000);
+  }
+
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.body.dataset.view = btn.dataset.view;
@@ -6752,6 +6943,7 @@
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('view-' + btn.dataset.view).classList.add('active');
+      if (btn.dataset.view === 'maquinas') loadMaquinasView();
       if (btn.dataset.view === 'stocks') loadStocksView();
       if (btn.dataset.view === 'reposicao') loadReposicaoView();
       if (btn.dataset.view === 'produtos') loadProdutosView();
