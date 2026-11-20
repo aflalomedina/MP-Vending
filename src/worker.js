@@ -145,6 +145,7 @@ const CARDS = {
   "valor-cofre": 60,
   "copos-maquinas": 64,
   "produtos-total": 65,
+  "maquinas-online": 68,
 };
 
 // ===== Histórico diário (Cloudflare KV) =====
