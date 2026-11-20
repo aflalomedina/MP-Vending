@@ -1,3 +1,5 @@
+import { handleDemo, handleDemoAcessos } from "./demo.js";
+
 // ===== Autenticação simples (HTTP Basic) para /admin e /api =====
 function checkAuth(request, env) {
   const authHeader = request.headers.get("Authorization");
@@ -939,6 +941,10 @@ export default {
       }
     }
 
+    // /demo tem o seu próprio login (acessos temporários criados no admin) — ver src/demo.js
+    const demo = await handleDemo(request, env);
+    if (demo) return demo;
+
     // Protege /admin e /api — ninguém vê dados sem password
     if (url.pathname.startsWith("/admin") || url.pathname.startsWith("/api/")) {
       if (!checkAuth(request, env)) {
@@ -1050,6 +1056,14 @@ export default {
           status: 500,
           headers: { "Content-Type": "application/json" },
         });
+      }
+    }
+
+    if (url.pathname === "/api/demo-acessos") {
+      try {
+        return await handleDemoAcessos(request, env);
+      } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
       }
     }
 
