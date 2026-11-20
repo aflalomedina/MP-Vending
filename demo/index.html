@@ -135,7 +135,8 @@
 <div class="tabs">
   <button class="tab-btn active" data-view="vivo">Ao vivo</button>
   <button class="tab-btn" data-view="vendas">Vendas</button>
-  <button class="tab-btn" data-view="stock">Stock e alertas</button>
+  <button class="tab-btn" data-view="stock">Stock e reposições</button>
+  <button class="tab-btn" data-view="assistencia">Assistência</button>
   <button class="tab-btn" data-view="produtos">Produtos</button>
 </div>
 
@@ -201,18 +202,57 @@
 
   <!-- ===== STOCK ===== -->
   <div id="view-stock" class="view">
-    <div class="grid-2 igual">
+    <div class="kpis">
+      <div class="kpi"><div class="value" id="sDisp">—</div><div class="label">Produtos disponíveis agora</div></div>
+      <div class="kpi"><div class="value" id="sRep30">—</div><div class="label">Reposições nos últimos 30 dias</div></div>
+      <div class="kpi"><div class="value" id="sUnid30">—</div><div class="label">Unidades de snacks repostas (30 dias)</div></div>
+      <div class="kpi"><div class="value" id="sProx">—</div><div class="label">Próxima reposição</div></div>
+    </div>
+    <div class="grid-2">
       <div class="panel">
-        <h2>Alertas</h2>
-        <ul class="alertas" id="alertas"></ul>
+        <h2>Histórico de reposições</h2>
+        <div class="sub">Cada visita da equipa MP Vending fica registada com data, hora e o que foi reposto.</div>
+        <div class="table-wrap" id="histReposicoes"></div>
       </div>
       <div class="panel">
-        <h2>Próxima reposição sugerida</h2>
-        <div class="sub">Ordem de visita calculada a partir do stock atual e do ritmo de vendas.</div>
-        <div class="table-wrap" id="ordemVisita"></div>
+        <h2>Próximas reposições agendadas</h2>
+        <div class="sub">Rota fixa. A equipa passa mais cedo se uma máquina precisar.</div>
+        <ul class="alertas" id="proxReposicoes"></ul>
       </div>
     </div>
     <div id="stockMaquinas"></div>
+  </div>
+
+  <!-- ===== ASSISTÊNCIA ===== -->
+  <div id="view-assistencia" class="view">
+    <div class="kpis">
+      <div class="kpi"><div class="value" id="aDisp">—</div><div class="label">Disponibilidade das máquinas (30 dias)</div></div>
+      <div class="kpi"><div class="value" id="aInter">—</div><div class="label">Intervenções (30 dias)</div></div>
+      <div class="kpi"><div class="value" id="aResp">—</div><div class="label">Tempo médio de resposta</div></div>
+      <div class="kpi"><div class="value" id="aProx">—</div><div class="label">Próxima manutenção preventiva</div></div>
+    </div>
+    <div class="panel full">
+      <div class="cab">
+        <h2>Pedir assistência</h2>
+      </div>
+      <div class="sub" style="margin-top:-4px;">Algum problema numa máquina? O pedido chega diretamente à equipa técnica e pode acompanhar aqui o estado.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
+        <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Máquina</label>
+          <select id="pedMaq" style="border:1px solid var(--line);border-radius:6px;padding:8px;font-family:inherit;font-size:13px;"></select></div>
+        <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Problema</label>
+          <select id="pedTipo" style="border:1px solid var(--line);border-radius:6px;padding:8px;font-family:inherit;font-size:13px;">
+            <option>Não aceita moedas / não dá troco</option><option>Pagamento com cartão não funciona</option><option>Produto ficou preso</option>
+            <option>Bebida sai mal / máquina sem água</option><option>Pedido de produto novo</option><option>Outro</option></select></div>
+        <div style="flex:1 1 220px;"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Detalhes (opcional)</label>
+          <input id="pedTexto" maxlength="200" placeholder="ex: o canal 23 não roda" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:8px;font-family:inherit;font-size:13px;" /></div>
+        <button type="button" id="pedBtn" style="background:var(--ink);color:#fff;border:0;border-radius:6px;padding:9px 16px;font-family:inherit;font-size:13px;cursor:pointer;">Enviar pedido</button>
+      </div>
+      <div id="pedMsg" style="font-size:13px;margin-top:10px;"></div>
+    </div>
+    <div class="panel full">
+      <h2>Histórico de assistências técnicas</h2>
+      <div class="table-wrap" id="histAssist"></div>
+    </div>
   </div>
 
   <!-- ===== PRODUTOS ===== -->
@@ -297,6 +337,7 @@ MAQUINAS.forEach(m => {
   m.somaPag = m.pagamentos.reduce((a, p) => a + p[1], 0);
 });
 const PAGAMENTOS = ['Moedas', 'Contactless', 'MB WAY', 'App'];
+const TECNICOS = ['João S.', 'Rui M.'];
 
 // hash determinístico → número entre 0 e 1
 function rnd(a, b, c) {
@@ -316,6 +357,7 @@ const estado = {
   pendentes: [],   // vendas já geradas para o minuto atual mas com segundos ainda no futuro
   stock: [],       // por máquina: array (snacks) ou objeto de ingredientes (café)
   ultimaReposicao: [],
+  reposicoes: [],  // { t, m, unidades (snacks) | copos+cafe (café), duracaoMin, tecnico }
   minutoSimulado: 0,
 };
 
@@ -344,6 +386,11 @@ function simularMinuto(minAbs) {
   MAQUINAS.forEach((m, i) => {
     // reposição programada
     if (m.repoe.dias.includes(dow) && hora === m.repoe.hora && d.getMinutes() === m.repoe.min) {
+      const antes = estado.stock[i];
+      const reg = { t: t0 + Math.floor(rnd(i + 60, minAbs, 1) * 25) * 60000, m: i, duracaoMin: 12 + Math.floor(rnd(i + 61, minAbs, 1) * 20), tecnico: TECNICOS[Math.floor(rnd(i + 62, minAbs, 1) * TECNICOS.length)] };
+      if (m.tipo === 'snacks') reg.unidades = m.produtos.reduce((a, p, j) => a + p.cap - antes[j], 0);
+      else { reg.copos = m.cap.copos - antes.copos; reg.cafe = (m.cap.cafe - antes.cafe) / 1000; reg.limpeza = true; }
+      estado.reposicoes.push(reg);
       encherMaquina(i); estado.ultimaReposicao[i] = t0;
     }
     const fds = (dow === 0 || dow === 6) ? m.fimDeSemana : 1;
@@ -496,18 +543,7 @@ function renderVivo(novas) {
   });
 }
 
-// ===== STOCK =====
-function consumoDiario(i, dias = 7) {
-  // média diária vendida (por canal nos snacks, por ingrediente no café)
-  const de = Date.now() - dias * 86400000;
-  const m = MAQUINAS[i];
-  const vs = estado.vendas.filter(v => v.m === i && v.t >= de);
-  if (m.tipo === 'snacks') { const a = m.produtos.map(() => 0); vs.forEach(v => a[v.p]++); return a.map(x => x / dias); }
-  const c = {}; Object.keys(m.cap).forEach(k => c[k] = 0);
-  vs.forEach(v => { const g = m.produtos[v.p].gasta; for (const k in g) c[k] += g[k]; });
-  for (const k in c) c[k] /= dias;
-  return c;
-}
+// ===== STOCK E REPOSIÇÕES =====
 function nivelGeral(i) {
   const m = MAQUINAS[i], s = estado.stock[i];
   if (m.tipo === 'snacks') return s.reduce((a, x) => a + x, 0) / m.produtos.reduce((a, p) => a + p.cap, 0);
@@ -515,55 +551,141 @@ function nivelGeral(i) {
 }
 function tagNivel(f, vazio) {
   if (vazio) return '<span class="tag critico">✕ Esgotado</span>';
-  if (f < 0.25) return '<span class="tag critico">▼ Crítico</span>';
-  if (f < 0.45) return '<span class="tag aviso">! Baixo</span>';
-  return '<span class="tag ok">✓ OK</span>';
+  if (f < 0.25) return '<span class="tag aviso">! A acabar</span>';
+  return '<span class="tag ok">✓ Disponível</span>';
 }
-const duraDias = d => d === Infinity ? '—' : d < 1 ? `${num(d * 24)} h` : `${num(d, 1)} dias`;
 function barra(f, cor) { return `<div class="nivel"><div class="barra"><span style="width:${Math.max(0, f) * 100}%;background:${cor}"></span></div><span class="mono" style="font-size:12px;min-width:36px;text-align:right;">${num(f * 100)}%</span></div>`; }
-const corNivel = f => f < 0.25 ? 'var(--negative)' : f < 0.45 ? 'var(--warning)' : 'var(--ink)';
+const corNivel = f => f < 0.25 ? 'var(--warning)' : 'var(--ink)';
+const dataCurta = t => new Date(t).toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: '2-digit' });
+function proximaReposicao(i) {
+  const r = MAQUINAS[i].repoe;
+  for (let n = 0; n < 8; n++) {
+    const d = new Date(); d.setDate(d.getDate() + n); d.setHours(r.hora, r.min, 0, 0);
+    if (r.dias.includes(d.getDay()) && d.getTime() > Date.now()) return d.getTime();
+  }
+  return null;
+}
+function quandoTexto(t) {
+  const dias = Math.round((inicioDia(t) - inicioDia(Date.now())) / 86400000);
+  const h = hhmm(t);
+  if (dias === 0) return `hoje, ${h}`;
+  if (dias === 1) return `amanhã, ${h}`;
+  return `${dataCurta(t)}, ${h}`;
+}
 
 function renderStock() {
-  const alertas = [];
-  const ordem = [];
+  const agora = Date.now();
+  let disp = 0, total = 0;
   const html = MAQUINAS.map((m, i) => {
-    const s = estado.stock[i], c = consumoDiario(i);
-    let linhas, menorDura = Infinity;
+    const s = estado.stock[i];
+    let tabela;
     if (m.tipo === 'snacks') {
-      linhas = m.produtos.map((p, j) => {
-        const f = s[j] / p.cap, dura = c[j] ? s[j] / c[j] : Infinity;
-        menorDura = Math.min(menorDura, dura);
-        if (s[j] === 0) alertas.push({ n: 3, html: `<span class="tag critico">✕ Esgotado</span><span><strong>${esc(p.nome)}</strong> · ${m.nome}, canal ${p.canal}</span>` });
-        else if (f < 0.25) alertas.push({ n: 2, html: `<span class="tag aviso">! Baixo</span><span><strong>${esc(p.nome)}</strong> · ${m.nome} — restam ${s[j]} un., dá para ~${duraDias(dura)}</span>` });
-        return `<tr><td class="mono">${p.canal}</td><td>${esc(p.nome)}</td><td class="num">${s[j]}/${p.cap}</td><td class="esconder-mobile">${barra(f, corNivel(f))}</td><td class="num esconder-mobile">${num(c[j], 1)}</td><td class="num">${s[j] ? duraDias(dura) : '—'}</td><td>${tagNivel(f, s[j] === 0)}</td></tr>`;
-      }).join('');
-      linhas = `<table><thead><tr><th>Canal</th><th>Produto</th><th class="num">Stock</th><th class="esconder-mobile">Nível</th><th class="num esconder-mobile">Vende/dia</th><th class="num">Dura</th><th>Estado</th></tr></thead><tbody>${linhas}</tbody></table>`;
+      tabela = `<table><thead><tr><th>Canal</th><th>Produto</th><th class="num">Unidades</th><th class="esconder-mobile">Nível</th><th>Estado</th></tr></thead><tbody>${
+        m.produtos.map((p, j) => {
+          const f = s[j] / p.cap; total++; if (s[j] > 0) disp++;
+          return `<tr><td class="mono">${p.canal}</td><td>${esc(p.nome)}</td><td class="num">${s[j]}/${p.cap}</td><td class="esconder-mobile">${barra(f, corNivel(f))}</td><td>${tagNivel(f, s[j] === 0)}</td></tr>`;
+        }).join('')}</tbody></table>`;
     } else {
-      linhas = Object.keys(m.cap).map(k => {
-        const f = s[k] / m.cap[k], dura = c[k] ? s[k] / c[k] : Infinity;
-        menorDura = Math.min(menorDura, dura);
-        if (f < 0.25) alertas.push({ n: f < 0.1 ? 3 : 2, html: `${tagNivel(f)}<span><strong>${INGREDIENTES[k]}</strong> · ${m.nome} — ${num(f * 100)}%, dá para ~${duraDias(dura)}</span>` });
-        const unid = k === 'copos' ? `${num(s[k])} un.` : `${num(s[k] / 1000, 2)} kg`;
-        return `<tr><td>${INGREDIENTES[k]}</td><td class="num">${unid}</td><td class="esconder-mobile">${barra(f, corNivel(f))}</td><td class="num">${duraDias(dura)}</td><td>${tagNivel(f)}</td></tr>`;
-      }).join('');
-      linhas = `<table><thead><tr><th>Ingrediente</th><th class="num">Restante</th><th class="esconder-mobile">Nível</th><th class="num">Dura</th><th>Estado</th></tr></thead><tbody>${linhas}</tbody></table>`;
+      tabela = `<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Bebidas</div><div style="display:flex;flex-wrap:wrap;gap:8px;">${
+        m.produtos.map(p => {
+          total++;
+          const ok = Object.keys(p.gasta).every(k => s[k] >= p.gasta[k]);
+          if (ok) disp++;
+          const minimo = Math.min(...Object.keys(p.gasta).map(k => s[k] / m.cap[k]));
+          const cls = !ok ? 'critico' : minimo < 0.25 ? 'aviso' : 'ok';
+          return `<span class="tag ${cls}" style="font-size:12.5px;padding:5px 10px;">${!ok ? '✕' : minimo < 0.25 ? '!' : '✓'} ${esc(p.nome)}</span>`;
+        }).join('')}</div>
+        <div style="font-size:12px;color:var(--muted);margin:16px 0 4px;">Níveis dos ingredientes</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 18px;">${
+          Object.keys(m.cap).map(k => { const f = s[k] / m.cap[k]; return `<div><div style="font-size:12px;color:var(--muted);">${INGREDIENTES[k]}</div>${barra(f, corNivel(f))}</div>`; }).join('')
+        }</div>`;
     }
-    ordem.push({ i, menorDura, nivel: nivelGeral(i) });
     return `<div class="panel full"><div class="cab"><h2><span class="dot" style="background:${m.cor}"></span>${m.nome} <span style="font-weight:400;color:var(--muted);font-size:13px;">· ${m.id}</span></h2>
-      <span style="font-size:12.5px;color:var(--muted);">Última reposição ${haQuanto(estado.ultimaReposicao[i])}</span></div><div class="table-wrap" style="max-height:none;">${linhas}</div></div>`;
+      <span style="font-size:12.5px;color:var(--muted);">Última reposição ${haQuanto(estado.ultimaReposicao[i])}</span></div><div class="table-wrap" style="max-height:none;">${tabela}</div></div>`;
   }).join('');
   document.getElementById('stockMaquinas').innerHTML = html;
 
-  alertas.sort((a, b) => b.n - a.n);
-  document.getElementById('alertas').innerHTML = alertas.length
-    ? alertas.slice(0, 12).map(a => `<li>${a.html}</li>`).join('')
-    : '<li><span class="tag ok">✓ OK</span><span>Sem alertas: todas as máquinas têm stock suficiente.</span></li>';
+  const de30 = agora - 30 * 86400000;
+  const rep30 = estado.reposicoes.filter(r => r.t >= de30 && r.t <= agora);
+  document.getElementById('sDisp').textContent = `${disp}/${total}`;
+  document.getElementById('sRep30').textContent = rep30.length;
+  document.getElementById('sUnid30').textContent = num(rep30.reduce((a, r) => a + (r.unidades || 0), 0));
+  const prox = MAQUINAS.map((_, i) => ({ i, t: proximaReposicao(i) })).filter(x => x.t).sort((a, b) => a.t - b.t);
+  document.getElementById('sProx').textContent = prox[0] ? quandoTexto(prox[0].t) : '—';
+  document.getElementById('sProx').style.fontSize = '20px';
 
-  ordem.sort((a, b) => a.menorDura - b.menorDura);
-  document.getElementById('ordemVisita').innerHTML = `<table><thead><tr><th>#</th><th>Máquina</th><th class="num">Stock geral</th><th class="num">1.º a acabar</th></tr></thead><tbody>${
-    ordem.map((o, n) => `<tr><td class="mono">${n + 1}</td><td><span class="dot" style="background:${MAQUINAS[o.i].cor}"></span>${MAQUINAS[o.i].nome}</td><td class="num">${num(o.nivel * 100)}%</td><td class="num">${o.menorDura === 0 ? 'já esgotou' : duraDias(o.menorDura)}</td></tr>`).join('')
+  document.getElementById('proxReposicoes').innerHTML = prox.map(x => {
+    const m = MAQUINAS[x.i];
+    return `<li><span class="dot" style="background:${m.cor};margin-top:5px;"></span><span><strong>${quandoTexto(x.t)}</strong><br><span style="color:var(--muted);font-size:12.5px;">${m.nome} · ${m.local}</span></span></li>`;
+  }).join('');
+
+  const hist = estado.reposicoes.filter(r => r.t <= agora).slice(-40).reverse();
+  document.getElementById('histReposicoes').innerHTML = `<table><thead><tr><th>Data</th><th>Máquina</th><th>O que foi feito</th><th class="num esconder-mobile">Duração</th><th class="esconder-mobile">Técnico</th></tr></thead><tbody>${
+    hist.map(r => {
+      const m = MAQUINAS[r.m];
+      const feito = m.tipo === 'snacks'
+        ? `${r.unidades} unidades repostas`
+        : `${num(r.copos)} copos · ${num(r.cafe, 1)} kg café · limpeza`;
+      return `<tr><td style="white-space:nowrap;">${new Date(r.t).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' })} <span class="mono" style="color:var(--muted);font-size:12px;">${hhmm(r.t)}</span></td><td><span class="dot" style="background:${m.cor}"></span>${m.nome}</td><td>${feito}</td><td class="num esconder-mobile">${r.duracaoMin} min</td><td class="esconder-mobile" style="white-space:nowrap;">${r.tecnico}</td></tr>`;
+    }).join('')
   }</tbody></table>`;
 }
+
+// ===== ASSISTÊNCIA TÉCNICA =====
+// histórico fictício, sempre relativo ao dia de hoje para parecer recente
+const ASSISTENCIAS = [
+  { dias: 2,  hora: '10:15', m: 2, tipo: 'Corretiva',  desc: 'Produto preso no canal 23 — espiral realinhada', resposta: 95 },
+  { dias: 6,  hora: '08:40', m: 1, tipo: 'Preventiva', desc: 'Descalcificação e substituição do filtro de água', resposta: null },
+  { dias: 9,  hora: '15:30', m: 0, tipo: 'Corretiva',  desc: 'Leitor contactless sem ligação — terminal reiniciado e testado', resposta: 70 },
+  { dias: 13, hora: '11:05', m: 2, tipo: 'Corretiva',  desc: 'Moedeiro não aceitava moedas de 2 € — moedeiro limpo e calibrado', resposta: 140 },
+  { dias: 16, hora: '09:20', m: 0, tipo: 'Preventiva', desc: 'Limpeza do grupo de café e verificação de pressão', resposta: null },
+  { dias: 21, hora: '14:10', m: 1, tipo: 'Corretiva',  desc: 'Pequena fuga de água no depósito — vedante substituído', resposta: 110 },
+  { dias: 27, hora: '10:00', m: 2, tipo: 'Preventiva', desc: 'Limpeza geral, verificação de temperatura e das espirais', resposta: null },
+  { dias: 34, hora: '16:45', m: 1, tipo: 'Pedido',     desc: 'Pedido do cliente: acrescentar chá na máquina — configurado', resposta: 1440 },
+  { dias: 41, hora: '09:00', m: 0, tipo: 'Preventiva', desc: 'Descalcificação e substituição do filtro de água', resposta: null },
+];
+const pedidosDemo = [];
+function tempoResposta(min) { return min < 60 ? `${min} min` : min < 1440 ? `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}` : `${Math.round(min / 1440)} dia`; }
+
+function renderAssistencia() {
+  const lista = [
+    ...pedidosDemo,
+    ...ASSISTENCIAS.map(a => {
+      const [h, mi] = a.hora.split(':').map(Number);
+      const d = new Date(); d.setDate(d.getDate() - a.dias); d.setHours(h, mi, 0, 0);
+      return { ...a, t: d.getTime(), estado: 'Resolvida' };
+    }),
+  ];
+  const ult30 = lista.filter(a => !a.pendente && Date.now() - a.t <= 30 * 86400000);
+  const corretivas = ult30.filter(a => a.resposta);
+  document.getElementById('aDisp').textContent = '99,6%';
+  document.getElementById('aInter').textContent = ult30.length;
+  document.getElementById('aResp').textContent = corretivas.length ? tempoResposta(Math.round(corretivas.reduce((x, a) => x + a.resposta, 0) / corretivas.length)) : '—';
+  const prev = new Date(); prev.setDate(prev.getDate() + 5); prev.setHours(9, 0, 0, 0);
+  document.getElementById('aProx').textContent = dataCurta(prev.getTime());
+
+  const tagTipo = { Corretiva: 'aviso', Preventiva: 'ok', Pedido: 'ok' };
+  document.getElementById('histAssist').innerHTML = `<table><thead><tr><th>Data</th><th>Máquina</th><th>Tipo</th><th>Descrição</th><th class="num esconder-mobile">Resposta</th><th>Estado</th></tr></thead><tbody>${
+    lista.map(a => {
+      const m = MAQUINAS[a.m];
+      return `<tr><td style="white-space:nowrap;">${dataCurta(a.t)} <span class="mono" style="color:var(--muted);font-size:12px;">${hhmm(a.t)}</span></td>
+        <td><span class="dot" style="background:${m.cor}"></span>${m.nome}</td>
+        <td><span class="tag ${a.pendente ? 'aviso' : tagTipo[a.tipo]}">${a.tipo}</span></td>
+        <td>${esc(a.desc)}</td>
+        <td class="num esconder-mobile">${a.resposta ? tempoResposta(a.resposta) : '—'}</td>
+        <td>${a.pendente ? '<span class="tag aviso">⏳ Em análise</span>' : '<span class="tag ok">✓ Resolvida</span>'}</td></tr>`;
+    }).join('')
+  }</tbody></table>`;
+}
+document.getElementById('pedMaq').innerHTML = MAQUINAS.map((m, i) => `<option value="${i}">${m.nome}</option>`).join('');
+document.getElementById('pedBtn').addEventListener('click', () => {
+  const texto = document.getElementById('pedTexto').value.trim();
+  pedidosDemo.unshift({ t: Date.now(), m: Number(document.getElementById('pedMaq').value), tipo: 'Pedido', desc: document.getElementById('pedTipo').value + (texto ? ` — ${texto}` : ''), resposta: null, pendente: true });
+  document.getElementById('pedTexto').value = '';
+  const msg = document.getElementById('pedMsg');
+  msg.style.color = 'var(--positive)';
+  msg.textContent = '✓ Pedido registado. (Na demo fica só nesta página; no painel real chega de imediato à equipa técnica da MP Vending.)';
+  renderAssistencia();
+});
 
 // ===== VENDAS =====
 let periodo = 30;
@@ -681,6 +803,7 @@ function renderVistaAtual(novas) {
   if (vistaAtual === 'vivo') renderVivo(novas);
   if (vistaAtual === 'vendas') renderVendas();
   if (vistaAtual === 'stock') renderStock();
+  if (vistaAtual === 'assistencia') renderAssistencia();
   if (vistaAtual === 'produtos') renderProdutos();
 }
 document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => {
