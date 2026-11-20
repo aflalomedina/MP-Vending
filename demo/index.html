@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MP Vending · Demonstração do Painel de Vendas</title>
+<meta name="robots" content="noindex, nofollow" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --ink: #1B1F27; --bg: #F6F4EF; --panel: #FFFFFF; --line: #DEDAD1;
+    --accent: #FF9F1C; --accent-deep: #C7710A; --positive: #2F9E44; --negative: #E03131;
+    --warning: #B7791F; --muted: #6B7280;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; }
+  .mono { font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  .topbar { display: flex; justify-content: space-between; align-items: center; padding: 18px 32px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; gap: 10px; }
+  .topbar .brand { font-size: 12px; letter-spacing: 0.06em; color: var(--muted); }
+  .topbar h1 { margin: 4px 0 0; font-size: 22px; font-weight: 600; }
+  .topbar .right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+  .ao-vivo { display: inline-flex; align-items: center; gap: 7px; background: #E8F5EC; color: #1E6B30; font-weight: 600; font-size: 12px; letter-spacing: .04em; padding: 5px 10px; border-radius: 20px; }
+  .ao-vivo i { width: 8px; height: 8px; border-radius: 50%; background: var(--positive); animation: pulsar 1.6s infinite; }
+  @keyframes pulsar { 0% { box-shadow: 0 0 0 0 rgba(47,158,68,.5); } 70% { box-shadow: 0 0 0 7px rgba(47,158,68,0); } 100% { box-shadow: 0 0 0 0 rgba(47,158,68,0); } }
+  .sair { color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; text-decoration: none; background: #fff; }
+
+  .aviso-demo { background: #FFF5E6; border-bottom: 1px solid #F3DDB8; color: #7A4A06; font-size: 13px; padding: 9px 32px; }
+
+  .tabs { display: flex; gap: 4px; padding: 0 32px; background: var(--panel); border-bottom: 1px solid var(--line); overflow-x: auto; }
+  .tab-btn { background: none; border: 0; border-bottom: 2px solid transparent; padding: 13px 14px; font-family: inherit; font-size: 14px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+  .tab-btn.active { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+  main { padding: 22px 32px 40px; max-width: 1400px; margin: 0 auto; }
+  .view { display: none; } .view.active { display: block; }
+
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px 16px 14px; }
+  .kpi .value { font-size: 26px; font-weight: 600; font-family: 'IBM Plex Mono', ui-monospace, monospace; letter-spacing: -0.02em; }
+  .kpi .label { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+  .kpi .delta { font-size: 12.5px; margin-top: 6px; font-weight: 600; }
+  .up { color: var(--positive); } .down { color: var(--negative); }
+
+  .grid-2 { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 14px; margin-bottom: 14px; }
+  .grid-2.igual { grid-template-columns: 1fr 1fr; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px 16px; min-width: 0; }
+  .panel.full { margin-bottom: 14px; }
+  .panel h2 { margin: 0 0 12px; font-size: 15px; font-weight: 600; }
+  .panel .sub { font-size: 12.5px; color: var(--muted); margin: -6px 0 12px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 7px 8px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel); }
+  td { padding: 8px; border-bottom: 1px solid #EEEBE4; }
+  .tag { white-space: nowrap; }
+  td.num, th.num { text-align: right; font-family: 'IBM Plex Mono', ui-monospace, monospace; white-space: nowrap; }
+  .table-wrap { max-height: 420px; overflow: auto; }
+
+  .feed { list-style: none; margin: 0; padding: 0; max-height: 330px; overflow-y: auto; }
+  .feed li { display: grid; grid-template-columns: 62px 1fr auto; gap: 10px; align-items: center; padding: 8px 4px; border-bottom: 1px solid #EEEBE4; font-size: 13px; }
+  .feed li .hora { color: var(--muted); font-size: 12px; }
+  .feed li .maq { color: var(--muted); font-size: 11.5px; display: block; }
+  .feed li.novo { animation: brilho 2.4s ease-out; }
+  @keyframes brilho { 0% { background: #FFE8C2; } 100% { background: transparent; } }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+
+  .maquinas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 14px; }
+  .maq-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; border-top: 4px solid var(--c); }
+  .maq-card .topo { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .maq-card h3 { margin: 0; font-size: 15px; }
+  .maq-card .local { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .estado { font-size: 11.5px; font-weight: 600; color: #1E6B30; white-space: nowrap; }
+  .maq-card dl { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; margin: 14px 0 0; }
+  .maq-card dt { font-size: 11.5px; color: var(--muted); }
+  .maq-card dd { margin: 2px 0 0; font-size: 16px; font-weight: 600; font-family: 'IBM Plex Mono', ui-monospace, monospace; }
+  .barra { height: 8px; background: #EEEBE4; border-radius: 4px; overflow: hidden; margin-top: 6px; }
+  .barra > span { display: block; height: 100%; border-radius: 4px; background: var(--ink); }
+
+  .nivel { display: flex; align-items: center; gap: 8px; min-width: 140px; }
+  .nivel .barra { flex: 1; margin: 0; }
+  .tag { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+  .tag.critico { background: #FCE0E0; color: #B42318; }
+  .tag.aviso { background: #FFF3CD; color: #8A5A00; }
+  .tag.ok { background: #E8F5EC; color: #1E6B30; }
+  .alertas { list-style: none; margin: 0; padding: 0; }
+  .alertas li { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-bottom: 1px solid #EEEBE4; font-size: 13.5px; }
+  .alertas li:last-child { border-bottom: 0; }
+
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg button { background: #fff; border: 0; padding: 7px 13px; font-family: inherit; font-size: 13px; cursor: pointer; color: var(--muted); }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.active { background: var(--ink); color: #fff; }
+  .cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .cab h2 { margin: 0; }
+
+  .heat td { padding: 0; border: 2px solid #fff; height: 22px; min-width: 22px; border-radius: 3px; }
+  .heat th { padding: 3px 4px; font-size: 10.5px; text-align: center; border: 0; position: static; }
+  .heat th.dia { text-align: left; padding-right: 8px; }
+  .legenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
+
+  .cta { background: var(--ink); color: #fff; border-radius: 8px; padding: 18px 22px; display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .cta p { margin: 0; font-size: 14px; line-height: 1.5; }
+  .cta a { background: var(--accent); color: var(--ink); text-decoration: none; font-weight: 600; padding: 10px 16px; border-radius: 6px; white-space: nowrap; }
+
+  @media (max-width: 960px) {
+    .maquinas { grid-template-columns: 1fr; }
+    .grid-2, .grid-2.igual { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .topbar { padding: 14px 16px; } .topbar h1 { font-size: 19px; }
+    .aviso-demo { padding: 8px 16px; font-size: 12.5px; }
+    .tabs { padding: 0 8px; position: sticky; top: 0; z-index: 20; }
+    main { padding: 14px 12px 30px; }
+    .kpis { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .kpi { padding: 12px; } .kpi .value { font-size: 20px; }
+    .panel { padding: 14px; }
+    .esconder-mobile { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="brand">MP VENDING · DEMONSTRAÇÃO</div>
+    <h1>Painel de Vendas</h1>
+  </div>
+  <div class="right">
+    <span class="ao-vivo"><i></i>AO VIVO</span>
+    <span class="mono" id="atualizado">—</span>
+    <span id="quem"></span>
+    <a class="sair" href="/demo/sair">Sair</a>
+  </div>
+</div>
+<div class="aviso-demo">Dados fictícios: 3 máquinas simuladas (2 de café e 1 de snacks) que vendem em tempo real. No painel de um cliente MP Vending aparecem as máquinas reais do seu espaço.</div>
+
+<div class="tabs">
+  <button class="tab-btn active" data-view="vivo">Ao vivo</button>
+  <button class="tab-btn" data-view="vendas">Vendas</button>
+  <button class="tab-btn" data-view="stock">Stock e reposições</button>
+  <button class="tab-btn" data-view="assistencia">Assistência</button>
+  <button class="tab-btn" data-view="produtos">Produtos</button>
+</div>
+
+<main>
+  <!-- ===== AO VIVO ===== -->
+  <div id="view-vivo" class="view active">
+    <div class="kpis">
+      <div class="kpi"><div class="value" id="kReceita">—</div><div class="label">Receita hoje</div><div class="delta" id="kReceitaD"></div></div>
+      <div class="kpi"><div class="value" id="kVendas">—</div><div class="label">Vendas hoje</div><div class="delta" id="kVendasD"></div></div>
+      <div class="kpi"><div class="value" id="kTicket">—</div><div class="label">Ticket médio hoje</div><div class="delta" id="kTicketD"></div></div>
+      <div class="kpi"><div class="value" id="kMes">—</div><div class="label">Receita este mês</div><div class="delta" id="kMesD"></div></div>
+    </div>
+
+    <div class="maquinas" id="maquinasCards"></div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <h2>Receita por hora · hoje vs ontem</h2>
+        <div class="sub">As barras de hoje crescem à medida que as vendas entram.</div>
+        <div style="position:relative;height:280px;"><canvas id="chHoje"></canvas></div>
+      </div>
+      <div class="panel">
+        <h2>Últimas vendas <span id="ultimaHa" style="font-weight:400;font-size:12.5px;color:var(--muted);margin-left:6px;"></span></h2>
+        <ul class="feed" id="feed"></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== VENDAS ===== -->
+  <div id="view-vendas" class="view">
+    <div class="kpis">
+      <div class="kpi"><div class="value" id="vReceita">—</div><div class="label" id="vReceitaL">Receita</div><div class="delta" id="vReceitaD"></div></div>
+      <div class="kpi"><div class="value" id="vVendas">—</div><div class="label">Vendas</div><div class="delta" id="vVendasD"></div></div>
+      <div class="kpi"><div class="value" id="vTicket">—</div><div class="label">Ticket médio</div></div>
+      <div class="kpi"><div class="value" id="vMedia">—</div><div class="label">Média por dia</div></div>
+    </div>
+    <div class="panel full">
+      <div class="cab">
+        <h2>Receita diária por máquina</h2>
+        <div class="seg" id="segPeriodo">
+          <button data-dias="7">7 dias</button><button data-dias="14">14 dias</button><button data-dias="30" class="active">30 dias</button>
+        </div>
+      </div>
+      <div class="legenda" id="legendaMaquinas"></div>
+      <div style="position:relative;height:300px;"><canvas id="chDiario"></canvas></div>
+    </div>
+    <div class="grid-2 igual">
+      <div class="panel">
+        <h2>Quando se vende mais</h2>
+        <div class="sub">Número médio de vendas por hora e dia da semana, no período escolhido.</div>
+        <div style="overflow-x:auto;"><table class="heat" id="heat"></table></div>
+      </div>
+      <div class="panel">
+        <h2>Métodos de pagamento</h2>
+        <div style="position:relative;height:200px;"><canvas id="chPag"></canvas></div>
+      </div>
+    </div>
+    <div class="panel full">
+      <h2>Resumo por máquina</h2>
+      <div class="table-wrap" id="resumoMaquinas"></div>
+    </div>
+  </div>
+
+  <!-- ===== STOCK ===== -->
+  <div id="view-stock" class="view">
+    <div class="kpis">
+      <div class="kpi"><div class="value" id="sDisp">—</div><div class="label">Produtos disponíveis agora</div></div>
+      <div class="kpi"><div class="value" id="sRep30">—</div><div class="label">Reposições nos últimos 30 dias</div></div>
+      <div class="kpi"><div class="value" id="sUnid30">—</div><div class="label">Unidades de snacks repostas (30 dias)</div></div>
+      <div class="kpi"><div class="value" id="sProx">—</div><div class="label">Próxima reposição</div></div>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <h2>Histórico de reposições</h2>
+        <div class="sub">Cada visita da equipa MP Vending fica registada com data, hora e o que foi reposto.</div>
+        <div class="table-wrap" id="histReposicoes"></div>
+      </div>
+      <div class="panel">
+        <h2>Próximas reposições agendadas</h2>
+        <div class="sub">Rota fixa. A equipa passa mais cedo se uma máquina precisar.</div>
+        <ul class="alertas" id="proxReposicoes"></ul>
+      </div>
+    </div>
+    <div id="stockMaquinas"></div>
+  </div>
+
+  <!-- ===== ASSISTÊNCIA ===== -->
+  <div id="view-assistencia" class="view">
+    <div class="kpis">
+      <div class="kpi"><div class="value" id="aDisp">—</div><div class="label">Disponibilidade das máquinas (30 dias)</div></div>
+      <div class="kpi"><div class="value" id="aInter">—</div><div class="label">Intervenções (30 dias)</div></div>
+      <div class="kpi"><div class="value" id="aResp">—</div><div class="label">Tempo médio de resposta</div></div>
+      <div class="kpi"><div class="value" id="aProx">—</div><div class="label">Próxima manutenção preventiva</div></div>
+    </div>
+    <div class="panel full">
+      <div class="cab">
+        <h2>Pedir assistência</h2>
+      </div>
+      <div class="sub" style="margin-top:-4px;">Algum problema numa máquina? O pedido chega diretamente à equipa técnica e pode acompanhar aqui o estado.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
+        <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Máquina</label>
+          <select id="pedMaq" style="border:1px solid var(--line);border-radius:6px;padding:8px;font-family:inherit;font-size:13px;"></select></div>
+        <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Problema</label>
+          <select id="pedTipo" style="border:1px solid var(--line);border-radius:6px;padding:8px;font-family:inherit;font-size:13px;">
+            <option>Não aceita moedas / não dá troco</option><option>Pagamento com cartão não funciona</option><option>Produto ficou preso</option>
+            <option>Bebida sai mal / máquina sem água</option><option>Pedido de produto novo</option><option>Outro</option></select></div>
+        <div style="flex:1 1 220px;"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Detalhes (opcional)</label>
+          <input id="pedTexto" maxlength="200" placeholder="ex: o canal 23 não roda" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:8px;font-family:inherit;font-size:13px;" /></div>
+        <button type="button" id="pedBtn" style="background:var(--ink);color:#fff;border:0;border-radius:6px;padding:9px 16px;font-family:inherit;font-size:13px;cursor:pointer;">Enviar pedido</button>
+      </div>
+      <div id="pedMsg" style="font-size:13px;margin-top:10px;"></div>
+    </div>
+    <div class="panel full">
+      <h2>Histórico de assistências técnicas</h2>
+      <div class="table-wrap" id="histAssist"></div>
+    </div>
+  </div>
+
+  <!-- ===== PRODUTOS ===== -->
+  <div id="view-produtos" class="view">
+    <div class="grid-2">
+      <div class="panel">
+        <div class="cab">
+          <h2>Top 10 produtos por receita · 30 dias</h2>
+          <div class="seg" id="segProdTipo"><button data-tipo="todos" class="active">Todos</button><button data-tipo="cafe">Café</button><button data-tipo="snacks">Snacks</button></div>
+        </div>
+        <div style="position:relative;height:340px;"><canvas id="chProd"></canvas></div>
+      </div>
+      <div class="panel">
+        <h2>Tendência</h2>
+        <div class="sub">Últimos 7 dias comparados com os 7 dias anteriores.</div>
+        <ul class="alertas" id="tendencias"></ul>
+      </div>
+    </div>
+    <div class="panel full">
+      <h2>Todos os produtos · 30 dias</h2>
+      <div class="table-wrap" id="tabelaProdutos"></div>
+    </div>
+  </div>
+
+  <div class="cta">
+    <p><strong>Quer este controlo nas máquinas do seu espaço?</strong><br>A MP Vending instala, abastece e mantém as máquinas — e o cliente acompanha tudo ao minuto.</p>
+    <a href="https://mpvending.pt/#contacto">Falar com a MP Vending</a>
+  </div>
+</main>
+
+<script>
+// =====================================================================
+//  Simulador de vendas — dados 100% fictícios, gerados no browser.
+//  É determinístico (a mesma hora dá sempre as mesmas vendas), por isso
+//  o histórico não muda quando se recarrega a página, e a cada minuto
+//  entram vendas novas.
+// =====================================================================
+
+const PERFIL_ESCRITORIO = [0,0,0,0,0,0,0,2,9,10,6,5,4,8,7,4,5,3,1,0,0,0,0,0];
+const PERFIL_FABRICA    = [3,2,3,1,1,2,9,5,4,4,8,4,6,4,9,6,5,4,7,4,3,3,8,4];
+const PERFIL_SNACKS     = [2,1,2,1,1,1,5,4,3,4,7,6,9,4,6,5,6,5,8,5,3,2,5,3];
+
+// consumos por bebida (g, ou unidades para copos)
+const BEBIDAS = [
+  { nome: 'Expresso',         preco: 0.60, peso: 30, gasta: { cafe: 7, acucar: 5, copos: 1 } },
+  { nome: 'Café longo',       preco: 0.60, peso: 10, gasta: { cafe: 8, acucar: 5, copos: 1 } },
+  { nome: 'Descafeinado',     preco: 0.60, peso: 5,  gasta: { descaf: 7, acucar: 5, copos: 1 } },
+  { nome: 'Galão',            preco: 0.80, peso: 12, gasta: { cafe: 7, leite: 12, acucar: 5, copos: 1 } },
+  { nome: 'Meia de leite',    preco: 0.80, peso: 9,  gasta: { cafe: 7, leite: 9, acucar: 5, copos: 1 } },
+  { nome: 'Cappuccino',       preco: 0.90, peso: 12, gasta: { cafe: 7, leite: 10, chocolate: 4, acucar: 5, copos: 1 } },
+  { nome: 'Chocolate quente', preco: 0.90, peso: 9,  gasta: { chocolate: 25, leite: 8, copos: 1 } },
+  { nome: 'Chá',              preco: 0.60, peso: 4,  gasta: { cha: 12, acucar: 5, copos: 1 } },
+];
+const INGREDIENTES = { cafe: 'Café em grão', descaf: 'Café descafeinado', leite: 'Leite em pó', chocolate: 'Chocolate', cha: 'Chá', acucar: 'Açúcar', copos: 'Copos' };
+
+const CANAIS_SNACKS = [
+  ['11', 'Água 0,5 L', 0.80, 12, 10], ['12', 'Água com gás', 1.00, 8, 3], ['13', 'Coca-Cola lata', 1.20, 10, 9],
+  ['14', 'Coca-Cola Zero', 1.20, 10, 7], ['15', 'Ice Tea Pêssego', 1.20, 10, 6], ['16', 'Red Bull', 2.00, 8, 5],
+  ['21', 'Sumo de laranja', 1.10, 8, 3], ['22', 'KitKat', 1.10, 10, 6], ['23', 'Twix', 1.10, 10, 5],
+  ['24', 'Snickers', 1.10, 10, 5], ['25', "M&M's", 1.30, 8, 4], ['26', 'Batatas fritas', 1.20, 10, 6],
+  ['31', 'Pringles', 1.80, 8, 3], ['32', 'Bolachas Oreo', 1.20, 10, 4], ['33', 'Croissant misto', 1.50, 8, 5],
+  ['34', 'Barra de proteína', 2.20, 8, 2],
+].map(([canal, nome, preco, cap, peso]) => ({ canal, nome, preco, cap, peso }));
+
+const MAQUINAS = [
+  { id: 'CAF-01', nome: 'Café · Escritórios', local: 'Centro empresarial (receção)', tipo: 'cafe', cor: '#2F6FDE',
+    porDia: 85, fimDeSemana: 0.12, perfil: PERFIL_ESCRITORIO, repoe: { dias: [1, 3, 5], hora: 9, min: 0 },
+    cap: { cafe: 2500, descaf: 500, leite: 1500, chocolate: 2000, cha: 1000, acucar: 3000, copos: 300 },
+    pagamentos: [['Moedas', 55], ['Contactless', 30], ['MB WAY', 10], ['App', 5]] },
+  { id: 'CAF-02', nome: 'Café · Fábrica', local: 'Unidade fabril (refeitório)', tipo: 'cafe', cor: '#E8890C',
+    porDia: 150, fimDeSemana: 0.55, perfil: PERFIL_FABRICA, repoe: { dias: [0, 1, 2, 3, 4, 5, 6], hora: 7, min: 30 },
+    cap: { cafe: 2500, descaf: 500, leite: 2000, chocolate: 2000, cha: 1000, acucar: 3000, copos: 800 },
+    pagamentos: [['Moedas', 60], ['Contactless', 25], ['MB WAY', 10], ['App', 5]] },
+  { id: 'SNK-01', nome: 'Snacks · Fábrica', local: 'Unidade fabril (refeitório)', tipo: 'snacks', cor: '#8B5CD6',
+    porDia: 40, fimDeSemana: 0.5, perfil: PERFIL_SNACKS, repoe: { dias: [1, 4], hora: 10, min: 0 },
+    pagamentos: [['Moedas', 35], ['Contactless', 45], ['MB WAY', 15], ['App', 5]] },
+];
+MAQUINAS.forEach(m => {
+  m.produtos = m.tipo === 'cafe' ? BEBIDAS : CANAIS_SNACKS;
+  m.somaPerfil = m.perfil.reduce((a, b) => a + b, 0);
+  m.somaPesos = m.produtos.reduce((a, p) => a + p.peso, 0);
+  m.somaPag = m.pagamentos.reduce((a, p) => a + p[1], 0);
+});
+const PAGAMENTOS = ['Moedas', 'Contactless', 'MB WAY', 'App'];
+const TECNICOS = ['João S.', 'Rui M.'];
+
+// hash determinístico → número entre 0 e 1
+function rnd(a, b, c) {
+  let h = Math.imul(a ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(b, 0xc2b2ae35) ^ Math.imul(c + 0x27d4eb2f, 0x165667b1);
+  h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12; h = Math.imul(h, 0x297a2d39); h ^= h >>> 15;
+  return (h >>> 0) / 4294967296;
+}
+function escolher(lista, soma, pesoDe, r) {
+  let x = r * soma;
+  for (let i = 0; i < lista.length; i++) { x -= pesoDe(lista[i]); if (x <= 0) return i; }
+  return lista.length - 1;
+}
+
+const DIAS_HISTORICO = 65; // chega para comparar 30 dias com os 30 anteriores e o mês com o mês anterior
+const estado = {
+  vendas: [],      // { t, m, p, preco, pag }
+  pendentes: [],   // vendas já geradas para o minuto atual mas com segundos ainda no futuro
+  stock: [],       // por máquina: array (snacks) ou objeto de ingredientes (café)
+  ultimaReposicao: [],
+  reposicoes: [],  // { t, m, unidades (snacks) | copos+cafe (café), duracaoMin, tecnico }
+  minutoSimulado: 0,
+};
+
+function encherMaquina(i) {
+  const m = MAQUINAS[i];
+  estado.stock[i] = m.tipo === 'cafe' ? { ...m.cap } : m.produtos.map(p => p.cap);
+}
+
+function podeVender(i, p) {
+  const m = MAQUINAS[i];
+  if (m.tipo === 'snacks') return estado.stock[i][p] > 0;
+  const g = m.produtos[p].gasta;
+  return Object.keys(g).every(k => estado.stock[i][k] >= g[k]);
+}
+function descontar(i, p) {
+  const m = MAQUINAS[i];
+  if (m.tipo === 'snacks') { estado.stock[i][p]--; return; }
+  const g = m.produtos[p].gasta;
+  for (const k in g) estado.stock[i][k] -= g[k];
+}
+
+function simularMinuto(minAbs) {
+  const t0 = minAbs * 60000;
+  const d = new Date(t0);
+  const hora = d.getHours(), dow = d.getDay(), diaAbs = Math.floor((t0 - d.getTimezoneOffset() * 60000) / 86400000);
+  MAQUINAS.forEach((m, i) => {
+    // reposição programada
+    if (m.repoe.dias.includes(dow) && hora === m.repoe.hora && d.getMinutes() === m.repoe.min) {
+      const antes = estado.stock[i];
+      const reg = { t: t0 + Math.floor(rnd(i + 60, minAbs, 1) * 25) * 60000, m: i, duracaoMin: 12 + Math.floor(rnd(i + 61, minAbs, 1) * 20), tecnico: TECNICOS[Math.floor(rnd(i + 62, minAbs, 1) * TECNICOS.length)] };
+      if (m.tipo === 'snacks') reg.unidades = m.produtos.reduce((a, p, j) => a + p.cap - antes[j], 0);
+      else { reg.copos = m.cap.copos - antes.copos; reg.cafe = (m.cap.cafe - antes.cafe) / 1000; reg.limpeza = true; }
+      estado.reposicoes.push(reg);
+      encherMaquina(i); estado.ultimaReposicao[i] = t0;
+    }
+    const fds = (dow === 0 || dow === 6) ? m.fimDeSemana : 1;
+    const variacao = 0.85 + 0.3 * rnd(i + 50, diaAbs, 7);
+    const lambda = m.porDia * fds * variacao * m.perfil[hora] / m.somaPerfil / 60;
+    for (let k = 0; k < 3; k++) {
+      if (rnd(i, minAbs, k) >= lambda / 3) continue;
+      let p = escolher(m.produtos, m.somaPesos, x => x.peso, rnd(i + 10, minAbs, k));
+      if (!podeVender(i, p)) {
+        // o cliente escolhe outra coisa (ou desiste, se também não houver)
+        p = escolher(m.produtos, m.somaPesos, x => x.peso, rnd(i + 20, minAbs, k));
+        if (!podeVender(i, p)) continue;
+      }
+      descontar(i, p);
+      const pag = m.pagamentos[escolher(m.pagamentos, m.somaPag, x => x[1], rnd(i + 30, minAbs, k))][0];
+      const t = t0 + Math.floor(rnd(i + 40, minAbs, k) * 60000);
+      estado.pendentes.push({ t, m: i, p, preco: m.produtos[p].preco, pag });
+    }
+  });
+}
+
+function avancarSimulacao() {
+  const agora = Date.now();
+  const minAgora = Math.floor(agora / 60000);
+  if (!estado.minutoSimulado) {
+    const inicio = new Date(); inicio.setHours(0, 0, 0, 0); inicio.setDate(inicio.getDate() - DIAS_HISTORICO);
+    MAQUINAS.forEach((_, i) => { encherMaquina(i); estado.ultimaReposicao[i] = inicio.getTime(); });
+    estado.minutoSimulado = Math.floor(inicio.getTime() / 60000) - 1;
+  }
+  while (estado.minutoSimulado < minAgora) simularMinuto(++estado.minutoSimulado);
+  const novas = [];
+  estado.pendentes = estado.pendentes.filter(v => { if (v.t <= agora) { novas.push(v); return false; } return true; });
+  novas.sort((a, b) => a.t - b.t);
+  estado.vendas.push(...novas);
+  return novas;
+}
+
+// ===== utilitários =====
+const eur = v => v.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' });
+const num = (v, c = 0) => v.toLocaleString('pt-PT', { minimumFractionDigits: c, maximumFractionDigits: c });
+const hhmm = t => new Date(t).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+const hhmmss = t => new Date(t).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const inicioDia = (t, deslocDias = 0) => { const d = new Date(t); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + deslocDias); return d.getTime(); };
+const chaveDia = t => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function haQuanto(t) {
+  const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+  if (s < 60) return `há ${s} s`;
+  if (s < 3600) return `há ${Math.floor(s / 60)} min`;
+  if (s < 86400) return `há ${Math.floor(s / 3600)} h`;
+  const d = Math.floor(s / 86400); return d === 1 ? 'há 1 dia' : `há ${d} dias`;
+}
+function delta(atual, anterior, sufixo) {
+  if (!anterior) return '';
+  const p = (atual - anterior) / anterior * 100;
+  const cls = p >= 0 ? 'up' : 'down';
+  return `<span class="${cls}">${p >= 0 ? '▲' : '▼'} ${num(Math.abs(p), 1)}%</span> <span style="color:var(--muted);font-weight:400;">${sufixo}</span>`;
+}
+const soma = (vs) => vs.reduce((a, v) => a + v.preco, 0);
+const entre = (de, ate) => estado.vendas.filter(v => v.t >= de && v.t < ate);
+const nomeProduto = v => MAQUINAS[v.m].produtos[v.p].nome;
+
+Chart.defaults.font.family = "'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+Chart.defaults.color = '#6B7280';
+Chart.defaults.borderColor = '#EEEBE4';
+const graficos = {};
+function grafico(id, config) {
+  if (graficos[id]) { graficos[id].data = config.data; graficos[id].options = config.options; graficos[id].update('none'); return; }
+  graficos[id] = new Chart(document.getElementById(id), config);
+}
+const eixoEur = { ticks: { callback: v => eur(v).replace(',00', '') }, grid: { color: '#EEEBE4' }, border: { display: false } };
+
+// ===== AO VIVO =====
+let feedVisto = new Set();
+function renderVivo(novas) {
+  const agora = Date.now();
+  const hoje0 = inicioDia(agora), ontem0 = inicioDia(agora, -1);
+  const hoje = entre(hoje0, agora);
+  const ontemAteAgora = entre(ontem0, ontem0 + (agora - hoje0));
+  const rHoje = soma(hoje), rOntem = soma(ontemAteAgora);
+
+  document.getElementById('kReceita').textContent = eur(rHoje);
+  document.getElementById('kReceitaD').innerHTML = delta(rHoje, rOntem, 'vs ontem à mesma hora');
+  document.getElementById('kVendas').textContent = num(hoje.length);
+  document.getElementById('kVendasD').innerHTML = delta(hoje.length, ontemAteAgora.length, 'vs ontem à mesma hora');
+  const tHoje = hoje.length ? rHoje / hoje.length : 0, tOntem = ontemAteAgora.length ? rOntem / ontemAteAgora.length : 0;
+  document.getElementById('kTicket').textContent = eur(tHoje);
+  document.getElementById('kTicketD').innerHTML = delta(tHoje, tOntem, 'vs ontem');
+  const d = new Date(agora), mes0 = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+  const mesAnt0 = new Date(d.getFullYear(), d.getMonth() - 1, 1).getTime();
+  const rMes = soma(entre(mes0, agora));
+  const rMesAnt = soma(entre(mesAnt0, mesAnt0 + (agora - mes0)));
+  document.getElementById('kMes').textContent = eur(rMes);
+  document.getElementById('kMesD').innerHTML = delta(rMes, rMesAnt, 'vs mês anterior');
+
+  // cartões das máquinas
+  document.getElementById('maquinasCards').innerHTML = MAQUINAS.map((m, i) => {
+    const vs = hoje.filter(v => v.m === i);
+    const ultima = estado.vendas.findLast(v => v.m === i);
+    const nivel = nivelGeral(i);
+    const temp = m.tipo === 'snacks'
+      ? `${num(4.6 + Math.sin(agora / 600000 + i) * 0.5, 1)} °C`
+      : `${num(92.5 + Math.sin(agora / 300000 + i) * 0.8, 1)} °C`;
+    return `<div class="maq-card" style="--c:${m.cor}">
+      <div class="topo"><h3>${m.nome}</h3><span class="estado">● Online</span></div>
+      <div class="local">${m.id} · ${m.local}</div>
+      <dl>
+        <div><dt>Receita hoje</dt><dd>${eur(soma(vs))}</dd></div>
+        <div><dt>Vendas hoje</dt><dd>${vs.length}</dd></div>
+        <div><dt>Última venda</dt><dd style="font-size:14px;">${ultima ? haQuanto(ultima.t) : '—'}</dd></div>
+        <div><dt>${m.tipo === 'snacks' ? 'Temperatura' : 'Caldeira'}</dt><dd style="font-size:14px;">${temp}</dd></div>
+      </dl>
+      <div style="margin-top:12px;font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between;"><span>Stock geral</span><span class="mono">${num(nivel * 100)}%</span></div>
+      <div class="barra"><span style="width:${nivel * 100}%;background:${nivel < 0.25 ? 'var(--negative)' : nivel < 0.45 ? 'var(--warning)' : 'var(--ink)'}"></span></div>
+    </div>`;
+  }).join('');
+
+  // feed
+  const ultimas = estado.vendas.slice(-25).reverse();
+  document.getElementById('feed').innerHTML = ultimas.map(v => {
+    const m = MAQUINAS[v.m];
+    const novo = feedVisto.size && !feedVisto.has(v.t + '-' + v.m);
+    return `<li class="${novo ? 'novo' : ''}"><span class="hora mono">${hhmmss(v.t)}</span>
+      <span><span class="dot" style="background:${m.cor}"></span>${esc(nomeProduto(v))}<span class="maq">${m.nome} · ${v.pag}</span></span>
+      <span class="mono">${eur(v.preco)}</span></li>`;
+  }).join('');
+  ultimas.forEach(v => feedVisto.add(v.t + '-' + v.m));
+  document.getElementById('ultimaHa').textContent = ultimas[0] ? `· última ${haQuanto(ultimas[0].t)}` : '';
+
+  // gráfico por hora
+  const porHora = (vs, base) => { const a = new Array(24).fill(0); vs.forEach(v => { const h = new Date(v.t).getHours(); a[h] += v.preco; }); return a; };
+  const hHoje = porHora(hoje, hoje0);
+  const hOntem = porHora(entre(ontem0, hoje0), ontem0);
+  const horaAtual = new Date(agora).getHours();
+  grafico('chHoje', {
+    type: 'bar',
+    data: {
+      labels: [...Array(24).keys()].map(h => `${h}h`),
+      datasets: [
+        { type: 'bar', label: 'Hoje', data: hHoje.map((v, h) => h <= horaAtual ? v : null), backgroundColor: '#FF9F1C', borderRadius: 4, borderSkipped: 'start', maxBarThickness: 18, order: 2 },
+        { type: 'line', label: 'Ontem', data: hOntem, borderColor: '#6B7280', borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.3, borderDash: [5, 4], order: 1 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top', align: 'end', labels: { boxWidth: 12, boxHeight: 12 } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${eur(c.parsed.y || 0)}` } } },
+      scales: { y: { ...eixoEur, beginAtZero: true }, x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkipPadding: 8 } } },
+    },
+  });
+}
+
+// ===== STOCK E REPOSIÇÕES =====
+function nivelGeral(i) {
+  const m = MAQUINAS[i], s = estado.stock[i];
+  if (m.tipo === 'snacks') return s.reduce((a, x) => a + x, 0) / m.produtos.reduce((a, p) => a + p.cap, 0);
+  return Math.min(...['cafe', 'leite', 'copos', 'acucar'].map(k => s[k] / m.cap[k]));
+}
+function tagNivel(f, vazio) {
+  if (vazio) return '<span class="tag critico">✕ Esgotado</span>';
+  if (f < 0.25) return '<span class="tag aviso">! A acabar</span>';
+  return '<span class="tag ok">✓ Disponível</span>';
+}
+function barra(f, cor) { return `<div class="nivel"><div class="barra"><span style="width:${Math.max(0, f) * 100}%;background:${cor}"></span></div><span class="mono" style="font-size:12px;min-width:36px;text-align:right;">${num(f * 100)}%</span></div>`; }
+const corNivel = f => f < 0.25 ? 'var(--warning)' : 'var(--ink)';
+const dataCurta = t => new Date(t).toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: '2-digit' });
+function proximaReposicao(i) {
+  const r = MAQUINAS[i].repoe;
+  for (let n = 0; n < 8; n++) {
+    const d = new Date(); d.setDate(d.getDate() + n); d.setHours(r.hora, r.min, 0, 0);
+    if (r.dias.includes(d.getDay()) && d.getTime() > Date.now()) return d.getTime();
+  }
+  return null;
+}
+function quandoTexto(t) {
+  const dias = Math.round((inicioDia(t) - inicioDia(Date.now())) / 86400000);
+  const h = hhmm(t);
+  if (dias === 0) return `hoje, ${h}`;
+  if (dias === 1) return `amanhã, ${h}`;
+  return `${dataCurta(t)}, ${h}`;
+}
+
+function renderStock() {
+  const agora = Date.now();
+  let disp = 0, total = 0;
+  const html = MAQUINAS.map((m, i) => {
+    const s = estado.stock[i];
+    let tabela;
+    if (m.tipo === 'snacks') {
+      tabela = `<table><thead><tr><th>Canal</th><th>Produto</th><th class="num">Unidades</th><th class="esconder-mobile">Nível</th><th>Estado</th></tr></thead><tbody>${
+        m.produtos.map((p, j) => {
+          const f = s[j] / p.cap; total++; if (s[j] > 0) disp++;
+          return `<tr><td class="mono">${p.canal}</td><td>${esc(p.nome)}</td><td class="num">${s[j]}/${p.cap}</td><td class="esconder-mobile">${barra(f, corNivel(f))}</td><td>${tagNivel(f, s[j] === 0)}</td></tr>`;
+        }).join('')}</tbody></table>`;
+    } else {
+      tabela = `<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Bebidas</div><div style="display:flex;flex-wrap:wrap;gap:8px;">${
+        m.produtos.map(p => {
+          total++;
+          const ok = Object.keys(p.gasta).every(k => s[k] >= p.gasta[k]);
+          if (ok) disp++;
+          const minimo = Math.min(...Object.keys(p.gasta).map(k => s[k] / m.cap[k]));
+          const cls = !ok ? 'critico' : minimo < 0.25 ? 'aviso' : 'ok';
+          return `<span class="tag ${cls}" style="font-size:12.5px;padding:5px 10px;">${!ok ? '✕' : minimo < 0.25 ? '!' : '✓'} ${esc(p.nome)}</span>`;
+        }).join('')}</div>
+        <div style="font-size:12px;color:var(--muted);margin:16px 0 4px;">Níveis dos ingredientes</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 18px;">${
+          Object.keys(m.cap).map(k => { const f = s[k] / m.cap[k]; return `<div><div style="font-size:12px;color:var(--muted);">${INGREDIENTES[k]}</div>${barra(f, corNivel(f))}</div>`; }).join('')
+        }</div>`;
+    }
+    return `<div class="panel full"><div class="cab"><h2><span class="dot" style="background:${m.cor}"></span>${m.nome} <span style="font-weight:400;color:var(--muted);font-size:13px;">· ${m.id}</span></h2>
+      <span style="font-size:12.5px;color:var(--muted);">Última reposição ${haQuanto(estado.ultimaReposicao[i])}</span></div><div class="table-wrap" style="max-height:none;">${tabela}</div></div>`;
+  }).join('');
+  document.getElementById('stockMaquinas').innerHTML = html;
+
+  const de30 = agora - 30 * 86400000;
+  const rep30 = estado.reposicoes.filter(r => r.t >= de30 && r.t <= agora);
+  document.getElementById('sDisp').textContent = `${disp}/${total}`;
+  document.getElementById('sRep30').textContent = rep30.length;
+  document.getElementById('sUnid30').textContent = num(rep30.reduce((a, r) => a + (r.unidades || 0), 0));
+  const prox = MAQUINAS.map((_, i) => ({ i, t: proximaReposicao(i) })).filter(x => x.t).sort((a, b) => a.t - b.t);
+  document.getElementById('sProx').textContent = prox[0] ? quandoTexto(prox[0].t) : '—';
+  document.getElementById('sProx').style.fontSize = '20px';
+
+  document.getElementById('proxReposicoes').innerHTML = prox.map(x => {
+    const m = MAQUINAS[x.i];
+    return `<li><span class="dot" style="background:${m.cor};margin-top:5px;"></span><span><strong>${quandoTexto(x.t)}</strong><br><span style="color:var(--muted);font-size:12.5px;">${m.nome} · ${m.local}</span></span></li>`;
+  }).join('');
+
+  const hist = estado.reposicoes.filter(r => r.t <= agora).slice(-40).reverse();
+  document.getElementById('histReposicoes').innerHTML = `<table><thead><tr><th>Data</th><th>Máquina</th><th>O que foi feito</th><th class="num esconder-mobile">Duração</th><th class="esconder-mobile">Técnico</th></tr></thead><tbody>${
+    hist.map(r => {
+      const m = MAQUINAS[r.m];
+      const feito = m.tipo === 'snacks'
+        ? `${r.unidades} unidades repostas`
+        : `${num(r.copos)} copos · ${num(r.cafe, 1)} kg café · limpeza`;
+      return `<tr><td style="white-space:nowrap;">${new Date(r.t).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' })} <span class="mono" style="color:var(--muted);font-size:12px;">${hhmm(r.t)}</span></td><td><span class="dot" style="background:${m.cor}"></span>${m.nome}</td><td>${feito}</td><td class="num esconder-mobile">${r.duracaoMin} min</td><td class="esconder-mobile" style="white-space:nowrap;">${r.tecnico}</td></tr>`;
+    }).join('')
+  }</tbody></table>`;
+}
+
+// ===== ASSISTÊNCIA TÉCNICA =====
+// histórico fictício, sempre relativo ao dia de hoje para parecer recente
+const ASSISTENCIAS = [
+  { dias: 2,  hora: '10:15', m: 2, tipo: 'Corretiva',  desc: 'Produto preso no canal 23 — espiral realinhada', resposta: 95 },
+  { dias: 6,  hora: '08:40', m: 1, tipo: 'Preventiva', desc: 'Descalcificação e substituição do filtro de água', resposta: null },
+  { dias: 9,  hora: '15:30', m: 0, tipo: 'Corretiva',  desc: 'Leitor contactless sem ligação — terminal reiniciado e testado', resposta: 70 },
+  { dias: 13, hora: '11:05', m: 2, tipo: 'Corretiva',  desc: 'Moedeiro não aceitava moedas de 2 € — moedeiro limpo e calibrado', resposta: 140 },
+  { dias: 16, hora: '09:20', m: 0, tipo: 'Preventiva', desc: 'Limpeza do grupo de café e verificação de pressão', resposta: null },
+  { dias: 21, hora: '14:10', m: 1, tipo: 'Corretiva',  desc: 'Pequena fuga de água no depósito — vedante substituído', resposta: 110 },
+  { dias: 27, hora: '10:00', m: 2, tipo: 'Preventiva', desc: 'Limpeza geral, verificação de temperatura e das espirais', resposta: null },
+  { dias: 34, hora: '16:45', m: 1, tipo: 'Pedido',     desc: 'Pedido do cliente: acrescentar chá na máquina — configurado', resposta: 1440 },
+  { dias: 41, hora: '09:00', m: 0, tipo: 'Preventiva', desc: 'Descalcificação e substituição do filtro de água', resposta: null },
+];
+const pedidosDemo = [];
+function tempoResposta(min) { return min < 60 ? `${min} min` : min < 1440 ? `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}` : `${Math.round(min / 1440)} dia`; }
+
+function renderAssistencia() {
+  const lista = [
+    ...pedidosDemo,
+    ...ASSISTENCIAS.map(a => {
+      const [h, mi] = a.hora.split(':').map(Number);
+      const d = new Date(); d.setDate(d.getDate() - a.dias); d.setHours(h, mi, 0, 0);
+      return { ...a, t: d.getTime(), estado: 'Resolvida' };
+    }),
+  ];
+  const ult30 = lista.filter(a => !a.pendente && Date.now() - a.t <= 30 * 86400000);
+  const corretivas = ult30.filter(a => a.resposta);
+  document.getElementById('aDisp').textContent = '99,6%';
+  document.getElementById('aInter').textContent = ult30.length;
+  document.getElementById('aResp').textContent = corretivas.length ? tempoResposta(Math.round(corretivas.reduce((x, a) => x + a.resposta, 0) / corretivas.length)) : '—';
+  const prev = new Date(); prev.setDate(prev.getDate() + 5); prev.setHours(9, 0, 0, 0);
+  document.getElementById('aProx').textContent = dataCurta(prev.getTime());
+
+  const tagTipo = { Corretiva: 'aviso', Preventiva: 'ok', Pedido: 'ok' };
+  document.getElementById('histAssist').innerHTML = `<table><thead><tr><th>Data</th><th>Máquina</th><th>Tipo</th><th>Descrição</th><th class="num esconder-mobile">Resposta</th><th>Estado</th></tr></thead><tbody>${
+    lista.map(a => {
+      const m = MAQUINAS[a.m];
+      return `<tr><td style="white-space:nowrap;">${dataCurta(a.t)} <span class="mono" style="color:var(--muted);font-size:12px;">${hhmm(a.t)}</span></td>
+        <td><span class="dot" style="background:${m.cor}"></span>${m.nome}</td>
+        <td><span class="tag ${a.pendente ? 'aviso' : tagTipo[a.tipo]}">${a.tipo}</span></td>
+        <td>${esc(a.desc)}</td>
+        <td class="num esconder-mobile">${a.resposta ? tempoResposta(a.resposta) : '—'}</td>
+        <td>${a.pendente ? '<span class="tag aviso">⏳ Em análise</span>' : '<span class="tag ok">✓ Resolvida</span>'}</td></tr>`;
+    }).join('')
+  }</tbody></table>`;
+}
+document.getElementById('pedMaq').innerHTML = MAQUINAS.map((m, i) => `<option value="${i}">${m.nome}</option>`).join('');
+document.getElementById('pedBtn').addEventListener('click', () => {
+  const texto = document.getElementById('pedTexto').value.trim();
+  pedidosDemo.unshift({ t: Date.now(), m: Number(document.getElementById('pedMaq').value), tipo: 'Pedido', desc: document.getElementById('pedTipo').value + (texto ? ` — ${texto}` : ''), resposta: null, pendente: true });
+  document.getElementById('pedTexto').value = '';
+  const msg = document.getElementById('pedMsg');
+  msg.style.color = 'var(--positive)';
+  msg.textContent = '✓ Pedido registado. (Na demo fica só nesta página; no painel real chega de imediato à equipa técnica da MP Vending.)';
+  renderAssistencia();
+});
+
+// ===== VENDAS =====
+let periodo = 30;
+function renderVendas() {
+  const agora = Date.now();
+  const de = inicioDia(agora, -(periodo - 1));
+  const deAnt = inicioDia(agora, -(2 * periodo - 1));
+  const vs = entre(de, agora), ant = entre(deAnt, deAnt + (agora - de));
+  const r = soma(vs), rAnt = soma(ant);
+  document.getElementById('vReceita').textContent = eur(r);
+  document.getElementById('vReceitaL').textContent = `Receita · últimos ${periodo} dias`;
+  document.getElementById('vReceitaD').innerHTML = delta(r, rAnt, `vs ${periodo} dias anteriores`);
+  document.getElementById('vVendas').textContent = num(vs.length);
+  document.getElementById('vVendasD').innerHTML = delta(vs.length, ant.length, `vs ${periodo} dias anteriores`);
+  document.getElementById('vTicket').textContent = eur(vs.length ? r / vs.length : 0);
+  document.getElementById('vMedia').textContent = eur(r / periodo);
+
+  const dias = [...Array(periodo).keys()].map(n => inicioDia(agora, -(periodo - 1 - n)));
+  const labels = dias.map(t => new Date(t).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' }));
+  const idx = {}; dias.forEach((t, n) => idx[chaveDia(t)] = n);
+  const series = MAQUINAS.map(() => new Array(periodo).fill(0));
+  vs.forEach(v => { series[v.m][idx[chaveDia(v.t)]] += v.preco; });
+  document.getElementById('legendaMaquinas').innerHTML = MAQUINAS.map(m => `<span><span class="dot" style="background:${m.cor}"></span>${m.nome}</span>`).join('');
+  grafico('chDiario', {
+    type: 'bar',
+    data: { labels, datasets: MAQUINAS.map((m, i) => ({ label: m.nome, data: series[i], backgroundColor: m.cor, borderColor: '#fff', borderWidth: { top: 2 }, borderSkipped: false, maxBarThickness: 26 })) },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${eur(c.parsed.y)}`, footer: items => `Total: ${eur(items.reduce((a, c) => a + c.parsed.y, 0))}` } } },
+      scales: { x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 0, autoSkipPadding: 10 } }, y: { ...eixoEur, stacked: true, beginAtZero: true } },
+    },
+  });
+
+  // mapa de calor (segunda → domingo, 6h → 23h e madrugada agregada)
+  const DIAS_SEM = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+  const contagem = DIAS_SEM.map(() => new Array(24).fill(0));
+  const ocorrencias = new Array(7).fill(0);
+  dias.forEach(t => ocorrencias[(new Date(t).getDay() + 6) % 7]++);
+  vs.forEach(v => { const d = new Date(v.t); contagem[(d.getDay() + 6) % 7][d.getHours()]++; });
+  const medias = contagem.map((linha, d) => linha.map(x => x / Math.max(1, ocorrencias[d])));
+  const max = Math.max(...medias.flat());
+  const cor = x => { const f = max ? x / max : 0; if (f < 0.02) return '#F3F1EC'; const l = 94 - f * 52; return `hsl(33, 95%, ${l}%)`; };
+  document.getElementById('heat').innerHTML = `<thead><tr><th></th>${[...Array(24).keys()].map(h => `<th>${h % 3 === 0 ? h + 'h' : ''}</th>`).join('')}</tr></thead><tbody>${
+    medias.map((linha, d) => `<tr><th class="dia">${DIAS_SEM[d]}</th>${linha.map((x, h) => `<td style="background:${cor(x)}" title="${DIAS_SEM[d]} ${h}h: ${num(x, 1)} vendas em média"></td>`).join('')}</tr>`).join('')
+  }</tbody>`;
+
+  // pagamentos
+  const pag = PAGAMENTOS.map(p => vs.filter(v => v.pag === p).length);
+  const totalPag = pag.reduce((a, b) => a + b, 0) || 1;
+  grafico('chPag', {
+    type: 'bar',
+    data: { labels: PAGAMENTOS, datasets: [{ label: 'Vendas', data: pag.map(x => x / totalPag * 100), backgroundColor: '#1B1F27', borderRadius: 4, borderSkipped: 'start', maxBarThickness: 22 }] },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${num(c.parsed.x, 1)}% das vendas (${num(pag[c.dataIndex])})` } } },
+      scales: { x: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' }, grid: { color: '#EEEBE4' }, border: { display: false } }, y: { grid: { display: false } } },
+    },
+  });
+
+  // resumo por máquina
+  document.getElementById('resumoMaquinas').innerHTML = `<table><thead><tr><th>Máquina</th><th class="num">Receita</th><th class="num">Vendas</th><th class="num">Ticket médio</th><th class="num esconder-mobile">Melhor dia</th><th class="num">vs período anterior</th></tr></thead><tbody>${
+    MAQUINAS.map((m, i) => {
+      const a = vs.filter(v => v.m === i), b = ant.filter(v => v.m === i);
+      const ra = soma(a), rb = soma(b);
+      const melhor = series[i].indexOf(Math.max(...series[i]));
+      return `<tr><td><span class="dot" style="background:${m.cor}"></span>${m.nome}</td><td class="num">${eur(ra)}</td><td class="num">${num(a.length)}</td><td class="num">${eur(a.length ? ra / a.length : 0)}</td><td class="num esconder-mobile">${labels[melhor]} · ${eur(series[i][melhor])}</td><td class="num">${delta(ra, rb, '')}</td></tr>`;
+    }).join('')
+  }</tbody></table>`;
+}
+
+// ===== PRODUTOS =====
+let tipoProd = 'todos';
+function agregarProdutos(vs) {
+  const mapa = new Map();
+  vs.forEach(v => {
+    const m = MAQUINAS[v.m];
+    const chave = m.tipo + '|' + nomeProduto(v);
+    const r = mapa.get(chave) || { nome: nomeProduto(v), tipo: m.tipo, qtd: 0, receita: 0 };
+    r.qtd++; r.receita += v.preco; mapa.set(chave, r);
+  });
+  return mapa;
+}
+function renderProdutos() {
+  const agora = Date.now();
+  const vs30 = entre(agora - 30 * 86400000, agora);
+  const total = soma(vs30) || 1;
+  const lista = [...agregarProdutos(vs30).values()].sort((a, b) => b.receita - a.receita);
+  const filtrada = lista.filter(p => tipoProd === 'todos' || p.tipo === tipoProd).slice(0, 10);
+  grafico('chProd', {
+    type: 'bar',
+    data: { labels: filtrada.map(p => p.nome), datasets: [{ label: 'Receita', data: filtrada.map(p => p.receita), backgroundColor: '#FF9F1C', borderRadius: 4, borderSkipped: 'start', maxBarThickness: 20 }] },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${eur(c.parsed.x)} · ${num(filtrada[c.dataIndex].qtd)} unidades` } } },
+      scales: { x: { ...eixoEur, beginAtZero: true }, y: { grid: { display: false } } },
+    },
+  });
+
+  const ult7 = agregarProdutos(entre(agora - 7 * 86400000, agora));
+  const ant7 = agregarProdutos(entre(agora - 14 * 86400000, agora - 7 * 86400000));
+  const tend = [...ult7.entries()].map(([k, r]) => ({ ...r, antes: (ant7.get(k) || {}).qtd || 0 }))
+    .filter(r => r.antes >= 5).map(r => ({ ...r, var: (r.qtd - r.antes) / r.antes }))
+    .sort((a, b) => Math.abs(b.var) - Math.abs(a.var)).slice(0, 7);
+  document.getElementById('tendencias').innerHTML = tend.map(r => `<li><span class="tag ${r.var >= 0 ? 'ok' : 'aviso'}">${r.var >= 0 ? '▲' : '▼'} ${num(Math.abs(r.var) * 100)}%</span><span><strong>${esc(r.nome)}</strong> · ${r.qtd} vendas (antes ${r.antes})</span></li>`).join('');
+
+  document.getElementById('tabelaProdutos').innerHTML = `<table><thead><tr><th>Produto</th><th class="esconder-mobile">Tipo</th><th class="num">Unidades</th><th class="num">Receita</th><th class="num">% receita</th></tr></thead><tbody>${
+    lista.map(p => `<tr><td>${esc(p.nome)}</td><td class="esconder-mobile">${p.tipo === 'cafe' ? 'Café' : 'Snacks'}</td><td class="num">${num(p.qtd)}</td><td class="num">${eur(p.receita)}</td><td class="num">${num(p.receita / total * 100, 1)}%</td></tr>`).join('')
+  }</tbody></table>`;
+}
+
+// ===== navegação e ciclo ao vivo =====
+let vistaAtual = 'vivo';
+function renderVistaAtual(novas) {
+  if (vistaAtual === 'vivo') renderVivo(novas);
+  if (vistaAtual === 'vendas') renderVendas();
+  if (vistaAtual === 'stock') renderStock();
+  if (vistaAtual === 'assistencia') renderAssistencia();
+  if (vistaAtual === 'produtos') renderProdutos();
+}
+document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.tab-btn').forEach(x => x.classList.toggle('active', x === b));
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + b.dataset.view));
+  vistaAtual = b.dataset.view;
+  renderVistaAtual([]);
+}));
+document.querySelectorAll('#segPeriodo button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#segPeriodo button').forEach(x => x.classList.toggle('active', x === b));
+  periodo = Number(b.dataset.dias); renderVendas();
+}));
+document.querySelectorAll('#segProdTipo button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#segProdTipo button').forEach(x => x.classList.toggle('active', x === b));
+  tipoProd = b.dataset.tipo; renderProdutos();
+}));
+
+let ultimoRenderPesado = 0;
+function ciclo() {
+  const novas = avancarSimulacao();
+  document.getElementById('atualizado').textContent = 'atualizado às ' + hhmmss(Date.now());
+  // o separador "Ao vivo" atualiza a cada 5 s; os outros a cada minuto (ou quando entram vendas)
+  if (vistaAtual === 'vivo' || novas.length || Date.now() - ultimoRenderPesado > 60000) {
+    renderVistaAtual(novas);
+    ultimoRenderPesado = Date.now();
+  }
+}
+
+fetch('/demo/sessao', { cache: 'no-store' }).then(r => {
+  if (r.status === 401) { location.reload(); return null; }
+  return r.ok ? r.json() : null;
+}).then(s => {
+  if (!s) return;
+  const ate = new Date(s.acessoExpiraEm).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  document.getElementById('quem').textContent = `${s.nome} · acesso até ${ate}`;
+}).catch(() => {});
+
+ciclo();
+setInterval(ciclo, 5000);
+// se a sessão expirar com a página aberta, volta ao ecrã de login
+setInterval(() => fetch('/demo/sessao', { cache: 'no-store' }).then(r => { if (r.status === 401) location.reload(); }).catch(() => {}), 5 * 60000);
+</script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MP Vending · Demonstração</title>
+<meta name="robots" content="noindex, nofollow" />
+<style>
+  :root { --ink:#1B1F27; --bg:#F6F4EF; --panel:#FFFFFF; --line:#DEDAD1; --accent:#FF9F1C; --accent-deep:#C7710A; --negative:#E03131; --muted:#6B7280; }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg); color:var(--ink);
+    font-family:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; -webkit-font-smoothing:antialiased; padding:20px; }
+  .caixa { width:100%; max-width:380px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:28px 26px 22px; }
+  .logo { display:block; height:44px; margin:0 0 18px; }
+  .brand { font-size:12px; letter-spacing:.08em; color:var(--muted); }
+  h1 { margin:4px 0 6px; font-size:22px; font-weight:600; }
+  p.sub { margin:0 0 20px; font-size:14px; color:var(--muted); line-height:1.45; }
+  label { display:block; font-size:12.5px; color:var(--muted); margin:0 0 5px; }
+  input { width:100%; border:1px solid var(--line); border-radius:6px; padding:11px 12px; font-family:inherit; font-size:15px; margin-bottom:14px; background:#fff; }
+  input:focus { outline:2px solid var(--accent); outline-offset:0; border-color:var(--accent); }
+  button { width:100%; background:var(--ink); color:#fff; border:0; border-radius:6px; padding:12px; font-size:15px; font-weight:600; font-family:inherit; cursor:pointer; }
+  button:hover { background:#333744; }
+  .erro { display:none; background:#FCE0E0; color:#B42318; border-radius:6px; padding:10px 12px; font-size:13.5px; margin-bottom:16px; }
+  .rodape { margin-top:18px; font-size:12px; color:var(--muted); text-align:center; line-height:1.5; }
+  .rodape a { color:var(--accent-deep); }
+</style>
+</head>
+<body>
+  <form class="caixa" method="POST" action="/demo/entrar">
+    <img class="logo" src="/logo.png" alt="MP Vending" />
+    <div class="brand">MP VENDING · DEMONSTRAÇÃO</div>
+    <h1>Controlo de vendas ao minuto</h1>
+    <p class="sub">Entre com o utilizador e a password que recebeu para explorar o painel que acompanha as máquinas instaladas no seu espaço.</p>
+    <div class="erro" id="erro"></div>
+    <label for="utilizador">Utilizador</label>
+    <input id="utilizador" name="utilizador" autocomplete="username" autocapitalize="none" spellcheck="false" required />
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required />
+    <button type="submit">Entrar</button>
+    <div class="rodape">Ainda não tem acesso? Fale connosco em <a href="https://mpvending.pt">mpvending.pt</a></div>
+  </form>
+<script>
+  const erros = {
+    credenciais: 'Utilizador ou password incorretos.',
+    expirado: 'Este acesso de demonstração expirou. Contacte a MP Vending para receber um novo.',
+    bloqueado: 'Demasiadas tentativas. Tente de novo daqui a 15 minutos.',
+  };
+  const e = new URLSearchParams(location.search).get('erro');
+  if (e && erros[e]) { const el = document.getElementById('erro'); el.textContent = erros[e]; el.style.display = 'block'; }
+  document.getElementById('utilizador').focus();
+</script>
+</body>
+</html>

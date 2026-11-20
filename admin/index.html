@@ -500,6 +500,7 @@
   <button class="tab-btn" data-view="resultados">Resultados</button>
   <button class="tab-btn" data-view="smartcake">Smartcake</button>
   <button class="tab-btn" data-view="tarefas">Tarefas Pendentes</button>
+  <button class="tab-btn" data-view="demo">Acessos Demo</button>
 </div>
 
 <main>
@@ -1269,6 +1270,58 @@
         </div>
       </div>
       <div class="table-wrap tarefas-mobile" id="tarefasListaWrap"><div class="state small">a carregar…</div></div>
+    </div>
+  </div>
+
+  <div id="view-demo" class="view">
+    <div class="panel full">
+      <h2>Novo acesso à demo</h2>
+      <div style="font-size:13px;color:var(--muted);margin:-4px 0 14px;">Cria um utilizador temporário para um potencial cliente ver o painel de demonstração em <a href="/demo/" target="_blank" style="color:var(--accent-deep);">mpvending.pt/demo</a> (dados fictícios). O acesso desaparece sozinho quando expira.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
+        <div style="flex:1 1 200px;">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Cliente / empresa</label>
+          <input type="text" id="demoNome" maxlength="80" placeholder="ex: Worten Grijó" style="width:100%;border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;" />
+        </div>
+        <div style="flex:1 1 150px;">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Utilizador</label>
+          <input type="text" id="demoUser" maxlength="40" autocapitalize="none" spellcheck="false" placeholder="ex: worten" style="width:100%;border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;" />
+        </div>
+        <div style="flex:1 1 170px;">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Password</label>
+          <div style="display:flex;gap:6px;">
+            <input type="text" id="demoPass" maxlength="60" autocapitalize="none" spellcheck="false" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;" />
+            <button type="button" id="demoGerarPass" style="background:none;border:1px solid var(--line);border-radius:4px;padding:6px 10px;font-size:12.5px;cursor:pointer;font-family:inherit;">Gerar</button>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Válido por</label>
+          <select id="demoDias" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;">
+            <option value="3">3 dias</option>
+            <option value="7" selected>7 dias</option>
+            <option value="14">14 dias</option>
+            <option value="30">30 dias</option>
+          </select>
+        </div>
+        <button type="button" id="demoCriarBtn" style="background:var(--ink);color:#fff;border:none;border-radius:4px;padding:8px 16px;font-size:13px;cursor:pointer;">Criar acesso</button>
+      </div>
+      <div id="demoMsg" style="font-size:13px;margin-top:10px;"></div>
+      <div id="demoCriado" style="display:none;margin-top:14px;background:#FFF5E6;border:1px solid #F3DDB8;border-radius:6px;padding:12px 14px;">
+        <div style="font-size:12.5px;color:#7A4A06;margin-bottom:8px;"><strong>Copie já esta mensagem</strong> — por segurança, a password não volta a ser mostrada.</div>
+        <textarea id="demoMensagem" rows="8" readonly style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;background:#fff;resize:vertical;"></textarea>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+          <button type="button" id="demoCopiar" style="background:var(--ink);color:#fff;border:none;border-radius:4px;padding:8px 14px;font-size:13px;cursor:pointer;">Copiar mensagem</button>
+          <a id="demoWhatsapp" target="_blank" rel="noopener" style="border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:4px;padding:8px 14px;font-size:13px;text-decoration:none;">Enviar por WhatsApp</a>
+          <span id="demoCopiarMsg" style="font-size:12px;align-self:center;"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel full">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+        <h2 style="margin:0;">Acessos ativos</h2>
+        <a href="/demo/" target="_blank" style="font-size:13px;color:var(--accent-deep);">Abrir a demo ↗</a>
+      </div>
+      <div class="table-wrap cards-mobile" id="demoListaWrap"><div class="state small">a carregar…</div></div>
     </div>
   </div>
 
@@ -6589,6 +6642,108 @@
     return y + 10;
   }
 
+
+  // ===== Acessos Demo (mpvending.pt/demo) =====
+  let demoEventosLigados = false;
+  function demoGerarPassword() {
+    const letras = 'abcdefghjkmnpqrstuvwxyz23456789';
+    const r = crypto.getRandomValues(new Uint8Array(10));
+    return [...r].map(x => letras[x % letras.length]).join('').replace(/^(.{5})/, '$1-');
+  }
+  function demoSlug(texto) {
+    return String(texto || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30);
+  }
+  const demoData = t => new Date(t).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const demoDataHora = t => new Date(t).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+  async function carregarDemoAcessos() {
+    const wrap = document.getElementById('demoListaWrap');
+    try {
+      const res = await fetch('/api/demo-acessos', { cache: 'no-store' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || res.status);
+      const lista = data.acessos || [];
+      if (!lista.length) { wrap.innerHTML = '<div class="state small">Ainda não há acessos ativos.</div>'; return; }
+      const agora = Date.now();
+      wrap.innerHTML = `<table><thead><tr><th>Cliente</th><th>Utilizador</th><th>Criado</th><th>Expira</th><th class="num">Entradas</th><th>Última entrada</th><th></th></tr></thead><tbody>${
+        lista.map(a => {
+          const diasFalta = Math.ceil((a.expiraEm - agora) / 86400000);
+          const cor = diasFalta <= 1 ? 'var(--negative)' : 'var(--ink)';
+          return `<tr>
+            <td data-label="Cliente">${escapeHtml(a.nome)}</td>
+            <td data-label="Utilizador" style="font-family:'IBM Plex Mono',monospace;">${escapeHtml(a.utilizador)}</td>
+            <td data-label="Criado">${demoData(a.criadoEm)}</td>
+            <td data-label="Expira" style="color:${cor};">${demoData(a.expiraEm)} <span style="color:var(--muted);font-size:12px;">(${diasFalta <= 0 ? 'hoje' : diasFalta === 1 ? 'falta 1 dia' : 'faltam ' + diasFalta + ' dias'})</span></td>
+            <td data-label="Entradas" class="num">${a.nAcessos || 0}</td>
+            <td data-label="Última entrada">${a.ultimoAcesso ? demoDataHora(a.ultimoAcesso) : '<span style="color:var(--muted);">nunca entrou</span>'}</td>
+            <td data-label="" style="white-space:nowrap;">
+              <button type="button" class="demo-prolongar" data-user="${escapeHtml(a.utilizador)}" style="background:none;border:1px solid var(--line);border-radius:4px;padding:4px 8px;font-size:12px;cursor:pointer;font-family:inherit;">Renovar 7 dias</button>
+              <button type="button" class="demo-apagar" data-user="${escapeHtml(a.utilizador)}" style="background:none;border:1px solid var(--line);border-radius:4px;padding:4px 8px;font-size:12px;cursor:pointer;font-family:inherit;color:var(--negative);">Revogar</button>
+            </td></tr>`;
+        }).join('')
+      }</tbody></table>`;
+    } catch (err) {
+      wrap.innerHTML = `<div class="state small error">Erro: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  async function criarDemoAcesso() {
+    const msg = document.getElementById('demoMsg');
+    const nome = document.getElementById('demoNome').value.trim();
+    const utilizador = document.getElementById('demoUser').value.trim().toLowerCase();
+    const password = document.getElementById('demoPass').value.trim();
+    const dias = Number(document.getElementById('demoDias').value);
+    msg.style.color = 'var(--muted)'; msg.textContent = 'a criar…';
+    try {
+      const res = await fetch('/api/demo-acessos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome, utilizador, password, dias }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || res.status);
+      msg.style.color = 'var(--positive)'; msg.textContent = `Acesso criado para ${nome || utilizador}.`;
+      const texto = `Olá! Pode experimentar o painel de controlo de vendas da MP Vending (com dados de demonstração):\n\n${location.origin}/demo\nUtilizador: ${utilizador}\nPassword: ${password}\n\nO acesso é válido até ${demoData(data.expiraEm)}.`;
+      document.getElementById('demoMensagem').value = texto;
+      document.getElementById('demoWhatsapp').href = 'https://wa.me/?text=' + encodeURIComponent(texto);
+      document.getElementById('demoCopiarMsg').textContent = '';
+      document.getElementById('demoCriado').style.display = 'block';
+      document.getElementById('demoNome').value = '';
+      document.getElementById('demoUser').value = '';
+      document.getElementById('demoPass').value = demoGerarPassword();
+      carregarDemoAcessos();
+    } catch (err) {
+      msg.style.color = 'var(--negative)'; msg.textContent = 'Erro: ' + err.message;
+    }
+  }
+
+  async function loadDemoView() {
+    carregarDemoAcessos();
+    if (demoEventosLigados) return;
+    demoEventosLigados = true;
+    const pass = document.getElementById('demoPass');
+    if (!pass.value) pass.value = demoGerarPassword();
+    document.getElementById('demoGerarPass').addEventListener('click', () => { pass.value = demoGerarPassword(); });
+    const user = document.getElementById('demoUser');
+    user.addEventListener('input', () => { user.dataset.mexido = '1'; });
+    document.getElementById('demoNome').addEventListener('input', e => { if (!user.dataset.mexido) user.value = demoSlug(e.target.value); });
+    document.getElementById('demoCriarBtn').addEventListener('click', criarDemoAcesso);
+    document.getElementById('demoCopiar').addEventListener('click', async () => {
+      const t = document.getElementById('demoMensagem');
+      try { await navigator.clipboard.writeText(t.value); } catch { t.select(); document.execCommand('copy'); }
+      document.getElementById('demoCopiarMsg').textContent = '✓ copiada';
+    });
+    document.getElementById('demoListaWrap').addEventListener('click', async e => {
+      const b = e.target.closest('button'); if (!b) return;
+      const u = b.dataset.user;
+      if (b.classList.contains('demo-apagar')) {
+        if (!confirm(`Revogar o acesso "${u}"? O cliente deixa de conseguir entrar de imediato.`)) return;
+        await fetch(`/api/demo-acessos?utilizador=${encodeURIComponent(u)}`, { method: 'DELETE' });
+      } else if (b.classList.contains('demo-prolongar')) {
+        const res = await fetch('/api/demo-acessos', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ utilizador: u, dias: 7 }) });
+        if (!res.ok) { const d = await res.json().catch(() => ({})); alert('Erro: ' + (d.error || res.status)); }
+      }
+      carregarDemoAcessos();
+    });
+  }
+
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.body.dataset.view = btn.dataset.view;
@@ -6605,6 +6760,7 @@
       if (btn.dataset.view === 'resultados') loadResultadosView();
       if (btn.dataset.view === 'smartcake') loadSmartcakeView();
       if (btn.dataset.view === 'tarefas') loadTarefasView();
+      if (btn.dataset.view === 'demo') loadDemoView();
     });
   });
 
