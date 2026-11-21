@@ -123,19 +123,10 @@
   .navcta:hover{background:var(--blue-dark);}
   @media (max-width:800px){ .navlinks{display:none;} }
   .navacoes{display:flex; align-items:center; gap:10px;}
-  .navassist{border:2px solid var(--blue); color:var(--blue-dark); padding:9px 14px; font-weight:800; font-size:13px; border-radius:3px; white-space:nowrap; text-transform:uppercase; letter-spacing:0.02em;}
-  .navassist:hover{background:var(--blue); color:var(--white);}
-  .navassist .curto{display:none;}
   .navlinks a, .navcta{white-space:nowrap;}
   @media (max-width:1200px){ .navlinks{gap:22px;} }
   @media (max-width:1100px){ .navlinks{display:none;} }
-  @media (max-width:520px){
-    .brand-word{display:none;}
-    .navacoes{gap:8px;}
-    .navassist{padding:9px 10px; font-size:12px;}
-    .navassist .longo{display:none;} .navassist .curto{display:inline;}
-    .navcta{padding:11px 12px; font-size:12px;}
-  }
+  @media (max-width:420px){ .brand-word{font-size:14px;} .navcta{padding:11px 14px; font-size:12px;} }
   /* faixa no topo do site para clientes reportarem problemas */
   .faixa-assist{display:block; background:var(--ink); color:var(--white); text-align:center; padding:11px 16px; font-size:14px; line-height:1.35;}
   .faixa-assist b{font-weight:800;}
@@ -395,7 +386,6 @@
       <a href="#sobre">Sobre</a>
     </div>
     <div class="navacoes">
-      <a href="/assistencia/" class="navassist" title="Já é cliente? Reporte um problema numa máquina">🔧 <span class="longo">Reportar avaria</span><span class="curto">Avaria</span></a>
       <a href="#contacto" class="navcta">Pedir proposta</a>
     </div>
   </div>
