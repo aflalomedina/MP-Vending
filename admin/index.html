@@ -519,6 +519,18 @@
   .tk-tipo { font-weight: 600; font-size: 14.5px; }
   .tk-maq { color: var(--ink); }
   .tk-maq small { color: var(--muted); }
+  .tk-alocar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .tk-alocar select { border: 1px solid var(--line); border-radius: 4px; padding: 6px 7px; font-family: inherit; font-size: 12.5px; background: #fff; max-width: 100%; flex: 1 1 220px; }
+  .tk-alocar.por-alocar select { border-color: #E8A33D; background: #FFF7EA; }
+  .tk-alocar .tk-sugerir { border: 1px solid var(--accent); color: var(--accent-deep); background: #fff; border-radius: 4px; padding: 5px 9px; font-size: 12px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+  .tk-aviso { font-size: 11.5px; color: #A2620B; font-weight: 600; }
+  .tk-rel { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tk-rel th { text-align: left; font-weight: 600; color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .tk-rel td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .tk-rel tr.clicavel { cursor: pointer; }
+  .tk-rel tr.clicavel:hover td { background: var(--bg); }
+  .tk-rel .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .tk-chip { display: inline-block; margin: 1px 4px 1px 0; padding: 1px 7px; border-radius: 9px; background: var(--bg); font-size: 11.5px; white-space: nowrap; }
   .tk-desc { background: var(--bg); border-radius: 4px; padding: 8px 10px; white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
   .tk-fotos { display: flex; gap: 8px; flex-wrap: wrap; }
   .tk-fotos a { display: block; width: 84px; height: 84px; border-radius: 4px; overflow: hidden; border: 1px solid var(--line); background: var(--bg); }
@@ -1367,6 +1379,7 @@
         <div class="tk-filtros">
           <button type="button" class="tk-filtro active" data-f="abertos">Abertos</button>
           <button type="button" class="tk-filtro" data-f="Novo">Novos</button>
+          <button type="button" class="tk-filtro" data-f="alocar">Por alocar <span id="tkPorAlocarN"></span></button>
           <button type="button" class="tk-filtro" data-f="Resolvido">Resolvidos</button>
           <button type="button" class="tk-filtro" data-f="todos">Todos</button>
           <input type="text" id="tkPesquisa" placeholder="procurar máquina, telefone…" style="border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-family:inherit;font-size:13px;min-width:180px;" />
@@ -1374,9 +1387,21 @@
       </div>
       <div id="tkLista"><div class="state small">a carregar…</div></div>
     </div>
+    <div class="panel full">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+        <h2 style="margin:0;">Tickets por máquina</h2>
+        <select id="tkRelPeriodo" style="border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-family:inherit;font-size:13px;">
+          <option value="30">Últimos 30 dias</option>
+          <option value="90" selected>Últimos 90 dias</option>
+          <option value="365">Último ano</option>
+          <option value="0">Desde sempre</option>
+        </select>
+      </div>
+      <div id="tkRelatorio" style="overflow-x:auto;"><div class="state small">a carregar…</div></div>
+    </div>
     <div class="panel full" style="font-size:13px;color:var(--muted);line-height:1.6;">
       Os clientes reportam em <a href="/assistencia/" target="_blank" style="color:var(--accent-deep);">mpvending.pt/assistencia</a> (ligação no menu e no rodapé do site).
-      Para uma etiqueta/QR code numa máquina use <span style="font-family:'IBM Plex Mono',monospace;color:var(--ink);">mpvending.pt/assistencia/?maquina=007</span> — o campo da máquina já vem preenchido.
+      Os tickets que chegam pela etiqueta QR (<span style="font-family:'IBM Plex Mono',monospace;color:var(--ink);">mpvending.pt/assistencia/?m=007-S</span>) ficam logo alocados à máquina; os escritos à mão aparecem em <b>Por alocar</b> até escolherem a máquina no cartão.
       Este painel verifica novos tickets a cada minuto; cada ticket novo também chega por email.
       <span id="tkNotifWrap"> <button type="button" id="tkNotifBtn" style="background:none;border:1px solid var(--line);border-radius:4px;padding:4px 9px;font-size:12px;cursor:pointer;font-family:inherit;">Ativar notificações neste computador</button></span>
     </div>
@@ -7165,13 +7190,29 @@
     if (min < 1440) return `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}`;
     return `${(min / 1440).toFixed(1).replace('.', ',')} dias`;
   }
-  // se o cliente escreveu o número da etiqueta (ex: 007), mostra também o ponto de venda
-  function tkLocalMaquina(texto) {
-    const m = String(texto || '').match(/(?:^|\D)(\d{3})(\s*-?\s*S)?(?!\d)/i);
-    if (!m) return '';
-    const k = m[1] + (m[2] ? '-S' : '');
-    return MACHINES[k] ? `${k} · ${MACHINES[k]}` : (MACHINES[m[1]] ? `${m[1]} · ${MACHINES[m[1]]}` : '');
+  // sugere a máquina a partir do texto do cliente: número da etiqueta (ex: 007) ou nome do local
+  function tkSugestaoMaquina(texto) {
+    const t = String(texto || '');
+    const m = t.match(/(?:^|\D)(\d{3})(\s*-?\s*S)?(?!\d)/i);
+    if (m) {
+      const k = m[1] + (m[2] ? '-S' : '');
+      if (MACHINES[k]) return k;
+      if (MACHINES[m[1]]) return m[1];
+    }
+    // pelo nome do local: só sugere se houver uma única máquina nesse local
+    const norm = x => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const tn = norm(t);
+    const porLocal = Object.keys(MACHINES).filter(k => !MAQUINAS_EXCLUIDAS.has(k)).filter(k => {
+      const nome = norm(MACHINES[k].replace(/\s*\(.*?\)/g, '')).split(/\s+-\s+/)[0].trim();
+      return nome.length >= 4 && tn.includes(nome);
+    });
+    return porLocal.length === 1 ? porLocal[0] : '';
   }
+  function tkNomeMaquina(k) {
+    return k ? `${k} · ${MACHINES[k] || '?'} · ${tipoMaquinaLabel(k) === 'Snacks' ? 'snacks' : 'café'}` : '';
+  }
+  const tkOpcoesMaquinas = () => Object.keys(MACHINES).filter(k => !MAQUINAS_EXCLUIDAS.has(k))
+    .sort((a, b) => a.localeCompare(b));
   function tkTelefoneLinks(tel) {
     let d = String(tel || '').replace(/\D/g, '');
     if (d.startsWith('00')) d = d.slice(2);
@@ -7199,9 +7240,12 @@
     tkAtualizarContador(novos.length);
 
     const q = document.getElementById('tkPesquisa').value.trim().toLowerCase();
+    const porAlocar = tkLista.filter(t => !t.maquinaId).length;
+    document.getElementById('tkPorAlocarN').textContent = porAlocar ? `(${porAlocar})` : '';
+    renderTicketsPorMaquina();
     let lista = tkLista.filter(t =>
-      tkFiltro === 'todos' ? true : tkFiltro === 'abertos' ? t.estado !== 'Resolvido' : t.estado === tkFiltro);
-    if (q) lista = lista.filter(t => [t.maquina, t.telefone, t.tipo, t.descricao, t.nome, t.notas, '#' + t.numero].join(' ').toLowerCase().includes(q));
+      tkFiltro === 'todos' ? true : tkFiltro === 'abertos' ? t.estado !== 'Resolvido' : tkFiltro === 'alocar' ? !t.maquinaId : t.estado === tkFiltro);
+    if (q) lista = lista.filter(t => [t.maquina, t.maquinaId ? 'maq:' + t.maquinaId + '; ' + tkNomeMaquina(t.maquinaId) : '', t.telefone, t.tipo, t.descricao, t.nome, t.notas, '#' + t.numero].join(' ').toLowerCase().includes(q));
     // abertos: novos primeiro, depois em curso; dentro de cada, mais recentes primeiro
     const ordem = { 'Novo': 0, 'Em curso': 1, 'Resolvido': 2 };
     lista.sort((a, b) => (ordem[a.estado] - ordem[b.estado]) || String(b.criadoEm).localeCompare(String(a.criadoEm)));
@@ -7213,7 +7257,9 @@
     }
     const opcoes = (lista, atual) => lista.map(o => `<option value="${escapeHtml(o)}"${o === atual ? ' selected' : ''}>${escapeHtml(o || '— responsável —')}</option>`).join('');
     wrap.innerHTML = `<div class="tk-lista">${lista.map(t => {
-      const local = tkLocalMaquina(t.maquina);
+      const sug = t.maquinaId ? '' : tkSugestaoMaquina(t.maquina);
+      const opMaq = tkOpcoesMaquinas();
+      if (t.maquinaId && !opMaq.includes(t.maquinaId)) opMaq.unshift(t.maquinaId);
       const recente = t.estado === 'Novo' && agora - new Date(t.criadoEm).getTime() < 3600000;
       return `<div class="tk-card ${t.estado.replace(' ', '-')}${recente ? ' recente' : ''}" data-id="${escapeHtml(t.id)}">
         <div class="tk-topo">
@@ -7221,7 +7267,14 @@
           <span class="tk-quando">${tkDataHora(t.criadoEm)} · ${tkHaQuanto(t.criadoEm)}${t.ocorridoEm ? `<br>ocorreu ${escapeHtml(t.ocorridoEm.slice(8, 10) + '/' + t.ocorridoEm.slice(5, 7) + ' ' + t.ocorridoEm.slice(11, 16))}` : ''}</span>
         </div>
         <div class="tk-tipo">${escapeHtml(t.tipo)}</div>
-        <div class="tk-maq">📍 ${escapeHtml(t.maquina)}${local ? ` <small>(${escapeHtml(local)})</small>` : ''}</div>
+        <div class="tk-maq">📍 <small>cliente escreveu:</small> ${escapeHtml(t.maquina)}</div>
+        <div class="tk-alocar${t.maquinaId ? '' : ' por-alocar'}">
+          <select class="tk-maqid" aria-label="Máquina">
+            <option value="">⚠ por alocar a uma máquina</option>
+            ${opMaq.map(k => `<option value="${k}"${k === t.maquinaId ? ' selected' : ''}>${escapeHtml(tkNomeMaquina(k))}</option>`).join('')}
+          </select>
+          ${sug ? `<button type="button" class="tk-sugerir" data-maq="${sug}">Alocar a ${escapeHtml(sug)}?</button>` : ''}
+        </div>
         ${t.descricao ? `<div class="tk-desc">${escapeHtml(t.descricao)}</div>` : ''}
         ${t.fotos ? `<div class="tk-fotos">${Array.from({ length: t.fotos }, (_, i) => {
           const u = `/api/tickets?id=${encodeURIComponent(t.id)}&foto=${i}`;
@@ -7237,6 +7290,41 @@
         </div>
       </div>`;
     }).join('')}</div>`;
+  }
+
+  // ===== Report: tickets por máquina (só os alocados contam; os por alocar aparecem numa linha à parte) =====
+  function renderTicketsPorMaquina() {
+    const dias = Number(document.getElementById('tkRelPeriodo').value);
+    const desde = dias ? Date.now() - dias * 86400000 : 0;
+    const noPeriodo = tkLista.filter(t => new Date(t.criadoEm).getTime() >= desde);
+    const wrap = document.getElementById('tkRelatorio');
+    if (!noPeriodo.length) { wrap.innerHTML = '<div class="state small">Sem tickets neste período.</div>'; return; }
+    const por = {};
+    let semMaq = 0;
+    for (const t of noPeriodo) {
+      if (!t.maquinaId) { semMaq++; continue; }
+      const r = por[t.maquinaId] || (por[t.maquinaId] = { total: 0, abertos: 0, tipos: {}, ultimo: '', minutos: [] });
+      r.total++;
+      if (t.estado !== 'Resolvido') r.abertos++;
+      r.tipos[t.tipo] = (r.tipos[t.tipo] || 0) + 1;
+      if (t.criadoEm > r.ultimo) r.ultimo = t.criadoEm;
+      if (t.resolvidoEm) r.minutos.push(new Date(t.resolvidoEm) - new Date(t.criadoEm));
+    }
+    const linhas = Object.entries(por).sort((a, b) => b[1].total - a[1].total || b[1].ultimo.localeCompare(a[1].ultimo));
+    wrap.innerHTML = `<table class="tk-rel">
+      <thead><tr><th>Máquina</th><th>Local</th><th class="num">Tickets</th><th class="num">Abertos</th><th>Problemas</th><th>Tempo médio</th><th>Último</th></tr></thead>
+      <tbody>
+      ${linhas.map(([k, r]) => `<tr class="clicavel" data-maq="${k}" title="Ver os tickets desta máquina">
+        <td style="font-family:'IBM Plex Mono',monospace;font-weight:600;white-space:nowrap;">${k}</td>
+        <td>${escapeHtml(MACHINES[k] || '?')} <span style="color:var(--muted);font-size:11.5px;">${tipoMaquinaLabel(k) === 'Snacks' ? 'snacks' : 'café'}</span></td>
+        <td class="num"><b>${r.total}</b></td>
+        <td class="num">${r.abertos ? `<span style="color:var(--negative);font-weight:600;">${r.abertos}</span>` : '0'}</td>
+        <td>${Object.entries(r.tipos).sort((a, b) => b[1] - a[1]).map(([tp, n]) => `<span class="tk-chip">${escapeHtml(tp)} ${n}</span>`).join('')}</td>
+        <td style="white-space:nowrap;">${r.minutos.length ? tkDuracao(r.minutos.reduce((a, b) => a + b, 0) / r.minutos.length) : '—'}</td>
+        <td style="white-space:nowrap;color:var(--muted);">${tkDataHora(r.ultimo)}</td>
+      </tr>`).join('')}
+      ${semMaq ? `<tr class="clicavel" data-maq="-"><td colspan="2" style="color:#A2620B;font-weight:600;">⚠ Por alocar a uma máquina</td><td class="num"><b>${semMaq}</b></td><td colspan="4" style="color:var(--muted);">clique para alocar — só depois contam no report</td></tr>` : ''}
+      </tbody></table>`;
   }
 
   async function tkGuardar(id, alteracoes) {
@@ -7266,15 +7354,29 @@
       renderTickets();
     }));
     document.getElementById('tkPesquisa').addEventListener('input', renderTickets);
+    document.getElementById('tkRelPeriodo').addEventListener('change', renderTicketsPorMaquina);
+    document.getElementById('tkRelatorio').addEventListener('click', e => {
+      const tr = e.target.closest('tr[data-maq]'); if (!tr) return;
+      document.querySelectorAll('.tk-filtro').forEach(x => x.classList.toggle('active', x.dataset.f === (tr.dataset.maq === '-' ? 'alocar' : 'todos')));
+      tkFiltro = tr.dataset.maq === '-' ? 'alocar' : 'todos';
+      document.getElementById('tkPesquisa').value = tr.dataset.maq === '-' ? '' : 'maq:' + tr.dataset.maq.toLowerCase() + ';';
+      renderTickets();
+      document.getElementById('tkLista').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
     const lista = document.getElementById('tkLista');
     lista.addEventListener('change', e => {
       const card = e.target.closest('.tk-card'); if (!card) return;
       if (e.target.classList.contains('tk-estado')) tkGuardar(card.dataset.id, { estado: e.target.value });
       if (e.target.classList.contains('tk-resp')) tkGuardar(card.dataset.id, { responsavel: e.target.value });
+      if (e.target.classList.contains('tk-maqid')) tkGuardar(card.dataset.id, { maquinaId: e.target.value });
       if (e.target.classList.contains('tk-notas')) tkGuardar(card.dataset.id, { notas: e.target.value });
     });
     lista.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('tk-notas')) e.target.blur(); });
     lista.addEventListener('click', async e => {
+      if (e.target.classList.contains('tk-sugerir')) {
+        tkGuardar(e.target.closest('.tk-card').dataset.id, { maquinaId: e.target.dataset.maq });
+        return;
+      }
       if (!e.target.classList.contains('tk-apagar')) return;
       const card = e.target.closest('.tk-card');
       const t = tkLista.find(x => x.id === card.dataset.id);
