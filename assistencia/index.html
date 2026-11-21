@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Assistência técnica | MP Vending Solutions</title>
+<meta name="description" content="Clientes MP Vending: reporte aqui problemas numa máquina — moedas, produto encravado, falta de stock — ou sugira produtos novos. Chega de imediato à equipa técnica.">
+<link rel="canonical" href="https://mpvending.pt/assistencia/">
+<meta name="theme-color" content="#0B1220">
+<link rel="icon" href="/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --blue:#4A7FE5; --blue-dark:#2F5FC4; --ink:#0B1220; --white:#FFFFFF;
+    --gray-dark:#93A0B8; --line-dark:rgba(255,255,255,0.12); --line-light:rgba(11,18,32,0.10);
+    --ok:#3DD68C; --err:#FF7A7A;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{background:var(--ink); color:var(--white); font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh;}
+  a{color:inherit; text-decoration:none;}
+  .mono{font-family:'Space Mono',monospace;}
+  .wrap{max-width:760px; margin:0 auto; padding:0 20px;}
+
+  nav{position:sticky; top:0; z-index:50; background:var(--white); color:var(--ink); border-bottom:1px solid var(--line-light);}
+  nav .wrap{max-width:1180px; display:flex; align-items:center; justify-content:space-between; height:68px;}
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand img{width:36px; height:36px; display:block;}
+  .brand-word{font-family:'Archivo Black'; font-size:15px;}
+  .voltar{font-size:13px; font-weight:700; opacity:.7;}
+  .voltar:hover{opacity:1;}
+
+  header{padding:56px 0 28px;}
+  .tag{font-size:12px; color:var(--blue); letter-spacing:.08em; text-transform:uppercase; margin-bottom:14px;}
+  h1{font-family:'Archivo Black',sans-serif; font-weight:400; text-transform:uppercase; line-height:1; font-size:clamp(32px,7vw,52px); letter-spacing:-0.01em;}
+  h1 em{color:var(--blue); font-style:normal;}
+  .lead{color:var(--gray-dark); margin-top:16px; font-size:16px; line-height:1.6; max-width:560px;}
+
+  form{display:flex; flex-direction:column; gap:22px; padding-bottom:40px;}
+  .campo{display:flex; flex-direction:column; gap:8px;}
+  label, .rotulo{font-family:'Space Mono'; font-size:12px; color:var(--gray-dark); text-transform:uppercase; letter-spacing:0.04em;}
+  .rotulo b, label b{color:var(--blue); font-weight:700;}
+  .ajuda{font-size:13px; color:var(--gray-dark); line-height:1.5;}
+  input, textarea{
+    background:rgba(255,255,255,0.03); border:1px solid var(--line-dark); color:var(--white);
+    padding:15px 16px; font-family:'Inter'; font-size:16px; border-radius:6px; width:100%;
+  }
+  input:focus, textarea:focus{outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgba(74,127,229,.25);}
+  input::placeholder, textarea::placeholder{color:#5F6B82;}
+  input[type="datetime-local"]{color-scheme:dark;}
+  .linha{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  @media (max-width:620px){ .linha{grid-template-columns:1fr;} }
+
+  .tipos{display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px;}
+  .tipo input{position:absolute; opacity:0; pointer-events:none;}
+  .tipo span{
+    display:flex; align-items:center; gap:10px; min-height:58px; padding:12px 14px;
+    border:1px solid var(--line-dark); border-radius:6px; cursor:pointer; font-size:14px; font-weight:600;
+    transition:border-color .15s, background .15s;
+  }
+  .tipo span i{font-style:normal; font-size:20px;}
+  .tipo input:checked + span{border-color:var(--blue); background:rgba(74,127,229,.14);}
+  .tipo input:focus-visible + span{box-shadow:0 0 0 3px rgba(74,127,229,.35);}
+
+  button[type="submit"]{
+    background:var(--blue); color:var(--white); border:none; padding:18px; font-family:'Inter';
+    font-weight:800; text-transform:uppercase; letter-spacing:0.03em; font-size:15px;
+    border-radius:6px; cursor:pointer; transition:background .15s;
+  }
+  button[type="submit"]:hover{background:var(--blue-dark);}
+  button[disabled]{opacity:.6; cursor:wait;}
+  .erro{color:var(--err); font-size:14px; display:none;}
+  .hp{position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden;}
+
+  .sucesso{display:none; border:1px solid var(--line-dark); border-radius:8px; padding:32px 26px; margin-bottom:48px;}
+  .sucesso .icone{width:52px; height:52px; border-radius:50%; background:rgba(61,214,140,.15); color:var(--ok); display:flex; align-items:center; justify-content:center; font-size:26px; margin-bottom:18px;}
+  .sucesso h2{font-family:'Archivo Black'; font-weight:400; text-transform:uppercase; font-size:26px; line-height:1.1;}
+  .sucesso p{color:var(--gray-dark); margin-top:12px; line-height:1.6;}
+  .sucesso .num{color:var(--white); font-family:'Space Mono'; font-weight:700;}
+  .btn-sec{display:inline-block; margin-top:22px; border:1px solid var(--line-dark); padding:13px 18px; border-radius:6px; font-weight:700; font-size:14px; cursor:pointer; background:none; color:var(--white); font-family:'Inter';}
+  .btn-sec:hover{border-color:var(--blue);}
+
+  .urgente{border-top:1px solid var(--line-dark); padding:28px 0 48px; color:var(--gray-dark); font-size:14px; line-height:1.7;}
+  .urgente a{color:var(--white); font-weight:700; font-family:'Space Mono';}
+  .urgente a:hover{color:var(--blue);}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/logo.png" alt="MP Vending"><span class="brand-word">MP VENDING</span></a>
+    <a class="voltar" href="/">← Voltar ao site</a>
+  </div>
+</nav>
+
+<main class="wrap">
+  <header>
+    <div class="tag mono">Clientes · Assistência técnica</div>
+    <h1>Algum problema na <em>máquina?</em></h1>
+    <p class="lead">Diga-nos o que se passa e a equipa técnica recebe o pedido no momento. Não precisa de ligar — se for preciso, contactamos nós.</p>
+  </header>
+
+  <form id="ticketForm" novalidate>
+    <div class="campo">
+      <span class="rotulo">Qual é o problema? <b>*</b></span>
+      <div class="tipos" id="tipos" role="radiogroup">
+        <label class="tipo"><input type="radio" name="tipo" value="Moedas / troco"><span><i>🪙</i>Moedas / troco</span></label>
+        <label class="tipo"><input type="radio" name="tipo" value="Pagamento com cartão"><span><i>💳</i>Pagamento com cartão</span></label>
+        <label class="tipo"><input type="radio" name="tipo" value="Produto encravado"><span><i>📦</i>Produto encravado</span></label>
+        <label class="tipo"><input type="radio" name="tipo" value="Falta de stock"><span><i>🫙</i>Falta de stock</span></label>
+        <label class="tipo"><input type="radio" name="tipo" value="Máquina não liga / avariada"><span><i>⚠️</i>Não liga / avariada</span></label>
+        <label class="tipo"><input type="radio" name="tipo" value="Sugestão de produto"><span><i>💡</i>Sugestão de produto</span></label>
+        <label class="tipo"><input type="radio" name="tipo" value="Outro"><span><i>✏️</i>Outro</span></label>
+      </div>
+    </div>
+
+    <div class="campo">
+      <label for="maquina">Qual é a máquina? <b>*</b></label>
+      <input id="maquina" name="maquina" maxlength="120" required placeholder="ex: Empresa X — máquina de snacks do refeitório">
+      <span class="ajuda">Indique a empresa e onde está a máquina. Se tiver, acrescente o número da etiqueta (ex: 007).</span>
+    </div>
+
+    <div class="campo">
+      <label for="descricao" id="descricaoRotulo">Descreva o que aconteceu</label>
+      <textarea id="descricao" name="descricao" rows="4" maxlength="1000" placeholder="ex: meti 1 € e a máquina não deu o produto nem devolveu a moeda"></textarea>
+    </div>
+
+    <div class="linha">
+      <div class="campo">
+        <label for="telefone">Contacto telefónico <b>*</b></label>
+        <input id="telefone" name="telefone" type="tel" inputmode="tel" autocomplete="tel" maxlength="30" required placeholder="912 345 678">
+      </div>
+      <div class="campo">
+        <label for="ocorridoEm">Dia e hora</label>
+        <input id="ocorridoEm" name="ocorridoEm" type="datetime-local">
+      </div>
+    </div>
+
+    <div class="campo">
+      <label for="nome">O seu nome (opcional)</label>
+      <input id="nome" name="nome" maxlength="80" autocomplete="name" placeholder="Para sabermos por quem perguntar">
+    </div>
+
+    <div class="hp" aria-hidden="true"><label>Website<input type="text" name="website" id="website" tabindex="-1" autocomplete="off"></label></div>
+
+    <p class="erro" id="erro" role="alert"></p>
+    <button type="submit" id="enviar">Enviar pedido →</button>
+  </form>
+
+  <div class="sucesso" id="sucesso" role="status">
+    <div class="icone">✓</div>
+    <h2>Pedido recebido</h2>
+    <p id="sucessoTexto"></p>
+    <button type="button" class="btn-sec" id="outro">Reportar outro problema</button>
+  </div>
+
+  <div class="urgente">
+    Urgente, ou a máquina está a perder água? Ligue-nos:
+    <a href="tel:916073188">916 073 188</a> · <a href="tel:914079820">914 079 820</a>
+  </div>
+</main>
+
+<script>
+(function () {
+  var WEB3FORMS_KEY = 'd33cd99d-d70e-48e5-8157-fea4bae024f1'; // o mesmo do formulário de contacto do site
+  var form = document.getElementById('ticketForm');
+  var erro = document.getElementById('erro');
+  var btn = document.getElementById('enviar');
+  var campoData = document.getElementById('ocorridoEm');
+
+  function agoraLocal() {
+    var d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16);
+  }
+  function porDataAtual() { campoData.value = agoraLocal(); campoData.max = agoraLocal(); }
+  porDataAtual();
+
+  // QR code / etiqueta na máquina: mpvending.pt/assistencia/?maquina=007 já preenche a máquina
+  var params = new URLSearchParams(location.search);
+  if (params.get('maquina')) document.getElementById('maquina').value = params.get('maquina').slice(0, 120);
+  if (params.get('tipo')) {
+    var r = form.querySelector('input[name="tipo"][value="' + params.get('tipo').replace(/"/g, '') + '"]');
+    if (r) r.checked = true;
+  }
+
+  // o texto e a obrigatoriedade da descrição mudam com o tipo escolhido
+  var rotulo = document.getElementById('descricaoRotulo');
+  var desc = document.getElementById('descricao');
+  var TEXTOS = {
+    'Sugestão de produto': ['Que produto gostaria de ver na máquina? <b>*</b>', 'ex: águas com gás, barras de proteína, Coca-Cola Zero…'],
+    'Falta de stock': ['Que produto está em falta?', 'ex: o café com leite e as bolachas Oreo'],
+    'Produto encravado': ['Que produto ficou preso?', 'ex: o 3.º da fila de cima (Kit Kat), já paguei 1,20 €'],
+    'Outro': ['Descreva o problema <b>*</b>', 'Conte-nos o que se passa'],
+  };
+  form.addEventListener('change', function (e) {
+    if (e.target.name !== 'tipo') return;
+    var t = TEXTOS[e.target.value] || ['Descreva o que aconteceu', 'ex: meti 1 € e a máquina não deu o produto nem devolveu a moeda'];
+    rotulo.innerHTML = t[0];
+    desc.placeholder = t[1];
+  });
+
+  function mostrarErro(msg) { erro.textContent = msg; erro.style.display = msg ? 'block' : 'none'; }
+
+  function enviarEmail(d, numero) {
+    var assunto = '🔧 ' + (numero ? 'Ticket nº ' + numero : 'Novo ticket') + ' — ' + d.tipo + ' — ' + d.maquina;
+    return fetch('https://api.web3forms.com/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        access_key: WEB3FORMS_KEY,
+        subject: assunto,
+        from_name: 'Assistência MP Vending',
+        'Ticket': numero ? 'nº ' + numero : '(não ficou gravado no painel — tratar por aqui)',
+        'Problema': d.tipo,
+        'Máquina': d.maquina,
+        'Descrição': d.descricao || '—',
+        'Telefone': d.telefone,
+        'Nome': d.nome || '—',
+        'Dia e hora': d.ocorridoEm ? d.ocorridoEm.replace('T', ' às ') : '—',
+        'Painel': 'https://mpvending.pt/admin/#tickets',
+        botcheck: '',
+      }),
+    }).then(function (r) { return r.json(); }).then(function (j) { return !!(j && j.success); }).catch(function () { return false; });
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    mostrarErro('');
+    var tipoEl = form.querySelector('input[name="tipo"]:checked');
+    var d = {
+      tipo: tipoEl ? tipoEl.value : '',
+      maquina: document.getElementById('maquina').value.trim(),
+      descricao: desc.value.trim(),
+      telefone: document.getElementById('telefone').value.trim(),
+      ocorridoEm: campoData.value,
+      nome: document.getElementById('nome').value.trim(),
+      website: document.getElementById('website').value,
+    };
+    if (!d.tipo) { mostrarErro('Escolha qual é o problema.'); document.getElementById('tipos').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+    if (!d.maquina) { mostrarErro('Indique qual é a máquina.'); document.getElementById('maquina').focus(); return; }
+    if ((d.tipo === 'Outro' || d.tipo === 'Sugestão de produto') && !d.descricao) { mostrarErro(d.tipo === 'Outro' ? 'Descreva o problema.' : 'Diga-nos que produto gostaria de ver.'); desc.focus(); return; }
+    if (d.telefone.replace(/\D/g, '').length < 9) { mostrarErro('Indique um número de telefone válido.'); document.getElementById('telefone').focus(); return; }
+
+    btn.disabled = true; btn.textContent = 'A enviar…';
+    fetch('/api/tickets/novo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d) })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, j: j }; }); })
+      .catch(function () { return { ok: false, status: 0, j: {} }; })
+      .then(function (res) {
+        if (!res.ok && res.status >= 400 && res.status < 500) {
+          // erro de validação ou excesso de pedidos — o cliente corrige e volta a tentar
+          btn.disabled = false; btn.textContent = 'Enviar pedido →';
+          mostrarErro(res.j.error || 'Verifique os dados e tente de novo.');
+          return;
+        }
+        if (d.website) return concluir(0); // robô
+        var numero = res.ok ? res.j.numero : 0;
+        // email para a equipa: se o servidor já o enviou, não duplica; se o painel falhou, o email garante que não se perde
+        var precisaEmail = !(res.ok && res.j.emailServidor);
+        var envio = precisaEmail ? enviarEmail(d, numero) : Promise.resolve(true);
+        envio.then(function (emailOk) {
+          if (!res.ok && !emailOk) {
+            btn.disabled = false; btn.textContent = 'Tentar novamente →';
+            mostrarErro('Não conseguimos enviar o pedido (sem ligação?). Tente novamente ou ligue 916 073 188.');
+            return;
+          }
+          concluir(numero);
+        });
+      });
+  });
+
+  function concluir(numero) {
+    form.style.display = 'none';
+    document.getElementById('sucessoTexto').innerHTML = (numero ? 'O seu pedido tem o número <span class="num">#' + numero + '</span>. ' : '') +
+      'A equipa técnica já foi avisada e trata do assunto o mais depressa possível. Se precisarmos de mais detalhes, ligamos para o número que deixou.';
+    var s = document.getElementById('sucesso');
+    s.style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  document.getElementById('outro').addEventListener('click', function () {
+    var maquina = document.getElementById('maquina').value, tel = document.getElementById('telefone').value, nome = document.getElementById('nome').value;
+    form.reset();
+    document.getElementById('maquina').value = maquina; document.getElementById('telefone').value = tel; document.getElementById('nome').value = nome;
+    porDataAtual();
+    btn.disabled = false; btn.textContent = 'Enviar pedido →';
+    document.getElementById('sucesso').style.display = 'none';
+    form.style.display = 'flex';
+  });
+
+  // contagem de visitas no painel (mesmo tracking do site)
+  try {
+    var payload = JSON.stringify({ event: 'pageview', page: location.pathname, referrer: document.referrer, device: /mobile|android|iphone/i.test(navigator.userAgent) ? 'Telemóvel' : 'Computador' });
+    if (navigator.sendBeacon) navigator.sendBeacon('/api/track', new Blob([payload], { type: 'application/json' }));
+  } catch (e) {}
+})();
+</script>
+</body>
+</html>

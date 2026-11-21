@@ -497,6 +497,40 @@
     .maq-card dd { font-size: 13.5px; }
     .maq-card .esconder-mob { display: none; }
   }
+  /* ===== Tickets de clientes (mpvending.pt/assistencia) ===== */
+  .tab-contador { display: none; margin-left: 6px; min-width: 18px; padding: 1px 6px; border-radius: 9px; background: var(--negative); color: #fff; font-size: 11px; font-weight: 700; line-height: 16px; text-align: center; }
+  .tab-contador.on { display: inline-block; }
+  .tickets-alerta { display: none; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0; padding: 10px 32px; background: #FCE0E0; color: #8A1C12; font-size: 13.5px; border-bottom: 1px solid #F3C2BE; cursor: pointer; }
+  .tickets-alerta.on { display: flex; }
+  .tickets-alerta b { font-weight: 700; }
+  .tickets-alerta span.ver { font-weight: 600; text-decoration: underline; white-space: nowrap; }
+  .tk-filtros { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .tk-filtro { border: 1px solid var(--line); background: var(--panel); color: var(--muted); padding: 6px 12px; border-radius: 14px; font-size: 12.5px; cursor: pointer; font-family: inherit; }
+  .tk-filtro.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .tk-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
+  .tk-card { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 6px; padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+  .tk-card.Novo { border-left-color: var(--negative); }
+  .tk-card.Em-curso { border-left-color: var(--accent); }
+  .tk-card.Resolvido { border-left-color: var(--positive); opacity: .8; }
+  .tk-card.recente { box-shadow: 0 0 0 2px #F8B4B0; }
+  .tk-topo { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .tk-num { font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
+  .tk-quando { color: var(--muted); font-size: 12px; text-align: right; }
+  .tk-tipo { font-weight: 600; font-size: 14.5px; }
+  .tk-maq { color: var(--ink); }
+  .tk-maq small { color: var(--muted); }
+  .tk-desc { background: var(--bg); border-radius: 4px; padding: 8px 10px; white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
+  .tk-contacto { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .tk-contacto a { border: 1px solid var(--line); border-radius: 4px; padding: 6px 10px; text-decoration: none; color: var(--ink); font-size: 12.5px; }
+  .tk-contacto a.ligar { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .tk-acoes { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; border-top: 1px solid var(--line); padding-top: 9px; }
+  .tk-acoes select, .tk-acoes input { border: 1px solid var(--line); border-radius: 4px; padding: 6px 7px; font-family: inherit; font-size: 12.5px; background: #fff; }
+  .tk-acoes input { flex: 1 1 140px; min-width: 0; }
+  .tk-apagar { background: none; border: 0; color: var(--negative); font-size: 12px; cursor: pointer; font-family: inherit; margin-left: auto; }
+  @media (max-width: 700px) {
+    .tickets-alerta { padding: 10px 12px; }
+    .tk-lista { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body data-view="diarias">
@@ -518,6 +552,7 @@
 
 <div class="tabs">
   <button class="tab-btn active" data-view="diarias">Vendas Diárias</button>
+  <button class="tab-btn" data-view="tickets">Tickets <span class="tab-contador" id="ticketsContador"></span></button>
   <button class="tab-btn" data-view="maquinas">Máquinas</button>
   <button class="tab-btn" data-view="stocks">Stocks</button>
   <button class="tab-btn" data-view="reposicao">Reposição e Layouts</button>
@@ -529,6 +564,8 @@
   <button class="tab-btn" data-view="tarefas">Tarefas Pendentes</button>
   <button class="tab-btn" data-view="demo">Acessos Demo</button>
 </div>
+
+<div class="tickets-alerta" id="ticketsAlerta" role="alert"><span id="ticketsAlertaTexto"></span><span class="ver">Ver tickets →</span></div>
 
 <main>
   <div id="view-diarias" class="view active">
@@ -1311,6 +1348,34 @@
         </div>
       </div>
       <div class="table-wrap tarefas-mobile" id="tarefasListaWrap"><div class="state small">a carregar…</div></div>
+    </div>
+  </div>
+
+  <div id="view-tickets" class="view">
+    <div class="kpis">
+      <div class="kpi"><div class="value" id="tkKpiNovos">—</div><div class="label">Novos (por ver)</div></div>
+      <div class="kpi"><div class="value" id="tkKpiCurso">—</div><div class="label">Em curso</div></div>
+      <div class="kpi"><div class="value" id="tkKpiResolvidos">—</div><div class="label">Resolvidos (30 dias)</div></div>
+      <div class="kpi"><div class="value" id="tkKpiTempo">—</div><div class="label">Tempo médio até resolver</div></div>
+    </div>
+    <div class="panel full">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+        <h2 style="margin:0;">Tickets de clientes</h2>
+        <div class="tk-filtros">
+          <button type="button" class="tk-filtro active" data-f="abertos">Abertos</button>
+          <button type="button" class="tk-filtro" data-f="Novo">Novos</button>
+          <button type="button" class="tk-filtro" data-f="Resolvido">Resolvidos</button>
+          <button type="button" class="tk-filtro" data-f="todos">Todos</button>
+          <input type="text" id="tkPesquisa" placeholder="procurar máquina, telefone…" style="border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-family:inherit;font-size:13px;min-width:180px;" />
+        </div>
+      </div>
+      <div id="tkLista"><div class="state small">a carregar…</div></div>
+    </div>
+    <div class="panel full" style="font-size:13px;color:var(--muted);line-height:1.6;">
+      Os clientes reportam em <a href="/assistencia/" target="_blank" style="color:var(--accent-deep);">mpvending.pt/assistencia</a> (ligação no menu e no rodapé do site).
+      Para uma etiqueta/QR code numa máquina use <span style="font-family:'IBM Plex Mono',monospace;color:var(--ink);">mpvending.pt/assistencia/?maquina=007</span> — o campo da máquina já vem preenchido.
+      Este painel verifica novos tickets a cada minuto; cada ticket novo também chega por email.
+      <span id="tkNotifWrap"> <button type="button" id="tkNotifBtn" style="background:none;border:1px solid var(--line);border-radius:4px;padding:4px 9px;font-size:12px;cursor:pointer;font-family:inherit;">Ativar notificações neste computador</button></span>
     </div>
   </div>
 
@@ -6953,6 +7018,7 @@
       if (btn.dataset.view === 'smartcake') loadSmartcakeView();
       if (btn.dataset.view === 'tarefas') loadTarefasView();
       if (btn.dataset.view === 'demo') loadDemoView();
+      if (btn.dataset.view === 'tickets') loadTicketsView();
     });
   });
 
@@ -7069,6 +7135,204 @@
     if (!date) return;
     compareWithDate(date);
   });
+
+  // ===== Separador Tickets: problemas reportados pelos clientes em mpvending.pt/assistencia =====
+  let tkLista = [], tkFiltro = 'abertos', tkEventosLigados = false, tkUltimoIdServidor = null;
+  const TK_TITULO_ORIGINAL = document.title;
+  const tkLS = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+  };
+
+  function tkDataHora(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleString('pt-PT', { timeZone: 'Europe/Lisbon', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '');
+  }
+  function tkHaQuanto(iso) {
+    const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+    if (min < 1) return 'agora mesmo';
+    if (min < 60) return `há ${min} min`;
+    if (min < 1440) return `há ${Math.floor(min / 60)} h`;
+    const d = Math.floor(min / 1440);
+    return d === 1 ? 'há 1 dia' : `há ${d} dias`;
+  }
+  function tkDuracao(ms) {
+    const min = Math.round(ms / 60000);
+    if (min < 60) return `${min} min`;
+    if (min < 1440) return `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}`;
+    return `${(min / 1440).toFixed(1).replace('.', ',')} dias`;
+  }
+  // se o cliente escreveu o número da etiqueta (ex: 007), mostra também o ponto de venda
+  function tkLocalMaquina(texto) {
+    const m = String(texto || '').match(/(?:^|\D)(\d{3})(\s*-?\s*S)?(?!\d)/i);
+    if (!m) return '';
+    const k = m[1] + (m[2] ? '-S' : '');
+    return MACHINES[k] ? `${k} · ${MACHINES[k]}` : (MACHINES[m[1]] ? `${m[1]} · ${MACHINES[m[1]]}` : '');
+  }
+  function tkTelefoneLinks(tel) {
+    let d = String(tel || '').replace(/\D/g, '');
+    if (d.startsWith('00')) d = d.slice(2);
+    const wa = d.length === 9 ? '351' + d : d;
+    return `<a class="ligar" href="tel:${escapeHtml(String(tel).replace(/[^\d+]/g, ''))}">📞 ${escapeHtml(tel)}</a>
+      <a href="https://wa.me/${wa}" target="_blank" rel="noopener">WhatsApp</a>`;
+  }
+
+  async function carregarTickets() {
+    const res = await fetch('/api/tickets', { cache: 'no-store' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    tkLista = data.tickets || [];
+  }
+
+  function renderTickets() {
+    const agora = Date.now();
+    const novos = tkLista.filter(t => t.estado === 'Novo');
+    const resolvidos30 = tkLista.filter(t => t.estado === 'Resolvido' && t.resolvidoEm && agora - new Date(t.resolvidoEm).getTime() <= 30 * 86400000);
+    document.getElementById('tkKpiNovos').textContent = novos.length;
+    document.getElementById('tkKpiCurso').textContent = tkLista.filter(t => t.estado === 'Em curso').length;
+    document.getElementById('tkKpiResolvidos').textContent = resolvidos30.length;
+    document.getElementById('tkKpiTempo').textContent = resolvidos30.length
+      ? tkDuracao(resolvidos30.reduce((s, t) => s + (new Date(t.resolvidoEm) - new Date(t.criadoEm)), 0) / resolvidos30.length) : '—';
+    tkAtualizarContador(novos.length);
+
+    const q = document.getElementById('tkPesquisa').value.trim().toLowerCase();
+    let lista = tkLista.filter(t =>
+      tkFiltro === 'todos' ? true : tkFiltro === 'abertos' ? t.estado !== 'Resolvido' : t.estado === tkFiltro);
+    if (q) lista = lista.filter(t => [t.maquina, t.telefone, t.tipo, t.descricao, t.nome, t.notas, '#' + t.numero].join(' ').toLowerCase().includes(q));
+    // abertos: novos primeiro, depois em curso; dentro de cada, mais recentes primeiro
+    const ordem = { 'Novo': 0, 'Em curso': 1, 'Resolvido': 2 };
+    lista.sort((a, b) => (ordem[a.estado] - ordem[b.estado]) || String(b.criadoEm).localeCompare(String(a.criadoEm)));
+
+    const wrap = document.getElementById('tkLista');
+    if (!lista.length) {
+      wrap.innerHTML = `<div class="state small">${tkLista.length ? 'Nenhum ticket neste filtro.' : 'Ainda não chegou nenhum ticket. Quando um cliente reportar um problema em mpvending.pt/assistencia aparece aqui.'}</div>`;
+      return;
+    }
+    const opcoes = (lista, atual) => lista.map(o => `<option value="${escapeHtml(o)}"${o === atual ? ' selected' : ''}>${escapeHtml(o || '— responsável —')}</option>`).join('');
+    wrap.innerHTML = `<div class="tk-lista">${lista.map(t => {
+      const local = tkLocalMaquina(t.maquina);
+      const recente = t.estado === 'Novo' && agora - new Date(t.criadoEm).getTime() < 3600000;
+      return `<div class="tk-card ${t.estado.replace(' ', '-')}${recente ? ' recente' : ''}" data-id="${escapeHtml(t.id)}">
+        <div class="tk-topo">
+          <span><span class="tk-num">#${t.numero || '—'}</span> ${t.estado === 'Novo' ? '<span class="badge E">Novo</span>' : t.estado === 'Em curso' ? '<span class="badge P">Em curso</span>' : '<span class="badge" style="background:#DDF5E3;color:#1E7B34;">Resolvido</span>'}</span>
+          <span class="tk-quando">${tkDataHora(t.criadoEm)} · ${tkHaQuanto(t.criadoEm)}${t.ocorridoEm ? `<br>ocorreu ${escapeHtml(t.ocorridoEm.slice(8, 10) + '/' + t.ocorridoEm.slice(5, 7) + ' ' + t.ocorridoEm.slice(11, 16))}` : ''}</span>
+        </div>
+        <div class="tk-tipo">${escapeHtml(t.tipo)}</div>
+        <div class="tk-maq">📍 ${escapeHtml(t.maquina)}${local ? ` <small>(${escapeHtml(local)})</small>` : ''}</div>
+        ${t.descricao ? `<div class="tk-desc">${escapeHtml(t.descricao)}</div>` : ''}
+        <div class="tk-contacto">${tkTelefoneLinks(t.telefone)}${t.nome ? `<span style="color:var(--muted);">${escapeHtml(t.nome)}</span>` : ''}</div>
+        <div class="tk-acoes">
+          <select class="tk-estado" aria-label="Estado">${opcoes(['Novo', 'Em curso', 'Resolvido'], t.estado)}</select>
+          <select class="tk-resp" aria-label="Responsável">${opcoes(['', 'Pedro', 'Meir'], t.responsavel || '')}</select>
+          <input class="tk-notas" maxlength="2000" placeholder="nota interna (ex: vou lá amanhã)" value="${escapeHtml(t.notas || '')}" />
+          ${t.resolvidoEm ? `<span style="font-size:11.5px;color:var(--muted);">resolvido ${tkDataHora(t.resolvidoEm)}</span>` : ''}
+          <button type="button" class="tk-apagar">Apagar</button>
+        </div>
+      </div>`;
+    }).join('')}</div>`;
+  }
+
+  async function tkGuardar(id, alteracoes) {
+    const res = await fetch(`/api/tickets?id=${encodeURIComponent(id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(alteracoes) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { alert('Erro ao guardar: ' + (data.error || res.status)); return; }
+    const i = tkLista.findIndex(t => t.id === id);
+    if (i >= 0) tkLista[i] = data.ticket;
+    renderTickets();
+  }
+
+  async function loadTicketsView() {
+    if (tkUltimoIdServidor) tkLS.set('tk:visto', tkUltimoIdServidor);
+    document.getElementById('ticketsAlerta').classList.remove('on');
+    try {
+      await carregarTickets();
+      renderTickets();
+    } catch (err) {
+      document.getElementById('tkLista').innerHTML = `<div class="state small error">Erro: ${escapeHtml(err.message)}</div>`;
+    }
+    if (tkEventosLigados) return;
+    tkEventosLigados = true;
+    document.querySelectorAll('.tk-filtro').forEach(b => b.addEventListener('click', () => {
+      document.querySelectorAll('.tk-filtro').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      tkFiltro = b.dataset.f;
+      renderTickets();
+    }));
+    document.getElementById('tkPesquisa').addEventListener('input', renderTickets);
+    const lista = document.getElementById('tkLista');
+    lista.addEventListener('change', e => {
+      const card = e.target.closest('.tk-card'); if (!card) return;
+      if (e.target.classList.contains('tk-estado')) tkGuardar(card.dataset.id, { estado: e.target.value });
+      if (e.target.classList.contains('tk-resp')) tkGuardar(card.dataset.id, { responsavel: e.target.value });
+      if (e.target.classList.contains('tk-notas')) tkGuardar(card.dataset.id, { notas: e.target.value });
+    });
+    lista.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('tk-notas')) e.target.blur(); });
+    lista.addEventListener('click', async e => {
+      if (!e.target.classList.contains('tk-apagar')) return;
+      const card = e.target.closest('.tk-card');
+      const t = tkLista.find(x => x.id === card.dataset.id);
+      if (!confirm(`Apagar o ticket #${t ? t.numero : ''}? Não dá para recuperar.`)) return;
+      await fetch(`/api/tickets?id=${encodeURIComponent(card.dataset.id)}`, { method: 'DELETE' });
+      tkLista = tkLista.filter(x => x.id !== card.dataset.id);
+      renderTickets();
+    });
+    const notifBtn = document.getElementById('tkNotifBtn');
+    if (!('Notification' in window) || Notification.permission === 'granted') document.getElementById('tkNotifWrap').style.display = 'none';
+    notifBtn.addEventListener('click', async () => {
+      try { const p = await Notification.requestPermission(); if (p === 'granted') document.getElementById('tkNotifWrap').style.display = 'none'; } catch {}
+    });
+  }
+
+  // ===== Alertas de tickets novos (contador no separador, faixa no topo, título do browser, notificação) =====
+  function tkAtualizarContador(novos) {
+    const c = document.getElementById('ticketsContador');
+    c.textContent = novos > 99 ? '99+' : String(novos);
+    c.classList.toggle('on', novos > 0);
+    document.title = novos > 0 ? `(${novos}) ${TK_TITULO_ORIGINAL}` : TK_TITULO_ORIGINAL;
+    const alerta = document.getElementById('ticketsAlerta');
+    const naVista = document.body.dataset.view === 'tickets';
+    alerta.classList.toggle('on', novos > 0 && !naVista);
+    document.getElementById('ticketsAlertaTexto').innerHTML = `🔧 <b>${novos} ${novos === 1 ? 'ticket novo' : 'tickets novos'}</b> de clientes por ver`;
+  }
+
+  async function tkVerificarNovos() {
+    let r;
+    try {
+      const res = await fetch('/api/tickets?resumo=1', { cache: 'no-store' });
+      if (!res.ok) return;
+      r = await res.json();
+    } catch { return; }
+    const mudou = tkUltimoIdServidor && r.ultimoId && r.ultimoId !== tkUltimoIdServidor;
+    tkUltimoIdServidor = r.ultimoId;
+    tkAtualizarContador(r.novos || 0);
+    if (document.body.dataset.view === 'tickets') {
+      if (r.ultimoId) tkLS.set('tk:visto', r.ultimoId);
+      if (mudou) carregarTickets().then(renderTickets).catch(() => {});
+    }
+    // notificação do sistema só quando chega um ticket que ainda não foi alertado (e com permissão dada)
+    if (r.ultimoId && r.novos > 0 && r.ultimoId !== tkLS.get('tk:alertado') && r.ultimoId !== tkLS.get('tk:visto')) {
+      tkLS.set('tk:alertado', r.ultimoId);
+      if (mudou || !tkLS.get('tk:visto')) {
+        try {
+          if ('Notification' in window && Notification.permission === 'granted') {
+            const n = new Notification('MP Vending · novo ticket de cliente', { body: `${r.novos} ${r.novos === 1 ? 'ticket por ver' : 'tickets por ver'} — toque para abrir`, icon: '/logo.png', tag: 'mpv-tickets' });
+            n.onclick = () => { window.focus(); document.querySelector('.tab-btn[data-view="tickets"]').click(); n.close(); };
+          }
+        } catch {}
+      }
+    }
+  }
+
+  document.getElementById('ticketsAlerta').addEventListener('click', () => {
+    const b = document.querySelector('.tab-btn[data-view="tickets"]');
+    b.click();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+  tkVerificarNovos();
+  setInterval(() => { if (!document.hidden) tkVerificarNovos(); }, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) tkVerificarNovos(); });
+  // o link dos emails (mpvending.pt/admin/#tickets) abre logo este separador
+  if (location.hash === '#tickets') setTimeout(() => document.querySelector('.tab-btn[data-view="tickets"]').click(), 0);
 
   init();
 </script>
