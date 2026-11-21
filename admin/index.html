@@ -520,6 +520,9 @@
   .tk-maq { color: var(--ink); }
   .tk-maq small { color: var(--muted); }
   .tk-desc { background: var(--bg); border-radius: 4px; padding: 8px 10px; white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
+  .tk-fotos { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tk-fotos a { display: block; width: 84px; height: 84px; border-radius: 4px; overflow: hidden; border: 1px solid var(--line); background: var(--bg); }
+  .tk-fotos img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .tk-contacto { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .tk-contacto a { border: 1px solid var(--line); border-radius: 4px; padding: 6px 10px; text-decoration: none; color: var(--ink); font-size: 12.5px; }
   .tk-contacto a.ligar { background: var(--ink); color: #fff; border-color: var(--ink); }
@@ -7214,12 +7217,16 @@
       const recente = t.estado === 'Novo' && agora - new Date(t.criadoEm).getTime() < 3600000;
       return `<div class="tk-card ${t.estado.replace(' ', '-')}${recente ? ' recente' : ''}" data-id="${escapeHtml(t.id)}">
         <div class="tk-topo">
-          <span><span class="tk-num">#${t.numero || '—'}</span> ${t.estado === 'Novo' ? '<span class="badge E">Novo</span>' : t.estado === 'Em curso' ? '<span class="badge P">Em curso</span>' : '<span class="badge" style="background:#DDF5E3;color:#1E7B34;">Resolvido</span>'}</span>
+          <span><span class="tk-num">#${t.numero || '—'}</span>${t.fotos ? ` <span title="${t.fotos} fotografia(s)">📷${t.fotos > 1 ? t.fotos : ''}</span>` : ''} ${t.estado === 'Novo' ? '<span class="badge E">Novo</span>' : t.estado === 'Em curso' ? '<span class="badge P">Em curso</span>' : '<span class="badge" style="background:#DDF5E3;color:#1E7B34;">Resolvido</span>'}</span>
           <span class="tk-quando">${tkDataHora(t.criadoEm)} · ${tkHaQuanto(t.criadoEm)}${t.ocorridoEm ? `<br>ocorreu ${escapeHtml(t.ocorridoEm.slice(8, 10) + '/' + t.ocorridoEm.slice(5, 7) + ' ' + t.ocorridoEm.slice(11, 16))}` : ''}</span>
         </div>
         <div class="tk-tipo">${escapeHtml(t.tipo)}</div>
         <div class="tk-maq">📍 ${escapeHtml(t.maquina)}${local ? ` <small>(${escapeHtml(local)})</small>` : ''}</div>
         ${t.descricao ? `<div class="tk-desc">${escapeHtml(t.descricao)}</div>` : ''}
+        ${t.fotos ? `<div class="tk-fotos">${Array.from({ length: t.fotos }, (_, i) => {
+          const u = `/api/tickets?id=${encodeURIComponent(t.id)}&foto=${i}`;
+          return `<a href="${u}" target="_blank" rel="noopener" title="Abrir fotografia ${i + 1}"><img src="${u}" alt="Fotografia ${i + 1} do ticket #${t.numero}" loading="lazy"></a>`;
+        }).join('')}</div>` : ''}
         <div class="tk-contacto">${tkTelefoneLinks(t.telefone)}${t.nome ? `<span style="color:var(--muted);">${escapeHtml(t.nome)}</span>` : ''}</div>
         <div class="tk-acoes">
           <select class="tk-estado" aria-label="Estado">${opcoes(['Novo', 'Em curso', 'Resolvido'], t.estado)}</select>
