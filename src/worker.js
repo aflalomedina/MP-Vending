@@ -1,4 +1,5 @@
 import { handleDemo, handleDemoAcessos } from "./demo.js";
+import { handleTicketPublico, handleTickets } from "./tickets.js";
 
 // ===== Autenticação simples (HTTP Basic) para /admin e /api =====
 function checkAuth(request, env) {
@@ -942,6 +943,15 @@ export default {
       }
     }
 
+    // /api/tickets/novo fica público: clientes reportam avarias em mpvending.pt/assistencia sem password
+    if (url.pathname === "/api/tickets/novo") {
+      try {
+        return await handleTicketPublico(request, env, ctx);
+      } catch (err) {
+        return jsonResponse({ error: "Não foi possível registar o pedido. Tente novamente ou ligue-nos." }, 500);
+      }
+    }
+
     // /demo tem o seu próprio login (acessos temporários criados no admin) — ver src/demo.js
     const demo = await handleDemo(request, env);
     if (demo) return demo;
@@ -1057,6 +1067,14 @@ export default {
           status: 500,
           headers: { "Content-Type": "application/json" },
         });
+      }
+    }
+
+    if (url.pathname === "/api/tickets") {
+      try {
+        return await handleTickets(request, env);
+      } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
       }
     }
 
