@@ -15,6 +15,21 @@ export const TICKET_TIPOS = [
 export const TICKET_ESTADOS = ["Novo", "Em curso", "Resolvido"];
 
 const MAX_POR_HORA_POR_IP = 6;
+export const MAX_FOTOS = 3;
+const MAX_BYTES_FOTO = 1_500_000; // o browser já reduz para ~1600px JPEG (normalmente 150–500 KB)
+
+// fotografias chegam como "data:image/jpeg;base64,…" — só aceita JPEG verdadeiro (bytes FF D8 FF)
+function lerFoto(dataUrl) {
+  const m = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl || ""));
+  if (!m) return null;
+  let bin;
+  try { bin = atob(m[1]); } catch { return null; }
+  if (bin.length < 100 || bin.length > MAX_BYTES_FOTO) return null;
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  if (bytes[0] !== 0xFF || bytes[1] !== 0xD8 || bytes[2] !== 0xFF) return null;
+  return bytes;
+}
 
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
@@ -64,6 +79,7 @@ async function enviarEmailServidor(env, t) {
     `Telefone: ${t.telefone}`,
     t.nome ? `Nome / empresa: ${t.nome}` : "",
     t.descricao ? `\n${t.descricao}` : "",
+    t.fotos ? `\n📷 ${t.fotos} fotografia(s) anexada(s) — ver no painel` : "",
     `\nVer no painel: https://mpvending.pt/admin/#tickets`,
   ].filter(Boolean);
   const res = await fetch("https://api.resend.com/emails", {
@@ -103,6 +119,14 @@ export async function handleTicketPublico(request, env, ctx) {
     return json({ error: tipo === "Outro" ? "Descreva o problema." : "Diga-nos que produto gostaria de ver na máquina." }, 400);
   }
 
+  const fotosRecebidas = Array.isArray(p.fotos) ? p.fotos.slice(0, MAX_FOTOS) : [];
+  const fotos = [];
+  for (const f of fotosRecebidas) {
+    const bytes = lerFoto(f);
+    if (!bytes) return json({ error: "Uma das fotografias não é válida ou é demasiado grande. Retire-a e tente de novo." }, 400);
+    fotos.push(bytes);
+  }
+
   // limite simples por IP para evitar abusos
   const ip = request.headers.get("CF-Connecting-IP") || "desconhecido";
   const chaveLimite = `ticket-limite:${ip}`;
@@ -119,7 +143,11 @@ export async function handleTicketPublico(request, env, ctx) {
   const ticket = {
     id, numero, criadoEm: agora, ocorridoEm, telefone, maquina, tipo, descricao, nome,
     estado: "Novo", notas: "", responsavel: "", atualizadoEm: agora, resolvidoEm: null,
+    fotos: fotos.length,
   };
+  // fotos ficam fora do prefixo "ticket:" para a listagem não as ler
+  await Promise.all(fotos.map((bytes, i) =>
+    env.HISTORY_KV.put(`ticketfoto:${id}:${i}`, bytes, { metadata: { tipo: "image/jpeg", criadoEm: agora } })));
   await env.HISTORY_KV.put(`ticket:${id}`, JSON.stringify(ticket));
   await gravarResumo(env, { ...resumo, contador: numero, novos: (Number(resumo.novos) || 0) + 1, ultimoId: id, ultimoEm: agora });
 
@@ -133,12 +161,13 @@ export async function handleTicketPublico(request, env, ctx) {
 // /api/tickets (protegido pela password do admin)
 //   GET               → lista completa (e acerta a contagem de novos)
 //   GET ?resumo=1     → só { novos, ultimoId, ultimoEm } — usado para os alertas a cada minuto
+//   GET ?id=…&foto=n  → fotografia n (JPEG) anexada pelo cliente
 //   PUT ?id=…         → { estado?, notas?, responsavel? }
 //   DELETE ?id=…
 export async function handleTickets(request, env) {
   const url = new URL(request.url);
 
-  if (request.method === "GET") {
+  if (request.method === "GET" && !url.searchParams.has("foto")) {
     if (url.searchParams.get("resumo")) {
       const r = await lerResumo(env);
       return json({ novos: Math.max(0, Number(r.novos) || 0), ultimoId: r.ultimoId, ultimoEm: r.ultimoEm });
@@ -152,6 +181,14 @@ export async function handleTickets(request, env) {
 
   const id = url.searchParams.get("id") || "";
   if (!/^[\w-]{6,60}$/.test(id)) return json({ error: "Falta o parâmetro id" }, 400);
+
+  if (request.method === "GET" && url.searchParams.has("foto")) {
+    const n = Number(url.searchParams.get("foto"));
+    if (!Number.isInteger(n) || n < 0 || n >= MAX_FOTOS) return new Response("Foto inválida", { status: 400 });
+    const bytes = await env.HISTORY_KV.get(`ticketfoto:${id}:${n}`, { type: "arrayBuffer" });
+    if (!bytes) return new Response("Foto não encontrada", { status: 404 });
+    return new Response(bytes, { headers: { "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=86400" } });
+  }
 
   if (request.method === "PUT") {
     const raw = await env.HISTORY_KV.get(`ticket:${id}`);
@@ -177,6 +214,7 @@ export async function handleTickets(request, env) {
   if (request.method === "DELETE") {
     const raw = await env.HISTORY_KV.get(`ticket:${id}`);
     await env.HISTORY_KV.delete(`ticket:${id}`);
+    await Promise.all(Array.from({ length: MAX_FOTOS }, (_, i) => env.HISTORY_KV.delete(`ticketfoto:${id}:${i}`)));
     try {
       if (raw && JSON.parse(raw).estado === "Novo") {
         const r = await lerResumo(env);

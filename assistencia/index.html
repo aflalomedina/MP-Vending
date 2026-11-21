@@ -70,6 +70,16 @@
   }
   button[type="submit"]:hover{background:var(--blue-dark);}
   button[disabled]{opacity:.6; cursor:wait;}
+  .fotos-btn{font-family:'Inter',sans-serif; text-transform:none; letter-spacing:0; display:flex; align-items:center; justify-content:center; gap:10px; min-height:58px; padding:14px; border:1px dashed rgba(255,255,255,0.28); border-radius:6px; cursor:pointer; font-weight:600; font-size:15px; color:var(--white); background:rgba(255,255,255,0.02);}
+  .fotos-btn:hover{border-color:var(--blue);}
+  .fotos-btn.oculto{display:none;}
+  #fotosInput{position:absolute; opacity:0; width:1px; height:1px; pointer-events:none;}
+  .fotos-prev{display:flex; gap:10px; flex-wrap:wrap;}
+  .fotos-prev:empty{display:none;}
+  .foto-mini{position:relative; width:96px; height:96px; border-radius:6px; overflow:hidden; border:1px solid var(--line-dark); background:#111a2b;}
+  .foto-mini img{width:100%; height:100%; object-fit:cover; display:block;}
+  .foto-mini button{position:absolute; top:4px; right:4px; width:28px; height:28px; border-radius:50%; border:none; background:rgba(11,18,32,.85); color:#fff; font-size:16px; line-height:28px; cursor:pointer;}
+  .foto-mini.a-processar::after{content:'…'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--gray-dark); font-size:22px;}
   .erro{color:var(--err); font-size:14px; display:none;}
   .hp{position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden;}
 
@@ -125,6 +135,14 @@
     <div class="campo">
       <label for="descricao" id="descricaoRotulo">Descreva o que aconteceu</label>
       <textarea id="descricao" name="descricao" rows="4" maxlength="1000" placeholder="ex: meti 1 € e a máquina não deu o produto nem devolveu a moeda"></textarea>
+    </div>
+
+    <div class="campo">
+      <span class="rotulo">Fotografia (opcional)</span>
+      <div class="fotos-prev" id="fotosPrev"></div>
+      <label class="fotos-btn" id="fotosBtn" for="fotosInput">📷 <span id="fotosBtnTexto">Tirar ou escolher fotografia</span></label>
+      <input type="file" id="fotosInput" accept="image/*" multiple>
+      <span class="ajuda">Uma foto ajuda-nos a perceber o problema — ex: o produto preso ou o ecrã com erro. Até 3 fotos.</span>
     </div>
 
     <div class="linha">
@@ -202,6 +220,73 @@
     desc.placeholder = t[1];
   });
 
+  // ===== fotografias: reduzidas no telemóvel para ~1600px JPEG antes de enviar (rápido mesmo com rede fraca) =====
+  var MAX_FOTOS = 3, fotos = []; // { id, dataUrl|null }
+  var fotosInput = document.getElementById('fotosInput');
+  var fotosPrev = document.getElementById('fotosPrev');
+
+  function reduzirFoto(file) {
+    var LADO = 1600;
+    function desenhar(fonte, w, h) {
+      var esc = Math.min(1, LADO / Math.max(w, h));
+      var c = document.createElement('canvas');
+      c.width = Math.round(w * esc); c.height = Math.round(h * esc);
+      c.getContext('2d').drawImage(fonte, 0, 0, c.width, c.height);
+      var q = 0.8, url = c.toDataURL('image/jpeg', q);
+      while (url.length > 1300000 && q > 0.4) { q -= 0.15; url = c.toDataURL('image/jpeg', q); }
+      return url;
+    }
+    if (window.createImageBitmap) {
+      return createImageBitmap(file, { imageOrientation: 'from-image' })
+        .then(function (bmp) { var u = desenhar(bmp, bmp.width, bmp.height); if (bmp.close) bmp.close(); return u; })
+        .catch(function () { return viaImg(); });
+    }
+    return viaImg();
+    function viaImg() {
+      return new Promise(function (ok, falha) {
+        var url = URL.createObjectURL(file), img = new Image();
+        img.onload = function () { URL.revokeObjectURL(url); ok(desenhar(img, img.naturalWidth, img.naturalHeight)); };
+        img.onerror = function () { URL.revokeObjectURL(url); falha(new Error('formato')); };
+        img.src = url;
+      });
+    }
+  }
+
+  function desenharFotos() {
+    fotosPrev.innerHTML = fotos.map(function (f) {
+      return '<div class="foto-mini' + (f.dataUrl ? '' : ' a-processar') + '" data-id="' + f.id + '">' +
+        (f.dataUrl ? '<img src="' + f.dataUrl + '" alt="Fotografia anexada">' : '') +
+        '<button type="button" aria-label="Retirar fotografia">×</button></div>';
+    }).join('');
+    document.getElementById('fotosBtn').classList.toggle('oculto', fotos.length >= MAX_FOTOS);
+    document.getElementById('fotosBtnTexto').textContent = fotos.length ? 'Juntar outra fotografia' : 'Tirar ou escolher fotografia';
+  }
+
+  fotosInput.addEventListener('change', function () {
+    var ficheiros = Array.prototype.slice.call(fotosInput.files || []);
+    fotosInput.value = '';
+    var livres = MAX_FOTOS - fotos.length;
+    if (ficheiros.length > livres) mostrarErro('Só pode juntar até ' + MAX_FOTOS + ' fotografias.');
+    ficheiros.slice(0, livres).forEach(function (file) {
+      var f = { id: Math.random().toString(36).slice(2), dataUrl: null };
+      fotos.push(f);
+      reduzirFoto(file).then(function (u) { f.dataUrl = u; desenharFotos(); })
+        .catch(function () {
+          fotos = fotos.filter(function (x) { return x !== f; });
+          desenharFotos();
+          mostrarErro('Não conseguimos abrir essa imagem. Experimente tirar a fotografia de novo.');
+        });
+    });
+    desenharFotos();
+  });
+
+  fotosPrev.addEventListener('click', function (e) {
+    if (e.target.tagName !== 'BUTTON') return;
+    var id = e.target.parentNode.getAttribute('data-id');
+    fotos = fotos.filter(function (f) { return f.id !== id; });
+    desenharFotos();
+  });
+
   function mostrarErro(msg) { erro.textContent = msg; erro.style.display = msg ? 'block' : 'none'; }
 
   function enviarEmail(d, numero) {
@@ -220,6 +305,7 @@
         'Telefone': d.telefone,
         'Nome': d.nome || '—',
         'Dia e hora': d.ocorridoEm ? d.ocorridoEm.replace('T', ' às ') : '—',
+        'Fotografias': d.fotos && d.fotos.length ? d.fotos.length + ' (ver no painel)' : '—',
         'Painel': 'https://mpvending.pt/admin/#tickets',
         botcheck: '',
       }),
@@ -239,12 +325,14 @@
       nome: document.getElementById('nome').value.trim(),
       website: document.getElementById('website').value,
     };
+    if (fotos.some(function (f) { return !f.dataUrl; })) { mostrarErro('Aguarde um instante — as fotografias ainda estão a ser preparadas.'); return; }
+    d.fotos = fotos.map(function (f) { return f.dataUrl; });
     if (!d.tipo) { mostrarErro('Escolha qual é o problema.'); document.getElementById('tipos').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
     if (!d.maquina) { mostrarErro('Indique qual é a máquina.'); document.getElementById('maquina').focus(); return; }
     if ((d.tipo === 'Outro' || d.tipo === 'Sugestão de produto') && !d.descricao) { mostrarErro(d.tipo === 'Outro' ? 'Descreva o problema.' : 'Diga-nos que produto gostaria de ver.'); desc.focus(); return; }
     if (d.telefone.replace(/\D/g, '').length < 9) { mostrarErro('Indique um número de telefone válido.'); document.getElementById('telefone').focus(); return; }
 
-    btn.disabled = true; btn.textContent = 'A enviar…';
+    btn.disabled = true; btn.textContent = d.fotos.length ? 'A enviar fotografias…' : 'A enviar…';
     fetch('/api/tickets/novo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d) })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, j: j }; }); })
       .catch(function () { return { ok: false, status: 0, j: {} }; })
@@ -285,6 +373,7 @@
     form.reset();
     document.getElementById('maquina').value = maquina; document.getElementById('telefone').value = tel; document.getElementById('nome').value = nome;
     porDataAtual();
+    fotos = []; desenharFotos();
     btn.disabled = false; btn.textContent = 'Enviar pedido →';
     document.getElementById('sucesso').style.display = 'none';
     form.style.display = 'flex';
