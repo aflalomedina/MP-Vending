@@ -144,6 +144,8 @@ export async function handleTicketPublico(request, env, ctx) {
     id, numero, criadoEm: agora, ocorridoEm, telefone, maquina, tipo, descricao, nome,
     estado: "Novo", notas: "", responsavel: "", atualizadoEm: agora, resolvidoEm: null,
     fotos: fotos.length,
+    // vindo da etiqueta QR ("Máquina 007-S (QR)") já fica alocado; texto livre é alocado no admin
+    maquinaId: (/^Máquina (\d{3}(?:-S)?) \(QR\)$/.exec(maquina) || [])[1] || "",
   };
   // fotos ficam fora do prefixo "ticket:" para a listagem não as ler
   await Promise.all(fotos.map((bytes, i) =>
@@ -162,7 +164,7 @@ export async function handleTicketPublico(request, env, ctx) {
 //   GET               → lista completa (e acerta a contagem de novos)
 //   GET ?resumo=1     → só { novos, ultimoId, ultimoEm } — usado para os alertas a cada minuto
 //   GET ?id=…&foto=n  → fotografia n (JPEG) anexada pelo cliente
-//   PUT ?id=…         → { estado?, notas?, responsavel? }
+//   PUT ?id=…         → { estado?, notas?, responsavel?, maquinaId? }  (maquinaId = matrícula, ex: "007-S")
 //   DELETE ?id=…
 export async function handleTickets(request, env) {
   const url = new URL(request.url);
@@ -200,6 +202,7 @@ export async function handleTickets(request, env) {
     if (TICKET_ESTADOS.includes(p.estado)) t.estado = p.estado;
     if (typeof p.notas === "string") t.notas = p.notas.slice(0, 2000);
     if (typeof p.responsavel === "string") t.responsavel = p.responsavel.slice(0, 60);
+    if (typeof p.maquinaId === "string" && (p.maquinaId === "" || /^\d{3}(-S)?$/.test(p.maquinaId))) t.maquinaId = p.maquinaId;
     if (t.estado === "Resolvido" && estadoAntes !== "Resolvido") t.resolvidoEm = new Date().toISOString();
     if (t.estado !== "Resolvido") t.resolvidoEm = null;
     t.atualizadoEm = new Date().toISOString();
