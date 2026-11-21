@@ -73,7 +73,15 @@
   .fotos-btn{font-family:'Inter',sans-serif; text-transform:none; letter-spacing:0; display:flex; align-items:center; justify-content:center; gap:10px; min-height:58px; padding:14px; border:1px dashed rgba(255,255,255,0.28); border-radius:6px; cursor:pointer; font-weight:600; font-size:15px; color:var(--white); background:rgba(255,255,255,0.02);}
   .fotos-btn:hover{border-color:var(--blue);}
   .fotos-btn.oculto{display:none;}
-  #fotosInput{position:absolute; opacity:0; width:1px; height:1px; pointer-events:none;}
+  .fotos-botoes{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .fotos-botoes.oculto{display:none;}
+  .fotos-botoes .fotos-btn.so-um{grid-column:1 / -1;}
+  #fotosInput, #fotoCamara{position:absolute; opacity:0; width:1px; height:1px; pointer-events:none;}
+  .maq-qr{display:none; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border:1px solid rgba(61,214,140,.45); background:rgba(61,214,140,.08); border-radius:6px;}
+  .maq-qr.on{display:flex;}
+  .maq-qr b{font-family:'Space Mono',monospace; font-size:17px;}
+  .maq-qr small{display:block; color:var(--gray-dark); font-size:13px; margin-top:3px;}
+  .maq-qr button{background:none; border:none; color:var(--blue); font-family:'Inter'; font-weight:700; font-size:13px; cursor:pointer; white-space:nowrap; padding:6px 0;}
   .fotos-prev{display:flex; gap:10px; flex-wrap:wrap;}
   .fotos-prev:empty{display:none;}
   .foto-mini{position:relative; width:96px; height:96px; border-radius:6px; overflow:hidden; border:1px solid var(--line-dark); background:#111a2b;}
@@ -128,8 +136,9 @@
 
     <div class="campo">
       <label for="maquina">Qual é a máquina? <b>*</b></label>
+      <div class="maq-qr" id="maqQr"><div>✓ <b id="maqQrCodigo"></b><small>Máquina identificada pelo código QR</small></div><button type="button" id="maqQrAlterar">Não é esta?</button></div>
       <input id="maquina" name="maquina" maxlength="120" required placeholder="ex: Empresa X — máquina de snacks do refeitório">
-      <span class="ajuda">Indique a empresa e onde está a máquina. Se tiver, acrescente o número da etiqueta (ex: 007).</span>
+      <span class="ajuda" id="maquinaAjuda">Indique a empresa e onde está a máquina. Se tiver, acrescente o número da etiqueta (ex: 007).</span>
     </div>
 
     <div class="campo">
@@ -140,7 +149,11 @@
     <div class="campo">
       <span class="rotulo">Fotografia (opcional)</span>
       <div class="fotos-prev" id="fotosPrev"></div>
-      <label class="fotos-btn" id="fotosBtn" for="fotosInput">📷 <span id="fotosBtnTexto">Tirar ou escolher fotografia</span></label>
+      <div class="fotos-botoes" id="fotosBotoes">
+        <label class="fotos-btn" id="fotoCamaraBtn" for="fotoCamara">📷 Tirar fotografia</label>
+        <label class="fotos-btn" id="fotosGaleriaBtn" for="fotosInput">🖼️ Galeria</label>
+      </div>
+      <input type="file" id="fotoCamara" accept="image/*" capture="environment">
       <input type="file" id="fotosInput" accept="image/*" multiple>
       <span class="ajuda">Uma foto ajuda-nos a perceber o problema — ex: o produto preso ou o ecrã com erro. Até 3 fotos.</span>
     </div>
@@ -198,7 +211,26 @@
 
   // QR code / etiqueta na máquina: mpvending.pt/assistencia/?maquina=007 já preenche a máquina
   var params = new URLSearchParams(location.search);
-  if (params.get('maquina')) document.getElementById('maquina').value = params.get('maquina').slice(0, 120);
+  // etiqueta QR na máquina: ?m=007-S → máquina já identificada, o cliente não escreve nada
+  var maqParam = (params.get('m') || params.get('maquina') || '').trim().slice(0, 120);
+  var maqInput = document.getElementById('maquina');
+  if (maqParam) {
+    var porQr = /^\d{3}(-S)?$/i.test(maqParam);
+    maqInput.value = porQr ? 'Máquina ' + maqParam.toUpperCase() + ' (QR)' : maqParam;
+    if (porQr) {
+      document.getElementById('maqQrCodigo').textContent = 'Máquina ' + maqParam.toUpperCase();
+      document.getElementById('maqQr').classList.add('on');
+      maqInput.style.display = 'none';
+      document.getElementById('maquinaAjuda').style.display = 'none';
+    }
+  }
+  document.getElementById('maqQrAlterar').addEventListener('click', function () {
+    document.getElementById('maqQr').classList.remove('on');
+    maqInput.value = '';
+    maqInput.style.display = '';
+    document.getElementById('maquinaAjuda').style.display = '';
+    maqInput.focus();
+  });
   if (params.get('tipo')) {
     var r = form.querySelector('input[name="tipo"][value="' + params.get('tipo').replace(/"/g, '') + '"]');
     if (r) r.checked = true;
@@ -258,13 +290,20 @@
         (f.dataUrl ? '<img src="' + f.dataUrl + '" alt="Fotografia anexada">' : '') +
         '<button type="button" aria-label="Retirar fotografia">×</button></div>';
     }).join('');
-    document.getElementById('fotosBtn').classList.toggle('oculto', fotos.length >= MAX_FOTOS);
-    document.getElementById('fotosBtnTexto').textContent = fotos.length ? 'Juntar outra fotografia' : 'Tirar ou escolher fotografia';
+    document.getElementById('fotosBotoes').classList.toggle('oculto', fotos.length >= MAX_FOTOS);
   }
 
-  fotosInput.addEventListener('change', function () {
-    var ficheiros = Array.prototype.slice.call(fotosInput.files || []);
-    fotosInput.value = '';
+  // no computador não há câmara: fica só o botão de escolher ficheiro
+  var temToque = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  if (!temToque) {
+    document.getElementById('fotoCamaraBtn').style.display = 'none';
+    document.getElementById('fotosGaleriaBtn').classList.add('so-um');
+    document.getElementById('fotosGaleriaBtn').textContent = '📷 Juntar fotografia';
+  }
+  function aoEscolher(e) {
+    var input = e.target;
+    var ficheiros = Array.prototype.slice.call(input.files || []);
+    input.value = '';
     var livres = MAX_FOTOS - fotos.length;
     if (ficheiros.length > livres) mostrarErro('Só pode juntar até ' + MAX_FOTOS + ' fotografias.');
     ficheiros.slice(0, livres).forEach(function (file) {
@@ -278,7 +317,9 @@
         });
     });
     desenharFotos();
-  });
+  }
+  fotosInput.addEventListener('change', aoEscolher);
+  document.getElementById('fotoCamara').addEventListener('change', aoEscolher);
 
   fotosPrev.addEventListener('click', function (e) {
     if (e.target.tagName !== 'BUTTON') return;
