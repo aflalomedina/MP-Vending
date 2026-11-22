@@ -214,6 +214,13 @@
   // etiqueta QR na máquina: ?m=007-S → máquina já identificada, o cliente não escreve nada
   var maqParam = (params.get('m') || params.get('maquina') || '').trim().slice(0, 120);
   var maqInput = document.getElementById('maquina');
+  // a mesma etiqueta serve à equipa: quem tem sessão em /reposicao (repositor) vai para o registo de chegada/saída.
+  // Clientes não têm essa sessão e ficam aqui. ?equipa=1 = o repositor quer mesmo abrir um ticket.
+  if (/^\d{3}(-S)?$/i.test(maqParam) && params.get('equipa') !== '1' && window.fetch) {
+    fetch('/reposicao/api/sessao', { credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) { if (r.ok) location.replace('/reposicao/?qr=' + encodeURIComponent(maqParam.toUpperCase())); })
+      .catch(function () {});
+  }
   if (maqParam) {
     var porQr = /^\d{3}(-S)?$/i.test(maqParam);
     maqInput.value = porQr ? 'Máquina ' + maqParam.toUpperCase() + ' (QR)' : maqParam;

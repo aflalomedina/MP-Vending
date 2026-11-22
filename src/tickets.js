@@ -51,7 +51,7 @@ async function gravarResumo(env, r) {
   await env.HISTORY_KV.put("tickets:resumo", JSON.stringify(r));
 }
 
-async function listarTickets(env) {
+export async function listarTickets(env) {
   const tickets = [];
   let cursor;
   do {
@@ -158,6 +158,29 @@ export async function handleTicketPublico(request, env, ctx) {
     try { emailServidor = await enviarEmailServidor(env, ticket); } catch { emailServidor = false; }
   }
   return json({ ok: true, numero, emailServidor });
+}
+
+// Equipa (mpvending.pt/reposicao): o repositor muda o estado e deixa uma nota, que fica no histórico do ticket.
+export async function atualizarTicketPorEquipa(env, id, p, quem) {
+  const raw = await env.HISTORY_KV.get(`ticket:${id}`);
+  if (!raw) return null;
+  const t = JSON.parse(raw);
+  const estadoAntes = t.estado;
+  if (TICKET_ESTADOS.includes(p.estado)) t.estado = p.estado;
+  const nota = limpar(p.nota, 1000);
+  const quando = new Intl.DateTimeFormat("pt-PT", { timeZone: "Europe/Lisbon", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date());
+  const linha = `[${quando} ${quem}]${t.estado !== estadoAntes ? " → " + t.estado : ""}${nota ? " " + nota : ""}`;
+  if (nota || t.estado !== estadoAntes) t.notas = ((t.notas ? t.notas + "\n" : "") + linha).slice(-2000);
+  if (!t.responsavel) t.responsavel = quem;
+  if (t.estado === "Resolvido" && estadoAntes !== "Resolvido") t.resolvidoEm = new Date().toISOString();
+  if (t.estado !== "Resolvido") t.resolvidoEm = null;
+  t.atualizadoEm = new Date().toISOString();
+  await env.HISTORY_KV.put(`ticket:${id}`, JSON.stringify(t));
+  if ((estadoAntes === "Novo") !== (t.estado === "Novo")) {
+    const r = await lerResumo(env);
+    await gravarResumo(env, { ...r, novos: Math.max(0, (Number(r.novos) || 0) + (t.estado === "Novo" ? 1 : -1)) });
+  }
+  return t;
 }
 
 // /api/tickets (protegido pela password do admin)

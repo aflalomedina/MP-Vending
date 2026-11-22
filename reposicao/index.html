@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MP Vending · Reposição</title>
+<meta name="robots" content="noindex, nofollow" />
+<meta name="theme-color" content="#1B1F27" />
+<link rel="icon" href="/logo.png" />
+<style>
+  :root { --ink:#1B1F27; --bg:#F6F4EF; --panel:#FFFFFF; --line:#DEDAD1; --accent:#FF9F1C; --accent-deep:#C7710A; --positive:#2F9E44; --negative:#E03131; --muted:#6B7280; --soft:#FFF5E6; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; background:var(--bg); color:var(--ink); font-family:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; -webkit-font-smoothing:antialiased; }
+  body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
+  a { color: var(--accent-deep); }
+  header { background:var(--ink); color:#fff; padding:14px 16px 12px; position:sticky; top:0; z-index:20; }
+  header .linha { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  header .marca { font-size:11px; letter-spacing:.08em; opacity:.65; }
+  header h1 { margin:2px 0 0; font-size:18px; font-weight:600; }
+  header .sair { color:#fff; opacity:.7; font-size:13px; text-decoration:none; }
+  .datas { display:flex; gap:6px; margin-top:10px; align-items:center; }
+  .chip { border:1px solid rgba(255,255,255,.25); background:none; color:#fff; border-radius:16px; padding:6px 12px; font-size:13px; font-family:inherit; }
+  .chip.on { background:var(--accent); border-color:var(--accent); color:var(--ink); font-weight:600; }
+  .datas input { background:none; color:#fff; border:1px solid rgba(255,255,255,.25); border-radius:16px; padding:5px 8px; font-family:inherit; font-size:13px; color-scheme:dark; }
+  main { padding:12px; max-width:720px; margin:0 auto; }
+  .cartao { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:12px; }
+  .cartao h2 { margin:0 0 6px; font-size:16px; }
+  .sub { font-size:13px; color:var(--muted); line-height:1.45; }
+  .vazio { text-align:center; color:var(--muted); font-size:14px; padding:26px 10px; }
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:8px; padding:10px 14px; font-size:14px; font-weight:600; font-family:inherit; text-decoration:none; cursor:pointer; }
+  .btn.escuro { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .btn.laranja { background:var(--accent); border-color:var(--accent); color:var(--ink); }
+  .btn.verde { background:var(--positive); border-color:var(--positive); color:#fff; }
+  .btn.grande { width:100%; padding:15px; font-size:16px; }
+  .btn:disabled { opacity:.5; }
+  .botoes { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11.5px; font-weight:600; background:#EEE; color:var(--ink); white-space:nowrap; }
+  .badge.ok { background:#D3F9D8; color:#1B5E20; }
+  .badge.curso { background:#FFE8CC; color:#8A4B00; }
+  .badge.mau { background:#FCE0E0; color:#B42318; }
+  .badge.azul { background:#E7F0FF; color:#1D4ED8; }
+  .paragem { display:flex; gap:12px; }
+  .paragem .num { flex:0 0 32px; height:32px; border-radius:50%; background:var(--ink); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; }
+  .paragem.feita .num { background:var(--positive); }
+  .paragem.curso .num { background:var(--accent); color:var(--ink); }
+  .paragem .corpo { flex:1; min-width:0; }
+  .paragem .nome { font-weight:600; font-size:15.5px; }
+  .etiquetas { display:flex; gap:5px; flex-wrap:wrap; margin-top:5px; }
+  details { margin-top:8px; }
+  summary { font-size:13px; color:var(--accent-deep); cursor:pointer; font-weight:600; }
+  table { width:100%; border-collapse:collapse; font-size:13px; margin-top:6px; }
+  th, td { text-align:left; padding:6px 4px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-size:11.5px; color:var(--muted); font-weight:600; }
+  td.n, th.n { text-align:right; white-space:nowrap; }
+  td.levar { font-weight:700; font-size:15px; text-align:right; }
+  .maqtit { font-size:12px; font-weight:700; color:var(--muted); margin:10px 0 0; text-transform:uppercase; letter-spacing:.04em; }
+  .faixa { position:sticky; top:var(--topo, 104px); z-index:15; background:var(--accent); color:var(--ink); border-radius:10px; padding:12px 14px; margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; gap:10px; box-shadow:0 2px 8px rgba(0,0,0,.12); }
+  .faixa b { font-size:15px; }
+  .resultado { border-width:2px; }
+  .resultado.entrada { border-color:var(--accent); background:var(--soft); }
+  .resultado.saida { border-color:var(--positive); background:#EBFBEE; }
+  .resultado .grande { font-size:20px; font-weight:700; margin:2px 0 4px; }
+  .item { border-top:1px solid var(--line); padding:12px 0; }
+  .item:first-of-type { border-top:0; padding-top:4px; }
+  .item .tit { font-weight:600; font-size:15px; }
+  .item .desc { font-size:13.5px; margin-top:4px; white-space:pre-wrap; }
+  .fotos { display:flex; gap:6px; margin-top:8px; }
+  .fotos img { width:72px; height:72px; object-fit:cover; border-radius:6px; border:1px solid var(--line); }
+  .caixa-pronta { border-color:var(--positive); }
+  .caixa-pronta .cabeca { color:var(--positive); }
+  textarea, input.campo { width:100%; border:1px solid var(--line); border-radius:6px; padding:10px; font-family:inherit; font-size:15px; }
+  nav.baixo { position:fixed; left:0; right:0; bottom:0; background:var(--panel); border-top:1px solid var(--line); display:flex; padding-bottom:env(safe-area-inset-bottom); z-index:30; }
+  nav.baixo button { flex:1; background:none; border:0; padding:9px 2px 8px; font-family:inherit; font-size:11.5px; color:var(--muted); display:flex; flex-direction:column; align-items:center; gap:2px; position:relative; }
+  nav.baixo button .ic { font-size:19px; line-height:1; }
+  nav.baixo button.on { color:var(--accent-deep); font-weight:700; }
+  nav.baixo .cont { position:absolute; top:4px; left:calc(50% + 6px); background:var(--negative); color:#fff; border-radius:9px; font-size:10px; padding:1px 5px; font-weight:700; }
+  .vista { display:none; }
+  .vista.on { display:block; }
+  .folha { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:50; display:none; align-items:flex-end; justify-content:center; }
+  .folha.on { display:flex; }
+  .folha .dentro { background:#fff; width:100%; max-width:720px; border-radius:14px 14px 0 0; padding:18px 16px calc(18px + env(safe-area-inset-bottom)); }
+  .folha h3 { margin:0 0 4px; font-size:17px; }
+  .aviso { font-size:13px; padding:10px 12px; border-radius:8px; background:#FCE0E0; color:#B42318; margin-bottom:12px; display:none; }
+  .progresso { height:8px; background:#EEE; border-radius:4px; overflow:hidden; margin-top:8px; }
+  .progresso div { height:100%; background:var(--positive); }
+  .dia { border-top:1px solid var(--line); padding:10px 0; }
+  .dia:first-child { border-top:0; }
+  .dia.hoje .dtit { color:var(--accent-deep); }
+  .dtit { font-weight:700; font-size:14px; text-transform:capitalize; }
+</style>
+</head>
+<body>
+<header id="topo">
+  <div class="linha">
+    <div><div class="marca">MP VENDING · REPOSIÇÃO</div><h1 id="ola">…</h1></div>
+    <a class="sair" href="/reposicao/sair">Sair</a>
+  </div>
+  <div class="datas" id="datas">
+    <button class="chip" data-d="hoje">Hoje</button>
+    <button class="chip" data-d="amanha">Amanhã</button>
+    <input type="date" id="dataOutra" aria-label="Outro dia" />
+  </div>
+</header>
+
+<main>
+  <div class="aviso" id="erro"></div>
+  <div id="faixaVisita"></div>
+  <div id="resultadoQr"></div>
+
+  <section class="vista" id="v-rota"></section>
+  <section class="vista" id="v-caixas"></section>
+  <section class="vista" id="v-tarefas"></section>
+  <section class="vista" id="v-tickets"></section>
+  <section class="vista" id="v-semana"></section>
+</main>
+
+<nav class="baixo" id="nav">
+  <button data-v="rota"><span class="ic">🚐</span>Rota</button>
+  <button data-v="caixas" id="navCaixas"><span class="ic">📦</span>Caixas</button>
+  <button data-v="tarefas"><span class="ic">✅</span>Tarefas<span class="cont" id="contTarefas" style="display:none"></span></button>
+  <button data-v="tickets"><span class="ic">🔧</span>Tickets<span class="cont" id="contTickets" style="display:none"></span></button>
+  <button data-v="semana"><span class="ic">📅</span>Semana</button>
+</nav>
+
+<div class="folha" id="folha"><div class="dentro">
+  <h3 id="folhaTit"></h3>
+  <div class="sub" id="folhaSub" style="margin-bottom:10px;"></div>
+  <textarea id="folhaNota" rows="3" placeholder="Nota (opcional)"></textarea>
+  <div class="botoes">
+    <button class="btn" id="folhaCancelar" style="flex:1;">Cancelar</button>
+    <button class="btn escuro" id="folhaOk" style="flex:2;">Confirmar</button>
+  </div>
+</div></div>
+
+<script>
+(function () {
+  const TZ = 'Europe/Lisbon';
+  const hojeStr = () => new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const somarDias = (d, n) => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+  const horaLisboa = () => Number(new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', hour12: false }).format(new Date()));
+  const hhmm = (iso) => iso ? new Date(iso).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', timeZone: TZ }) : '';
+  const dataBonita = (d) => new Date(d + 'T12:00:00Z').toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+  const diaCurto = (iso) => new Date(iso).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', timeZone: TZ });
+  const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const minutosDesde = (iso) => Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000));
+  const fmtMin = (m) => m == null ? '—' : m < 60 ? m + ' min' : Math.floor(m / 60) + 'h' + String(m % 60).padStart(2, '0');
+  const $ = (id) => document.getElementById(id);
+
+  let eu = null;
+  let dia = null;          // resposta de /api/dia
+  let dataSel = hojeStr();
+  let vista = 'rota';
+  let semanaInicio = null;
+
+  async function api(caminho, opcoes) {
+    const r = await fetch('/reposicao/api/' + caminho, { cache: 'no-store', credentials: 'same-origin', ...(opcoes || {}) });
+    if (r.status === 401) { location.href = '/reposicao/'; throw new Error('Sessão terminada'); }
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || ('Erro ' + r.status));
+    return d;
+  }
+  const enviar = (caminho, metodo, corpo) => api(caminho, { method: metodo, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo || {}) });
+  function mostrarErro(err) { const el = $('erro'); el.textContent = err ? (err.message || err) : ''; el.style.display = err ? 'block' : 'none'; }
+
+  // ---------- folha (confirmar com nota) ----------
+  let folhaAcao = null;
+  function pedirNota(titulo, sub, textoOk, acao) {
+    $('folhaTit').textContent = titulo; $('folhaSub').textContent = sub || ''; $('folhaOk').textContent = textoOk || 'Confirmar';
+    $('folhaNota').value = ''; folhaAcao = acao; $('folha').classList.add('on');
+  }
+  $('folhaCancelar').onclick = () => { $('folha').classList.remove('on'); folhaAcao = null; };
+  $('folha').addEventListener('click', (e) => { if (e.target.id === 'folha') $('folhaCancelar').onclick(); });
+  $('folhaOk').onclick = async () => {
+    const acao = folhaAcao; if (!acao) return;
+    $('folhaOk').disabled = true;
+    try { await acao($('folhaNota').value.trim()); $('folha').classList.remove('on'); folhaAcao = null; }
+    catch (err) { alert(err.message); }
+    finally { $('folhaOk').disabled = false; }
+  };
+
+  // ---------- navegação ----------
+  function mudarVista(v) {
+    vista = v;
+    document.querySelectorAll('nav.baixo button').forEach((b) => b.classList.toggle('on', b.dataset.v === v));
+    document.querySelectorAll('.vista').forEach((s) => s.classList.toggle('on', s.id === 'v-' + v));
+    if (v === 'semana') carregarSemana();
+    window.scrollTo(0, 0);
+  }
+  document.querySelectorAll('nav.baixo button').forEach((b) => b.addEventListener('click', () => mudarVista(b.dataset.v)));
+
+  function marcarChips() {
+    const h = hojeStr();
+    document.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', (c.dataset.d === 'hoje' && dataSel === h) || (c.dataset.d === 'amanha' && dataSel === somarDias(h, 1))));
+    $('dataOutra').value = dataSel;
+  }
+  document.querySelectorAll('.chip').forEach((c) => c.addEventListener('click', () => { dataSel = c.dataset.d === 'hoje' ? hojeStr() : somarDias(hojeStr(), 1); marcarChips(); carregarDia(); }));
+  $('dataOutra').addEventListener('change', (e) => { if (e.target.value) { dataSel = e.target.value; marcarChips(); carregarDia(); } });
+
+  // ---------- dados ----------
+  async function carregarDia() {
+    try {
+      dia = await api('dia?data=' + dataSel);
+      mostrarErro(null);
+      renderTudo();
+    } catch (err) { mostrarErro(err); }
+  }
+  function renderTudo() {
+    // mantém abertos/fechados os detalhes que a pessoa mexeu (a página atualiza-se sozinha a cada minuto)
+    const abertos = {};
+    document.querySelectorAll('details[data-k]').forEach((d) => { abertos[d.dataset.k] = d.open; });
+    renderFaixa(); renderRota(); renderCaixas(); renderTarefas(); renderTickets();
+    const nT = dia.ordens.length, nK = dia.tickets.length;
+    $('contTarefas').textContent = nT; $('contTarefas').style.display = nT ? '' : 'none';
+    $('contTickets').textContent = nK; $('contTickets').style.display = nK ? '' : 'none';
+    document.querySelectorAll('details[data-k]').forEach((d) => { if (d.dataset.k in abertos) d.open = abertos[d.dataset.k]; });
+  }
+  const nomeLocal = (id) => (dia && dia.locais[id] && dia.locais[id].nome) || id;
+  const ticketsDoLocal = (id) => dia.tickets.filter((t) => t.localId === id);
+  const ordensDoLocal = (id) => dia.ordens.filter((o) => o.localId === id);
+  const linkNavegar = (p) => 'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=' + encodeURIComponent(Number.isFinite(p.lat) && Number.isFinite(p.lon) && p.lat ? p.lat + ',' + p.lon : (p.morada || p.nome));
+
+  // ---------- visita em curso ----------
+  function renderFaixa() {
+    const v = dia && dia.aberta;
+    const el = $('faixaVisita');
+    if (!v) { el.innerHTML = ''; return; }
+    el.innerHTML = `<div class="faixa"><div><div style="font-size:12px;">Em visita desde ${hhmm(v.inicio)} · ${fmtMin(minutosDesde(v.inicio))}</div><b>${esc(v.localNome)}</b></div>
+      <button class="btn escuro" id="btnSair">Terminar visita</button></div>`;
+    $('btnSair').onclick = terminarVisita;
+  }
+  async function terminarVisita() {
+    try {
+      const r = await enviar('visita', 'POST', { acao: 'sair' });
+      if (r.acao === 'saida') mostrarResultado(r);
+      await carregarDia();
+    } catch (err) { mostrarErro(err); }
+  }
+  async function registarChegada(localId) {
+    try {
+      const r = await enviar('visita', 'POST', { localId });
+      mostrarResultado(r);
+      await carregarDia();
+    } catch (err) { mostrarErro(err); }
+  }
+
+  function mostrarResultado(r) {
+    const el = $('resultadoQr');
+    if (!r || !r.visita) { el.innerHTML = ''; return; }
+    const v = r.visita;
+    const maq = v.maquinas && v.maquinas.length ? ' · ' + v.maquinas.join(', ') : '';
+    if (r.acao === 'saida') {
+      el.innerHTML = `<div class="cartao resultado saida"><div class="sub">Saída registada às ${hhmm(v.fim)}</div>
+        <div class="grande">${esc(v.localNome)} · ${fmtMin(v.duracaoMin)}</div>
+        <div class="sub">Chegada às ${hhmm(v.inicio)}${esc(maq)}.</div>
+        <div class="botoes"><button class="btn" id="resFechar">OK</button></div></div>`;
+    } else {
+      const ts = dia ? ticketsDoLocal(v.localId) : [];
+      const os = dia ? ordensDoLocal(v.localId) : [];
+      const ultima = (r.juntou || (v.maquinas || [])[0] || '');
+      el.innerHTML = `<div class="cartao resultado entrada"><div class="sub">${r.juntou ? 'Máquina ' + esc(r.juntou) + ' juntada à visita' : r.repetido ? 'Visita em curso' : 'Chegada registada às ' + hhmm(v.inicio)}</div>
+        <div class="grande">${esc(v.localNome)}</div>
+        ${r.anterior ? `<div class="sub">A visita anterior (${esc(r.anterior.localNome)}) foi fechada automaticamente.</div>` : ''}
+        <div class="sub" style="margin-top:4px;">À saída, lê outra vez o mesmo QR ou carrega em <b>Terminar visita</b>.</div>
+        ${ts.length ? `<div class="maqtit">Tickets abertos (${ts.length})</div>${ts.map(htmlTicket).join('')}` : ''}
+        ${os.length ? `<div class="maqtit">Tarefas neste local (${os.length})</div>${os.map(htmlOrdem).join('')}` : ''}
+        <div class="botoes">
+          <button class="btn escuro" id="resSair">Terminar visita</button>
+          ${ultima ? `<a class="btn" href="/assistencia/?m=${encodeURIComponent(ultima)}&equipa=1">Reportar avaria</a>` : ''}
+          <button class="btn" id="resFechar">Fechar</button>
+        </div></div>`;
+      const s = $('resSair'); if (s) s.onclick = async () => { await terminarVisita(); };
+      ligarAcoes(el);
+    }
+    const f = $('resFechar'); if (f) f.onclick = () => { el.innerHTML = ''; };
+    window.scrollTo(0, 0);
+  }
+
+  // ---------- rota ----------
+  function estadoParagem(localId) {
+    const vs = dia.visitas.filter((v) => v.localId === localId);
+    const emCurso = vs.find((v) => !v.fim && v.fecho == null);
+    const feita = vs.filter((v) => v.fim);
+    if (emCurso) return { cls: 'curso', badge: `<span class="badge curso">em curso desde ${hhmm(emCurso.inicio)}</span>` };
+    if (feita.length) { const v = feita[feita.length - 1]; return { cls: 'feita', badge: `<span class="badge ok">✓ ${hhmm(v.inicio)}–${hhmm(v.fim)} · ${fmtMin(v.duracaoMin)}</span>` }; }
+    return { cls: '', badge: '' };
+  }
+  function itensPorMaquina(itens) {
+    const g = {};
+    for (const it of itens) (g[it.maquina || '—'] = g[it.maquina || '—'] || []).push(it);
+    return Object.entries(g);
+  }
+  function htmlItens(p) {
+    let h = '';
+    for (const [m, lista] of itensPorMaquina(p.itens)) {
+      h += `<div class="maqtit">Máquina ${esc(m)}</div><table><thead><tr><th>Produto</th><th>Canais</th><th class="n">Levar</th></tr></thead><tbody>${
+        lista.map((it) => `<tr><td>${esc(it.produto)}${it.nota ? `<div class="sub" style="font-size:11.5px;">${esc(it.nota)}</div>` : ''}</td><td>${esc(it.canais.join(', ') || '—')}</td><td class="levar">${it.aLevar}</td></tr>`).join('')}</tbody></table>`;
+    }
+    for (const f of p.retirar || []) h += `<div class="sub" style="color:var(--negative);margin-top:6px;">Retirar (fora de validade): ${esc(f.produto)} · ${f.qtd} un. · máquina ${esc(f.maquina)} canal ${esc(f.canal)}</div>`;
+    for (const t of p.trocas || []) {
+      h += `<div class="maqtit">${t.feita ? 'Layout novo (atualizar na Luope)' : 'Troca de layout'} · máquina ${esc(t.maquina)}</div>
+        <table><thead><tr><th>Canal</th><th>Antes</th><th>Depois</th><th>Ação</th></tr></thead><tbody>${t.canais.map((c) => `<tr><td>${esc(c.canal)}</td><td>${esc(c.antes || '—')}</td><td><b>${esc(c.depois || '— vazio —')}</b></td><td>${esc(c.acao)}</td></tr>`).join('')}</tbody></table>`;
+    }
+    return h || '<div class="sub">Sem produtos a repor (visita por outro motivo).</div>';
+  }
+  function renderRota() {
+    const el = $('v-rota');
+    const planos = dia.planos;
+    if (!planos.length) {
+      el.innerHTML = `<div class="cartao vazio">Ainda não há plano de reposição para ${dataSel === dia.hoje ? 'hoje' : esc(dataBonita(dataSel))}.<br><span style="font-size:12.5px;">O plano aparece aqui quando o Pedro ou o Meir o enviarem do painel.</span></div>` + htmlVisitasSemPlano();
+      return;
+    }
+    el.innerHTML = planos.map((pl) => {
+      const feitas = pl.paragens.filter((p) => estadoParagem(p.localId).cls === 'feita').length;
+      const prontas = pl.paragens.filter((p) => pl.caixas[p.localId] && pl.caixas[p.localId].pronta).length;
+      return `<div class="cartao">
+        <h2>Rota de ${esc(dataBonita(pl.data))}</h2>
+        <div class="sub">${pl.responsavelNome ? 'Repositor: <b>' + esc(pl.responsavelNome) + '</b> · ' : ''}${pl.paragens.length} paragens${pl.saida ? ' · saída ' + esc(pl.saida) : ''}${pl.fim ? ' · fim previsto ' + esc(pl.fim) : ''}${pl.km ? ' · ' + Math.round(pl.km) + ' km' : ''}</div>
+        <div class="etiquetas"><span class="badge ${feitas === pl.paragens.length ? 'ok' : ''}">${feitas}/${pl.paragens.length} visitados</span><span class="badge ${prontas === pl.paragens.length ? 'ok' : 'curso'}">${prontas}/${pl.paragens.length} caixas prontas</span></div>
+        ${pl.nota ? `<div class="desc" style="margin-top:8px;font-size:13.5px;background:var(--soft);padding:8px 10px;border-radius:6px;">📝 ${esc(pl.nota)}</div>` : ''}
+        ${pl.mapsLinks && pl.mapsLinks.length ? `<div class="botoes">${pl.mapsLinks.map((l, i) => `<a class="btn laranja" href="${esc(l)}" target="_blank" rel="noopener">🗺️ Rota no Google Maps${pl.mapsLinks.length > 1 ? ' (' + (i + 1) + ')' : ''}</a>`).join('')}</div>` : ''}
+      </div>` + pl.paragens.map((p) => {
+        const e = estadoParagem(p.localId);
+        const caixa = pl.caixas[p.localId] || {};
+        const nT = ticketsDoLocal(p.localId).length, nO = ordensDoLocal(p.localId).length;
+        const unidades = p.itens.reduce((s, it) => s + it.aLevar, 0);
+        const aberta = dia.aberta && dia.aberta.localId === p.localId;
+        return `<div class="cartao"><div class="paragem ${e.cls}"><div class="num">${p.n}</div><div class="corpo">
+          <div class="nome">${esc(p.nome)}</div>
+          <div class="sub">${p.chegada ? 'Chegada prevista ' + esc(p.chegada) + ' · ' : ''}${unidades} unidades${p.maquinas.length ? ' · ' + esc(p.maquinas.join(', ')) : ''}</div>
+          <div class="etiquetas">${e.badge}${caixa.pronta ? '<span class="badge ok">📦 caixa pronta</span>' : '<span class="badge">📦 caixa por preparar</span>'}${caixa.faltas ? `<span class="badge mau">faltou: ${esc(caixa.faltas)}</span>` : ''}${nT ? `<span class="badge mau">🔧 ${nT} ticket${nT > 1 ? 's' : ''}</span>` : ''}${nO ? `<span class="badge azul">✅ ${nO} tarefa${nO > 1 ? 's' : ''}</span>` : ''}${p.trocas && p.trocas.length ? '<span class="badge curso">troca de layout</span>' : ''}</div>
+          <details data-k="r-${esc(p.localId)}"><summary>O que levar e repor</summary>${htmlItens(p)}</details>
+          ${nT || nO ? `<details data-k="t-${esc(p.localId)}"><summary>Tickets e tarefas deste local</summary>${ticketsDoLocal(p.localId).map(htmlTicket).join('')}${ordensDoLocal(p.localId).map(htmlOrdem).join('')}</details>` : ''}
+          <div class="botoes">
+            <a class="btn" href="${linkNavegar(p)}" target="_blank" rel="noopener">Navegar</a>
+            ${dataSel === dia.hoje && !e.cls ? `<button class="btn" data-chegar="${esc(p.localId)}" title="Se não conseguires ler o QR">Cheguei (sem QR)</button>` : ''}
+            ${aberta ? '<button class="btn escuro" data-sair="1">Terminar visita</button>' : ''}
+          </div>
+        </div></div></div>`;
+      }).join('') + htmlVisitasSemPlano(pl);
+    }).join('');
+    ligarAcoes(el);
+  }
+  // visitas do dia a locais que não estavam no plano (ex.: avaria urgente)
+  function htmlVisitasSemPlano(pl) {
+    const noPlano = new Set(pl ? pl.paragens.map((p) => p.localId) : []);
+    const extra = dia.visitas.filter((v) => !noPlano.has(v.localId) && v.utilizador === eu.utilizador);
+    if (!extra.length) return '';
+    return `<div class="cartao"><h2>Outras visitas ${dataSel === dia.hoje ? 'de hoje' : 'deste dia'}</h2>${extra.map((v) => `<div class="item"><div class="tit">${esc(v.localNome)}</div><div class="sub">${hhmm(v.inicio)}${v.fim ? '–' + hhmm(v.fim) + ' · ' + fmtMin(v.duracaoMin) : ' · em curso'}</div></div>`).join('')}</div>`;
+  }
+
+  // ---------- caixas (preparação) ----------
+  function renderCaixas() {
+    const el = $('v-caixas');
+    if (!dia.planos.length) { el.innerHTML = `<div class="cartao vazio">Ainda não há plano para ${dataSel === dia.hoje ? 'hoje' : esc(dataBonita(dataSel))}.${dataSel === dia.hoje ? '<br><br><button class="btn" data-amanha="1">Ver amanhã</button>' : ''}</div>`; ligarAcoes(el); return; }
+    el.innerHTML = dia.planos.map((pl) => {
+      const prontas = pl.paragens.filter((p) => pl.caixas[p.localId] && pl.caixas[p.localId].pronta).length;
+      const pct = Math.round((prontas / pl.paragens.length) * 100);
+      return `<div class="cartao"><h2>Caixas para ${esc(dataBonita(pl.data))}</h2>
+        <div class="sub">${pl.responsavelNome ? 'Para ' + esc(pl.responsavelNome) + ' · ' : ''}${prontas} de ${pl.paragens.length} caixas prontas</div>
+        <div class="progresso"><div style="width:${pct}%"></div></div>
+        ${pl.nota ? `<div style="margin-top:8px;font-size:13.5px;background:var(--soft);padding:8px 10px;border-radius:6px;">📝 ${esc(pl.nota)}</div>` : ''}
+        <details data-k="carga-${esc(pl.id)}"><summary>Carga total do armazém 7 (${pl.resumo.length} produtos)</summary>
+          <table><thead><tr><th>Produto</th><th class="n">Locais</th><th class="n">Total</th></tr></thead><tbody>${pl.resumo.map((r) => `<tr><td>${esc(r.produto)}</td><td class="n">${r.locais}</td><td class="levar">${r.total}</td></tr>`).join('')}</tbody></table>
+          ${pl.faltas.length ? `<div class="maqtit" style="color:var(--negative);">Não há no armazém 7 (não vai)</div><table><tbody>${pl.faltas.map((f) => `<tr><td>${esc(f.produto)}</td><td class="n">faltam ${f.falta}${f.arm3 ? ' · há ' + f.arm3 + ' no arm. 3' : ''}</td></tr>`).join('')}</tbody></table>` : ''}
+        </details></div>` + pl.paragens.map((p) => {
+        const c = pl.caixas[p.localId] || {};
+        const unidades = p.itens.reduce((s, it) => s + it.aLevar, 0);
+        return `<div class="cartao ${c.pronta ? 'caixa-pronta' : ''}">
+          <div class="cabeca" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;"><h2 style="margin:0;">${p.n}. ${esc(p.nome)}</h2><span class="badge ${c.pronta ? 'ok' : ''}">${c.pronta ? '✓ pronta' : unidades + ' un.'}</span></div>
+          ${c.pronta ? `<div class="sub">Preparada por ${esc(c.por || '')} às ${hhmm(c.em)}</div>` : ''}
+          <details data-k="c-${esc(pl.id)}-${esc(p.localId)}" ${c.pronta ? '' : 'open'}><summary>Conteúdo da caixa</summary>${htmlItens(p)}</details>
+          <div style="margin-top:10px;"><input class="campo" placeholder="Faltou alguma coisa? (ex.: só havia 4 Bolas de Carne)" value="${esc(c.faltas || '')}" data-faltas="${esc(pl.id)}|${esc(p.localId)}" /></div>
+          <div class="botoes"><button class="btn grande ${c.pronta ? '' : 'verde'}" data-pronta="${esc(pl.id)}|${esc(p.localId)}|${c.pronta ? '0' : '1'}">${c.pronta ? 'Desmarcar' : '📦 Caixa pronta'}</button></div>
+        </div>`;
+      }).join('');
+    }).join('');
+    ligarAcoes(el);
+  }
+
+  // ---------- tarefas ----------
+  function htmlOrdem(o) {
+    const atrasada = o.data && o.data < dia.hoje;
+    const cor = o.urgencia === 'Urgente' ? 'mau' : o.urgencia === 'Alta' ? 'curso' : '';
+    return `<div class="item"><div class="tit">${esc(o.titulo)}</div>
+      <div class="etiquetas"><span class="badge azul">${esc(o.tipo)}</span>${o.urgencia !== 'Média' ? `<span class="badge ${cor}">${esc(o.urgencia)}</span>` : ''}${o.maquina ? `<span class="badge">máquina ${esc(o.maquina)}</span>` : o.localId ? `<span class="badge">${esc(nomeLocal(o.localId))}</span>` : ''}${o.data ? `<span class="badge ${atrasada ? 'mau' : ''}">${atrasada ? 'atrasada · era ' : 'até '}${diaCurto(o.data + 'T12:00:00Z')}</span>` : ''}${o.recorrencia && o.recorrencia !== 'nenhuma' ? `<span class="badge">repete ${esc(o.recorrencia)}</span>` : ''}</div>
+      ${o.maquina && o.localId ? `<div class="sub" style="margin-top:4px;">${esc(nomeLocal(o.localId))}</div>` : ''}
+      ${o.descricao ? `<div class="desc">${esc(o.descricao)}</div>` : ''}
+      ${o.ultimaVez ? `<div class="sub" style="margin-top:4px;">Última vez: ${diaCurto(o.ultimaVez)} por ${esc(o.ultimaPor || '')}</div>` : ''}
+      <div class="botoes"><button class="btn verde" data-feito="${esc(o.id)}" data-tit="${esc(o.titulo)}">Feito</button></div></div>`;
+  }
+  function renderTarefas() {
+    const el = $('v-tarefas');
+    const os = dia.ordens;
+    el.innerHTML = `<div class="cartao"><h2>Tarefas e ordens</h2><div class="sub">Pendentes até ${dataSel === dia.hoje ? 'hoje' : esc(dataBonita(dataSel))}, incluindo atrasadas e sem data.</div>
+      ${os.length ? os.map(htmlOrdem).join('') : '<div class="vazio">Nada pendente. 👌</div>'}</div>
+      ${dia.feitasHoje.length ? `<div class="cartao"><h2>Feitas ${dataSel === dia.hoje ? 'hoje' : 'neste dia'}</h2>${dia.feitasHoje.map((o) => `<div class="item"><div class="tit">✓ ${esc(o.titulo)}</div><div class="sub">${esc(o.por || '')} às ${hhmm(o.em)}${o.maquina ? ' · máquina ' + esc(o.maquina) : ''}</div></div>`).join('')}</div>` : ''}`;
+    ligarAcoes(el);
+  }
+
+  // ---------- tickets ----------
+  function htmlTicket(t) {
+    const fotos = Array.from({ length: t.fotos || 0 }, (_, i) => `<a href="/reposicao/api/ticket-foto?id=${encodeURIComponent(t.id)}&n=${i}" target="_blank"><img loading="lazy" src="/reposicao/api/ticket-foto?id=${encodeURIComponent(t.id)}&n=${i}" alt="foto ${i + 1}" /></a>`).join('');
+    return `<div class="item"><div class="tit">#${t.numero} · ${esc(t.tipo)}</div>
+      <div class="etiquetas"><span class="badge ${t.estado === 'Novo' ? 'mau' : 'curso'}">${esc(t.estado)}</span><span class="badge">${esc(t.maquinaId ? 'máquina ' + t.maquinaId : t.maquina)}</span>${t.localId ? `<span class="badge">${esc(nomeLocal(t.localId))}</span>` : ''}<span class="badge">${diaCurto(t.criadoEm)}</span></div>
+      ${t.descricao ? `<div class="desc">${esc(t.descricao)}</div>` : ''}
+      ${fotos ? `<div class="fotos">${fotos}</div>` : ''}
+      ${t.notas ? `<div class="sub" style="margin-top:6px;white-space:pre-wrap;font-size:12px;">${esc(t.notas)}</div>` : ''}
+      <div class="botoes">${t.estado !== 'Em curso' ? `<button class="btn" data-tk="${esc(t.id)}" data-est="Em curso" data-num="${t.numero}">Em curso</button>` : `<button class="btn" data-tk="${esc(t.id)}" data-est="" data-num="${t.numero}">Nota</button>`}<button class="btn verde" data-tk="${esc(t.id)}" data-est="Resolvido" data-num="${t.numero}">Resolvido</button></div></div>`;
+  }
+  function renderTickets() {
+    const el = $('v-tickets');
+    const naRota = new Set(dia.planos.flatMap((pl) => pl.paragens.map((p) => p.localId)));
+    const lista = [...dia.tickets].sort((a, b) => (naRota.has(b.localId) - naRota.has(a.localId)) || String(a.criadoEm).localeCompare(String(b.criadoEm)));
+    el.innerHTML = `<div class="cartao"><h2>Tickets abertos</h2><div class="sub">Avarias reportadas pelos clientes. Primeiro os dos locais da rota.</div>
+      ${lista.length ? lista.map(htmlTicket).join('') : '<div class="vazio">Sem tickets abertos. 👌</div>'}</div>`;
+    ligarAcoes(el);
+  }
+
+  // ---------- semana ----------
+  function segundaDe(d) { const x = new Date(d + 'T12:00:00Z'); const wd = (x.getUTCDay() + 6) % 7; return somarDias(d, -wd); }
+  async function carregarSemana() {
+    const el = $('v-semana');
+    if (!semanaInicio) semanaInicio = segundaDe(hojeStr());
+    el.innerHTML = '<div class="cartao vazio">a carregar…</div>';
+    try {
+      const s = await api('semana?inicio=' + semanaInicio);
+      const h = hojeStr();
+      el.innerHTML = `<div class="cartao"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <button class="btn" id="semAnt">‹</button><h2 style="margin:0;font-size:15px;text-align:center;">${diaCurto(s.inicio + 'T12:00:00Z')} a ${diaCurto(s.fim + 'T12:00:00Z')}</h2><button class="btn" id="semSeg">›</button></div>
+        ${s.dias.map((d) => `<div class="dia ${d.data === h ? 'hoje' : ''}"><div class="dtit">${esc(dataBonita(d.data))}${d.data === h ? ' · hoje' : ''}</div>
+          ${d.planos.map((pl) => `<div style="margin-top:4px;font-size:13.5px;">🚐 <b>${pl.paragens.length} paragens</b>${pl.responsavelNome ? ' · ' + esc(pl.responsavelNome) : ''}${pl.saida ? ' · saída ' + esc(pl.saida) : ''}<div class="sub">${esc(pl.paragens.join(' → '))}</div></div>`).join('')}
+          ${d.ordens.map((o) => `<div style="margin-top:4px;font-size:13.5px;">${o.tipo === 'Limpeza' ? '🧽' : o.tipo === 'Manutenção' ? '🔧' : '✅'} ${esc(o.titulo)}${o.maquina ? ' · ' + esc(o.maquina) : ''}${o.atrasada ? ' <span class="badge mau">atrasada</span>' : ''}${o.prevista ? ' <span class="badge">repete</span>' : ''}</div>`).join('')}
+          ${d.visitas ? `<div class="sub" style="margin-top:4px;">${d.visitas} visita${d.visitas > 1 ? 's' : ''} registada${d.visitas > 1 ? 's' : ''}</div>` : ''}
+          ${!d.planos.length && !d.ordens.length && !d.visitas ? '<div class="sub">—</div>' : ''}
+          ${d.planos.length ? `<button class="btn" style="margin-top:6px;padding:6px 10px;font-size:12.5px;" data-irdia="${d.data}">Abrir este dia</button>` : ''}</div>`).join('')}</div>`;
+      $('semAnt').onclick = () => { semanaInicio = somarDias(semanaInicio, -7); carregarSemana(); };
+      $('semSeg').onclick = () => { semanaInicio = somarDias(semanaInicio, 7); carregarSemana(); };
+      el.querySelectorAll('[data-irdia]').forEach((b) => b.onclick = () => { dataSel = b.dataset.irdia; marcarChips(); carregarDia(); mudarVista(eu.perfil === 'preparador' ? 'caixas' : 'rota'); });
+    } catch (err) { el.innerHTML = `<div class="cartao vazio">${esc(err.message)}</div>`; }
+  }
+
+  // ---------- ações (botões dentro dos cartões) ----------
+  function ligarAcoes(el) {
+    el.querySelectorAll('[data-chegar]').forEach((b) => b.onclick = () => registarChegada(b.dataset.chegar));
+    el.querySelectorAll('[data-sair]').forEach((b) => b.onclick = terminarVisita);
+    el.querySelectorAll('[data-amanha]').forEach((b) => b.onclick = () => { dataSel = somarDias(hojeStr(), 1); marcarChips(); carregarDia(); });
+    el.querySelectorAll('[data-feito]').forEach((b) => b.onclick = () => pedirNota('Marcar como feito', b.dataset.tit, 'Feito', async (nota) => {
+      await enviar('ordem?id=' + encodeURIComponent(b.dataset.feito), 'PUT', { nota });
+      await carregarDia();
+    }));
+    el.querySelectorAll('[data-tk]').forEach((b) => b.onclick = () => {
+      const est = b.dataset.est;
+      pedirNota(est ? `Ticket #${b.dataset.num} → ${est}` : `Nota no ticket #${b.dataset.num}`, est === 'Resolvido' ? 'O que foi feito?' : '', est || 'Guardar nota', async (nota) => {
+        if (!est && !nota) throw new Error('Escreve a nota.');
+        await enviar('ticket?id=' + encodeURIComponent(b.dataset.tk), 'PUT', est ? { estado: est, nota } : { nota });
+        await carregarDia();
+      });
+    });
+    el.querySelectorAll('[data-pronta]').forEach((b) => b.onclick = async () => {
+      const [plano, local, v] = b.dataset.pronta.split('|');
+      b.disabled = true;
+      try { await enviar(`caixa?plano=${encodeURIComponent(plano)}&local=${encodeURIComponent(local)}`, 'PUT', { pronta: v === '1' }); await carregarDia(); }
+      catch (err) { mostrarErro(err); b.disabled = false; }
+    });
+    el.querySelectorAll('[data-faltas]').forEach((inp) => inp.addEventListener('change', async () => {
+      const [plano, local] = inp.dataset.faltas.split('|');
+      try { await enviar(`caixa?plano=${encodeURIComponent(plano)}&local=${encodeURIComponent(local)}`, 'PUT', { faltas: inp.value }); inp.style.borderColor = 'var(--positive)'; }
+      catch (err) { mostrarErro(err); }
+    }));
+  }
+
+  // ---------- arranque ----------
+  async function iniciar() {
+    try { eu = await api('sessao'); } catch (err) { mostrarErro(err); return; }
+    $('ola').textContent = 'Olá, ' + eu.nome.split(' ')[0];
+    document.documentElement.style.setProperty('--topo', ($('topo').offsetHeight + 8) + 'px');
+    if (eu.perfil === 'repositor') $('navCaixas').style.display = 'none';
+    // quem prepara as caixas à tarde vê logo o dia seguinte
+    if (eu.perfil === 'preparador' && horaLisboa() >= 13) dataSel = somarDias(hojeStr(), 1);
+    marcarChips();
+    mudarVista(eu.perfil === 'preparador' ? 'caixas' : 'rota');
+    const q = new URLSearchParams(location.search);
+    const qr = (q.get('qr') || '').toUpperCase();
+    if (/^\d{3}(-S)?$/.test(qr)) {
+      history.replaceState(null, '', '/reposicao/');
+      dataSel = hojeStr(); marcarChips();
+      await carregarDia();
+      try { mostrarResultado(await enviar('visita', 'POST', { maquina: qr })); await carregarDia(); }
+      catch (err) { mostrarErro(err); }
+    } else await carregarDia();
+    setInterval(() => { const a = document.activeElement; if (!document.hidden && !$('folha').classList.contains('on') && !(a && /INPUT|TEXTAREA/.test(a.tagName))) carregarDia(); }, 60000);
+    setInterval(() => { if (dia && dia.aberta) renderFaixa(); }, 30000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) carregarDia(); });
+  }
+  iniciar();
+})();
+</script>
+</body>
+</html>

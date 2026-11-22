@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MP Vending · Equipa</title>
+<meta name="robots" content="noindex, nofollow" />
+<meta name="theme-color" content="#1B1F27" />
+<link rel="icon" href="/logo.png" />
+<style>
+  :root { --ink:#1B1F27; --bg:#F6F4EF; --panel:#FFFFFF; --line:#DEDAD1; --accent:#FF9F1C; --accent-deep:#C7710A; --negative:#E03131; --muted:#6B7280; }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg); color:var(--ink);
+    font-family:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; -webkit-font-smoothing:antialiased; padding:20px; }
+  .caixa { width:100%; max-width:380px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:28px 26px 22px; }
+  .logo { display:block; height:44px; margin:0 0 18px; }
+  .brand { font-size:12px; letter-spacing:.08em; color:var(--muted); }
+  h1 { margin:4px 0 6px; font-size:22px; font-weight:600; }
+  p.sub { margin:0 0 20px; font-size:14px; color:var(--muted); line-height:1.45; }
+  label { display:block; font-size:12.5px; color:var(--muted); margin:0 0 5px; }
+  input { width:100%; border:1px solid var(--line); border-radius:6px; padding:12px; font-family:inherit; font-size:16px; margin-bottom:14px; background:#fff; }
+  input:focus { outline:2px solid var(--accent); outline-offset:0; border-color:var(--accent); }
+  button { width:100%; background:var(--ink); color:#fff; border:0; border-radius:6px; padding:14px; font-size:16px; font-weight:600; font-family:inherit; cursor:pointer; }
+  .erro { display:none; background:#FCE0E0; color:#B42318; border-radius:6px; padding:10px 12px; font-size:13.5px; margin-bottom:16px; }
+  .qr { display:none; background:#FFF5E6; border:1px solid #F3DDB8; color:#7A4A06; border-radius:6px; padding:10px 12px; font-size:13.5px; margin-bottom:16px; }
+  .rodape { margin-top:18px; font-size:12px; color:var(--muted); text-align:center; line-height:1.5; }
+</style>
+</head>
+<body>
+  <form class="caixa" method="POST" action="/reposicao/entrar">
+    <img class="logo" src="/logo.png" alt="MP Vending" />
+    <div class="brand">MP VENDING · EQUIPA</div>
+    <h1>Reposição</h1>
+    <p class="sub">Entra com o utilizador e a password que recebeste. A sessão fica guardada neste telemóvel.</p>
+    <div class="erro" id="erro"></div>
+    <div class="qr" id="qrAviso"></div>
+    <input type="hidden" name="qr" id="qr" />
+    <label for="utilizador">Utilizador</label>
+    <input id="utilizador" name="utilizador" autocomplete="username" autocapitalize="none" spellcheck="false" required />
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required />
+    <button type="submit">Entrar</button>
+    <div class="rodape">És cliente e queres reportar uma avaria? <a href="/assistencia/" style="color:var(--accent-deep);">Assistência técnica</a></div>
+  </form>
+<script>
+  const erros = {
+    credenciais: 'Utilizador ou password incorretos.',
+    desativado: 'Este acesso foi desativado. Fala com o Pedro ou o Meir.',
+    bloqueado: 'Demasiadas tentativas. Tenta de novo daqui a 15 minutos.',
+  };
+  const q = new URLSearchParams(location.search);
+  const e = q.get('erro');
+  if (e && erros[e]) { const el = document.getElementById('erro'); el.textContent = erros[e]; el.style.display = 'block'; }
+  const qr = (q.get('qr') || '').toUpperCase();
+  if (/^\d{3}(-S)?$/.test(qr)) {
+    document.getElementById('qr').value = qr;
+    const a = document.getElementById('qrAviso');
+    a.textContent = 'Depois de entrares, fica registada a leitura do QR da máquina ' + qr + '.';
+    a.style.display = 'block';
+  }
+  document.getElementById('utilizador').focus();
+</script>
+</body>
+</html>
