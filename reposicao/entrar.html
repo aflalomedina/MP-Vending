@@ -52,10 +52,10 @@
   const e = q.get('erro');
   if (e && erros[e]) { const el = document.getElementById('erro'); el.textContent = erros[e]; el.style.display = 'block'; }
   const qr = (q.get('qr') || '').toUpperCase();
-  if (/^\d{3}(-S)?$/.test(qr)) {
+  if (/^(\d{3}(-S)?|ARMAZEM)$/.test(qr)) {
     document.getElementById('qr').value = qr;
     const a = document.getElementById('qrAviso');
-    a.textContent = 'Depois de entrares, fica registada a leitura do QR da máquina ' + qr + '.';
+    a.textContent = 'Depois de entrares, fica registada a leitura do QR ' + (qr === 'ARMAZEM' ? 'do armazém' : 'da máquina ' + qr) + '.';
     a.style.display = 'block';
   }
   document.getElementById('utilizador').focus();

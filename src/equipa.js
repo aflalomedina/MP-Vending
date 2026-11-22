@@ -31,6 +31,10 @@ const DATA_RE = /^\d{4}-\d{2}-\d{2}$/;
 const PLANO_ID = /^\d{4}-\d{2}-\d{2}:[a-f0-9]{8}$/;
 const VISITA_ID = /^\d{4}-\d{2}-\d{2}:\d{13}-[a-f0-9]{6}$/;
 const MAQ_RE = /^\d{3}(-S)?$/;
+// QR do armazém (mpvending.pt/reposicao/?qr=ARMAZEM): entrada/saída de quem prepara as caixas, como numa máquina
+const QR_ARMAZEM = "ARMAZEM";
+const LOCAL_ARMAZEM = { id: "armazem", nome: "Armazém (preparação de caixas)", morada: "", maquinas: [] };
+const QR_RE = /^(\d{3}(-S)?|ARMAZEM)$/;
 
 const normUser = (u) => String(u || "").trim().toLowerCase();
 const toHex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -127,7 +131,7 @@ async function handleLogin(request, env) {
   const falhas = parseInt((await env.HISTORY_KV.get(chaveFalhas)) || "0", 10);
   const f = await request.formData().catch(() => null);
   const qr = f ? String(f.get("qr") || "").toUpperCase() : "";
-  const extra = MAQ_RE.test(qr) ? `&qr=${qr}` : "";
+  const extra = QR_RE.test(qr) ? `&qr=${qr}` : "";
   if (falhas >= MAX_FALHAS) return redirect(`/reposicao/?erro=bloqueado${extra}`);
   const utilizador = normUser(f && f.get("utilizador"));
   const password = String((f && f.get("password")) || "");
@@ -186,7 +190,8 @@ async function registarVisita(request, env, s, p) {
   }
   const maquina = String(p.maquina || "").toUpperCase();
   let local = null;
-  if (MAQ_RE.test(maquina)) local = localDaMaquina(locais, maquina);
+  if (maquina === QR_ARMAZEM) local = LOCAL_ARMAZEM;
+  else if (MAQ_RE.test(maquina)) local = localDaMaquina(locais, maquina);
   else if (p.localId && locais.porId[p.localId]) local = locais.porId[p.localId];
   if (!local) return { erro: "Máquina ou local desconhecido." };
 
@@ -219,8 +224,8 @@ async function registarVisita(request, env, s, p) {
   };
   await env.HISTORY_KV.put(`eq:visita:${v.id}`, JSON.stringify(v), { expirationTtl: VISITA_TTL_S });
   await env.HISTORY_KV.put(`eq:aberta:${s.utilizador}`, v.id, { expirationTtl: VISITA_TTL_S });
-  await contarVisitaNasOrdens(env, local.id);
-  await registarLog(env, { quem: s.nome, utilizador: s.utilizador, tipo: "entrada", localId: local.id, texto: `chegou a ${local.nome}${maquina ? " (QR " + maquina + ")" : " (sem QR)"}` });
+  if (local !== LOCAL_ARMAZEM) await contarVisitaNasOrdens(env, local.id);
+  await registarLog(env, { quem: s.nome, utilizador: s.utilizador, tipo: "entrada", localId: local.id, texto: local === LOCAL_ARMAZEM ? "entrou no armazém (caixas)" : `chegou a ${local.nome}${maquina ? " (QR " + maquina + ")" : " (sem QR)"}` });
   return { acao: "entrada", visita: v, local, anterior, ordens: await ordensDoLocal(env, s, local.id) };
 }
 
