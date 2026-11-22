@@ -1486,6 +1486,17 @@
 
     <div class="panel full">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px;">
+        <h2 style="margin:0;">Produtos em falta no armazém</h2>
+        <select id="eqFaltasPeriodo" style="border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-family:inherit;font-size:13px;">
+          <option value="7">Últimos 7 dias</option><option value="30" selected>Últimos 30 dias</option><option value="90">Últimos 90 dias</option>
+        </select>
+      </div>
+      <div style="font-size:13px;color:var(--muted);margin:0 0 12px;line-height:1.5;">Reportados por quem faz as caixas quando o stock do armazém 7 dizia que havia mas não havia (ou havia menos). A caixa segue na mesma; use esta lista para corrigir o stock na Luope.</div>
+      <div id="eqFaltasWrap"><div class="state small">a carregar…</div></div>
+    </div>
+
+    <div class="panel full">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px;">
         <h2 style="margin:0;">Pessoas da equipa</h2>
         <a href="/reposicao/" target="_blank" style="font-size:13px;color:var(--accent-deep);">Abrir mpvending.pt/reposicao ↗</a>
       </div>
@@ -7733,7 +7744,7 @@
         return `<tr>
           <td data-label="Dia"><b>${eqDia(pl.data)}</b>${pl.data === eqHoje() ? ' <span style="font-size:11px;color:var(--accent-deep);font-weight:600;">hoje</span>' : ''}<div style="font-size:11px;color:var(--muted);">enviado ${demoDataHora(pl.criadoEm)}</div></td>
           <td data-label="Repositor">${escapeHtml(pl.responsavelNome || 'Qualquer')}</td>
-          <td data-label="Paragens" style="font-size:12.5px;">${pl.paragens.map(p => `${p.visitada ? '✓' : ''}${p.pronta ? '📦' : ''} ${escapeHtml(p.nome)}${p.faltas ? ` <span style="color:var(--negative);">(faltou: ${escapeHtml(p.faltas)})</span>` : ''}`).join('<br>')}</td>
+          <td data-label="Paragens" style="font-size:12.5px;">${pl.paragens.map(p => `${p.visitada ? '✓' : ''}${p.pronta ? '📦' : ''} ${escapeHtml(p.nome)}${p.emFalta ? ` <span style="color:var(--negative);">⚠️ ${p.emFalta} em falta</span>` : ''}${p.faltas ? ` <span style="color:var(--negative);">(${escapeHtml(p.faltas)})</span>` : ''}`).join('<br>')}</td>
           <td data-label="Caixas" class="num">${prontas}/${pl.paragens.length}</td>
           <td data-label="Visitados" class="num">${vis}/${pl.paragens.length}</td>
           <td data-label=""><button type="button" class="eq-pl-apagar" data-id="${escapeHtml(pl.id)}" style="${eqBtn}color:var(--negative);">Apagar</button></td></tr>`;
@@ -7799,7 +7810,7 @@
 
   // ----- ao vivo -----
   let eqVivoTimer = null;
-  const EQ_LOG_IC = { entrada: '📍', saida: '🚐', tarefa: '✅', ticket: '🔧', caixa: '📦' };
+  const EQ_LOG_IC = { entrada: '📍', saida: '🚐', tarefa: '✅', ticket: '🔧', caixa: '📦', falta: '⚠️' };
   async function eqCarregarVivo() {
     const wrap = document.getElementById('eqVivoWrap');
     if (!wrap || !document.getElementById('view-equipa').classList.contains('active')) return;
@@ -7821,7 +7832,7 @@
         return `<div style="margin-top:12px;"><div style="font-weight:600;font-size:13.5px;">${titulo}${pl.responsavelNome ? ' · ' + escapeHtml(pl.responsavelNome) : ''} — 📦 ${prontas}/${pl.paragens.length} caixas${comVisitas ? ` · ✓ ${vis}/${pl.paragens.length} visitados` : ''}</div>
           <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">${pl.paragens.map(x => {
             const cor = x.emCurso ? '#FFE8CC' : x.visitada ? '#D3F9D8' : x.pronta ? '#E7F0FF' : '#F1F0EC';
-            return `<div style="background:${cor};border-radius:6px;padding:6px 9px;font-size:12.5px;">${x.emCurso ? '📍 ' : x.visitada ? '✓ ' : ''}<b>${escapeHtml(x.nome)}</b>${x.chegada ? ' · ' + escapeHtml(x.chegada) : ''}<br><span style="color:var(--muted);">${x.pronta ? '📦 pronta' : `cesta ${x.itensFeitos}/${x.itens}`}${x.faltas ? ' · <span style="color:var(--negative);">faltou ' + escapeHtml(x.faltas) + '</span>' : ''}</span></div>`;
+            return `<div style="background:${cor};border-radius:6px;padding:6px 9px;font-size:12.5px;">${x.emCurso ? '📍 ' : x.visitada ? '✓ ' : ''}<b>${escapeHtml(x.nome)}</b>${x.chegada ? ' · ' + escapeHtml(x.chegada) : ''}<br><span style="color:var(--muted);">${x.pronta ? '📦 pronta' : `cesta ${x.itensFeitos}/${x.itens}`}${x.emFalta ? ` · <span style="color:var(--negative);">⚠️ ${x.emFalta} em falta</span>` : ''}${x.faltas ? ' · <span style="color:var(--negative);">' + escapeHtml(x.faltas) + '</span>' : ''}</span></div>`;
           }).join('')}</div></div>`;
       };
       wrap.innerHTML = `
@@ -7833,8 +7844,38 @@
           <span style="font-family:'IBM Plex Mono',monospace;color:var(--muted);flex:0 0 42px;">${eqHora(e.em)}</span><span>${EQ_LOG_IC[e.tipo] || '•'}</span><span><b>${escapeHtml(e.quem || '')}</b> ${escapeHtml(e.texto || '')}</span></div>`).join('') : '<div class="state small">Ainda nada hoje.</div>'}</div>`;
     } catch (err) { wrap.innerHTML = `<div class="state small error">Erro: ${escapeHtml(err.message)}</div>`; }
   }
+
+  // ----- produtos em falta reportados nas caixas -----
+  async function eqCarregarFaltas() {
+    const wrap = document.getElementById('eqFaltasWrap');
+    try {
+      const { faltas } = await eqApi('faltas?dias=' + document.getElementById('eqFaltasPeriodo').value);
+      const produtos = faltas.filter(f => f.produto);
+      const notas = faltas.filter(f => f.nota);
+      if (!faltas.length) { wrap.innerHTML = '<div class="state small">Nenhuma falta reportada neste período. 👌</div>'; return; }
+      const porProduto = new Map();
+      for (const f of produtos) {
+        const e = porProduto.get(f.produto) || { produto: f.produto, vezes: 0, falta: 0, ultima: '' };
+        e.vezes++; e.falta += f.falta; if (f.data > e.ultima) e.ultima = f.data;
+        porProduto.set(f.produto, e);
+      }
+      const resumo = [...porProduto.values()].sort((a, b) => b.falta - a.falta);
+      wrap.innerHTML = `
+        ${resumo.length ? `<h3 style="font-size:13.5px;margin:4px 0 6px;">Por produto</h3>
+        <div class="table-wrap cards-mobile"><table><thead><tr><th>Produto</th><th class="num">Vezes</th><th class="num">Unidades em falta</th><th>Última</th></tr></thead><tbody>${resumo.map(e => `<tr>
+          <td data-label="Produto"><b>${escapeHtml(e.produto)}</b></td><td data-label="Vezes" class="num">${e.vezes}</td><td data-label="Em falta" class="num" style="color:var(--negative);font-weight:600;">${fmtInt(e.falta)}</td><td data-label="Última">${eqDia(e.ultima)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+        <h3 style="font-size:13.5px;margin:16px 0 6px;">Detalhe</h3>
+        <div class="table-wrap cards-mobile" style="max-height:420px;overflow-y:auto;"><table><thead><tr><th>Caixa do dia</th><th>Produto</th><th>Local / máquina</th><th class="num">Pôs</th><th class="num">Em falta</th><th>Quem</th></tr></thead><tbody>${faltas.map(f => `<tr>
+          <td data-label="Caixa do dia">${eqDia(f.data)}${f.em ? ` <span style="font-size:11px;color:var(--muted);">reportado ${demoDataHora(f.em)}</span>` : ''}</td>
+          <td data-label="Produto">${f.produto ? escapeHtml(f.produto) : `<i style="color:var(--muted);">nota:</i> ${escapeHtml(f.nota)}`}</td>
+          <td data-label="Local">${escapeHtml(f.local)}${f.maquina ? ` · ${escapeHtml(f.maquina)}` : ''}</td>
+          <td data-label="Pôs" class="num">${f.produto ? `${f.pus} de ${f.precisava}` : ''}</td>
+          <td data-label="Em falta" class="num" style="color:var(--negative);font-weight:600;">${f.produto ? f.falta : ''}</td>
+          <td data-label="Quem">${escapeHtml(f.por || '')}</td></tr>`).join('')}</tbody></table></div>`;
+    } catch (err) { wrap.innerHTML = `<div class="state small error">Erro: ${escapeHtml(err.message)}</div>`; }
+  }
   async function loadEquipaView() {
-    eqCarregarVivo();
+    eqCarregarVivo(); eqCarregarFaltas();
     if (!eqVivoTimer) eqVivoTimer = setInterval(() => { if (!document.hidden) eqCarregarVivo(); }, 30000);
     try { await eqCarregarUsers(); eqRenderUsers(); } catch (err) { document.getElementById('eqUsersWrap').innerHTML = `<div class="state small error">Erro: ${escapeHtml(err.message)}</div>`; }
     eqCarregarOrdens(); eqCarregarPlanos(); eqCarregarTempos();
@@ -7854,6 +7895,7 @@
     rep.onchange = () => { document.getElementById('eqOIntervaloWrap').style.display = rep.value === 'nenhuma' ? 'none' : ''; };
     document.getElementById('eqOFiltro').onchange = eqRenderOrdens;
     document.getElementById('eqTemposPeriodo').onchange = eqCarregarTempos;
+    document.getElementById('eqFaltasPeriodo').onchange = eqCarregarFaltas;
   }
 
   // ----- Reposição → enviar o plano para /reposicao -----

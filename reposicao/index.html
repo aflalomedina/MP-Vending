@@ -71,6 +71,13 @@
   tr.chk td.cx { width:34px; font-size:22px; line-height:1; text-align:center; padding:8px 2px; }
   tr.chk.on td:not(.cx) { color:var(--muted); text-decoration:line-through; }
   tr.chk.on td.levar { color:var(--positive); }
+  tr.chk.falta td.cx { font-size:20px; }
+  tr.chk.falta td.levar { color:var(--negative); }
+  .faltaInfo { color:var(--negative); font-weight:600; font-size:12px; margin-top:2px; text-decoration:none; }
+  button.bfalta { border:1px solid #F3C6C6; background:#fff; color:var(--negative); border-radius:6px; padding:5px 7px; font-size:12px; font-weight:600; font-family:inherit; }
+  .numero { display:flex; align-items:center; gap:10px; justify-content:center; margin:6px 0 4px; }
+  .numero button { width:48px; height:48px; border-radius:50%; border:1px solid var(--line); background:#fff; font-size:24px; font-family:inherit; }
+  .numero input { width:90px; text-align:center; font-size:26px; font-weight:700; border:1px solid var(--line); border-radius:8px; padding:8px; font-family:inherit; }
   .caixa-pronta .cabeca { color:var(--positive); }
   textarea, input.campo { width:100%; border:1px solid var(--line); border-radius:6px; padding:10px; font-family:inherit; font-size:15px; }
   nav.baixo { position:fixed; left:0; right:0; bottom:0; background:var(--panel); border-top:1px solid var(--line); display:flex; padding-bottom:env(safe-area-inset-bottom); z-index:30; }
@@ -129,7 +136,9 @@
 <div class="folha" id="folha"><div class="dentro">
   <h3 id="folhaTit"></h3>
   <div class="sub" id="folhaSub" style="margin-bottom:10px;"></div>
+  <div class="numero" id="folhaNumWrap" style="display:none;"><button type="button" id="folhaMenos">−</button><input type="number" id="folhaNum" inputmode="numeric" min="0" /><button type="button" id="folhaMais">+</button></div>
   <textarea id="folhaNota" rows="3" placeholder="Nota (opcional)"></textarea>
+  <button class="btn" id="folhaExtra" style="display:none;width:100%;margin-top:8px;"></button>
   <div class="botoes">
     <button class="btn" id="folhaCancelar" style="flex:1;">Cancelar</button>
     <button class="btn escuro" id="folhaOk" style="flex:2;">Confirmar</button>
@@ -170,7 +179,20 @@
   let folhaAcao = null;
   function pedirNota(titulo, sub, textoOk, acao) {
     $('folhaTit').textContent = titulo; $('folhaSub').textContent = sub || ''; $('folhaOk').textContent = textoOk || 'Confirmar';
-    $('folhaNota').value = ''; folhaAcao = acao; $('folha').classList.add('on');
+    $('folhaNota').value = ''; $('folhaNota').style.display = ''; $('folhaNumWrap').style.display = 'none'; $('folhaExtra').style.display = 'none';
+    folhaAcao = acao; $('folha').classList.add('on');
+  }
+  // pede um número (ex.: quantas unidades foram para a cesta); extra = { texto, acao } para um 2º botão
+  function pedirNumero(titulo, sub, valor, max, textoOk, acao, extra) {
+    pedirNota(titulo, sub, textoOk, async () => acao(Math.max(0, Math.min(max, Math.round(Number($('folhaNum').value) || 0)))));
+    $('folhaNota').style.display = 'none'; $('folhaNumWrap').style.display = '';
+    $('folhaNum').value = valor; $('folhaNum').max = max;
+    $('folhaMenos').onclick = () => { $('folhaNum').value = Math.max(0, (Number($('folhaNum').value) || 0) - 1); };
+    $('folhaMais').onclick = () => { $('folhaNum').value = Math.min(max, (Number($('folhaNum').value) || 0) + 1); };
+    if (extra) {
+      $('folhaExtra').style.display = ''; $('folhaExtra').textContent = extra.texto;
+      $('folhaExtra').onclick = async () => { try { await extra.acao(); $('folha').classList.remove('on'); folhaAcao = null; } catch (err) { alert(err.message); } };
+    }
   }
   $('folhaCancelar').onclick = () => { $('folha').classList.remove('on'); folhaAcao = null; };
   $('folha').addEventListener('click', (e) => { if (e.target.id === 'folha') $('folhaCancelar').onclick(); });
@@ -311,15 +333,19 @@
     return Object.entries(g);
   }
   // chk = { pi, marcados } → na preparação das caixas cada produto tem um ✅ para marcar quando vai para a cesta
-  function htmlItens(p, chk) {
+  // emFalta = { "maquina|produto": { pus, precisava } } — produtos que não havia no armazém (reportados por quem fez a caixa)
+  function htmlItens(p, chk, emFalta) {
     let h = '';
+    emFalta = emFalta || {};
     for (const [m, lista] of itensPorMaquina(p.itens)) {
-      h += `<div class="maqtit">Máquina ${esc(m)}</div><table><thead><tr>${chk ? '<th></th>' : ''}<th>Produto</th><th>Canais</th><th class="n">Levar</th></tr></thead><tbody>${
+      h += `<div class="maqtit">Máquina ${esc(m)}</div><table><thead><tr>${chk ? '<th></th>' : ''}<th>Produto</th><th>Canais</th><th class="n">Levar</th>${chk ? '<th></th>' : ''}</tr></thead><tbody>${
         lista.map((it) => {
-          const linha = `<td>${esc(it.produto)}${it.nota ? `<div class="sub" style="font-size:11.5px;">${esc(it.nota)}</div>` : ''}</td><td>${esc(it.canais.join(', ') || '—')}</td><td class="levar">${it.aLevar}</td>`;
-          if (!chk || !(it.aLevar > 0)) return `<tr>${chk ? '<td></td>' : ''}${linha}</tr>`;
+          const f = emFalta[it.maquina + '|' + it.produto];
+          const linha = `<td>${esc(it.produto)}${it.nota ? `<div class="sub" style="font-size:11.5px;">${esc(it.nota)}</div>` : ''}${f ? `<div class="faltaInfo">⚠️ em falta no armazém: ${f.pus ? 'só ' + f.pus + ' de ' + f.precisava : 'não havia'}</div>` : ''}</td><td>${esc(it.canais.join(', ') || '—')}</td><td class="levar">${f ? f.pus : it.aLevar}</td>`;
+          if (!chk || !(it.aLevar > 0)) return `<tr>${chk ? '<td></td>' : ''}${linha}${chk ? '<td></td>' : ''}</tr>`;
           const on = !!chk.marcados[it.maquina + '|' + it.produto];
-          return `<tr class="chk ${on ? 'on' : ''}" data-item="${chk.pi}|${esc(p.localId)}|${p.itens.indexOf(it)}"><td class="cx">${on ? '✅' : '⬜'}</td>${linha}</tr>`;
+          const idx = `${chk.pi}|${esc(p.localId)}|${p.itens.indexOf(it)}`;
+          return `<tr class="chk ${on ? 'on' : ''} ${f ? 'falta' : ''}" data-item="${idx}"><td class="cx">${f ? '⚠️' : on ? '✅' : '⬜'}</td>${linha}<td class="n"><button type="button" class="bfalta" data-falta="${idx}">Falta</button></td></tr>`;
         }).join('')}</tbody></table>`;
     }
     for (const f of p.retirar || []) h += `<div class="sub" style="color:var(--negative);margin-top:6px;">Retirar (fora de validade): ${esc(f.produto)} · ${f.qtd} un. · máquina ${esc(f.maquina)} canal ${esc(f.canal)}</div>`;
@@ -354,8 +380,8 @@
         return `<div class="cartao"><div class="paragem ${e.cls}"><div class="num">${p.n}</div><div class="corpo">
           <div class="nome">${esc(p.nome)}</div>
           <div class="sub">${p.chegada ? 'Chegada prevista ' + esc(p.chegada) + ' · ' : ''}${unidades} unidades${p.maquinas.length ? ' · ' + esc(p.maquinas.join(', ')) : ''}</div>
-          <div class="etiquetas">${e.badge}${caixa.pronta ? '<span class="badge ok">📦 caixa pronta</span>' : '<span class="badge">📦 caixa por preparar</span>'}${caixa.faltas ? `<span class="badge mau">faltou: ${esc(caixa.faltas)}</span>` : ''}${nT ? `<span class="badge mau">🔧 ${nT} ticket${nT > 1 ? 's' : ''}</span>` : ''}${nO ? `<span class="badge azul">✅ ${nO} tarefa${nO > 1 ? 's' : ''}</span>` : ''}${p.trocas && p.trocas.length ? '<span class="badge curso">troca de layout</span>' : ''}</div>
-          <details data-k="r-${esc(p.localId)}"><summary>O que levar e repor</summary>${htmlItens(p)}</details>
+          <div class="etiquetas">${e.badge}${caixa.pronta ? '<span class="badge ok">📦 caixa pronta</span>' : '<span class="badge">📦 caixa por preparar</span>'}${Object.keys(caixa.emFalta || {}).length ? `<span class="badge mau">⚠️ ${Object.keys(caixa.emFalta).length} em falta</span>` : ''}${caixa.faltas ? `<span class="badge mau">nota: ${esc(caixa.faltas)}</span>` : ''}${nT ? `<span class="badge mau">🔧 ${nT} ticket${nT > 1 ? 's' : ''}</span>` : ''}${nO ? `<span class="badge azul">✅ ${nO} tarefa${nO > 1 ? 's' : ''}</span>` : ''}${p.trocas && p.trocas.length ? '<span class="badge curso">troca de layout</span>' : ''}</div>
+          <details data-k="r-${esc(p.localId)}"><summary>O que levar e repor</summary>${htmlItens(p, null, caixa.emFalta)}</details>
           ${nT || nO ? `<details data-k="t-${esc(p.localId)}"><summary>Tickets e tarefas deste local</summary>${ticketsDoLocal(p.localId).map(htmlTicket).join('')}${ordensDoLocal(p.localId).map((o) => htmlOrdem(o)).join('')}</details>` : ''}
           <div class="botoes">
             <a class="btn" href="${linkNavegar(p)}" target="_blank" rel="noopener">Navegar</a>
@@ -393,11 +419,11 @@
         const c = pl.caixas[p.localId] || {};
         const unidades = p.itens.reduce((s, it) => s + it.aLevar, 0);
         return `<div class="cartao ${c.pronta ? 'caixa-pronta' : ''}">
-          <div class="cabeca" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;"><h2 style="margin:0;">${p.n}. ${esc(p.nome)}</h2><span class="badge ${c.pronta ? 'ok' : ''}">${c.pronta ? '✓ pronta' : unidades + ' un.'}</span></div>
+          <div class="cabeca" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;"><h2 style="margin:0;">${p.n}. ${esc(p.nome)}</h2><span>${Object.keys(c.emFalta || {}).length ? `<span class="badge mau">⚠️ ${Object.keys(c.emFalta).length} em falta</span> ` : ''}<span class="badge ${c.pronta ? 'ok' : ''}">${c.pronta ? '✓ pronta' : unidades + ' un.'}</span></span></div>
           ${c.pronta ? `<div class="sub">Preparada por ${esc(c.por || '')} às ${hhmm(c.em)}</div>` : ''}
           <div class="sub" style="margin-top:2px;" data-conta="${esc(pl.id)}|${esc(p.localId)}"></div>
-          <details data-k="c-${esc(pl.id)}-${esc(p.localId)}" ${c.pronta ? '' : 'open'}><summary>Conteúdo da caixa — toca em cada produto quando o puseres na cesta</summary>${htmlItens(p, { pi, marcados: c.itens || {} })}</details>
-          <div style="margin-top:10px;"><input class="campo" placeholder="Faltou alguma coisa? (ex.: só havia 4 Bolas de Carne)" value="${esc(c.faltas || '')}" data-faltas="${esc(pl.id)}|${esc(p.localId)}" /></div>
+          <details data-k="c-${esc(pl.id)}-${esc(p.localId)}" ${c.pronta ? '' : 'open'}><summary>Conteúdo da caixa — toca no produto quando o puseres na cesta; se não houver, carrega em Falta</summary>${htmlItens(p, { pi, marcados: c.itens || {} }, c.emFalta)}</details>
+          <div style="margin-top:10px;"><input class="campo" placeholder="Outra nota sobre esta caixa (opcional)" value="${esc(c.faltas || '')}" data-faltas="${esc(pl.id)}|${esc(p.localId)}" /></div>
           <div class="botoes"><button class="btn grande ${c.pronta ? '' : 'verde'}" data-pronta="${esc(pl.id)}|${esc(p.localId)}|${c.pronta ? '0' : '1'}">${c.pronta ? 'Desmarcar' : '📦 Caixa pronta'}</button></div>
         </div>`;
       }).join('');
@@ -413,6 +439,7 @@
     const chave = it.maquina + '|' + it.produto;
     const c = pl.caixas[localId] = pl.caixas[localId] || {};
     c.itens = c.itens || {};
+    if (c.emFalta && c.emFalta[chave]) { abrirFalta(tr.dataset.item); return; } // em falta: abre a janela para corrigir
     const feito = !c.itens[chave];
     // muda logo no ecrã; o servidor confirma a seguir
     if (feito) c.itens[chave] = 1; else delete c.itens[chave];
@@ -430,8 +457,26 @@
     if (!el) return;
     const c = pl.caixas[p.localId] || {};
     const lista = p.itens.filter((it) => it.aLevar > 0);
-    const feitos = lista.filter((it) => c.itens && c.itens[it.maquina + '|' + it.produto]).length;
-    el.textContent = `${feitos}/${lista.length} produtos na cesta`;
+    const k = (it) => it.maquina + '|' + it.produto;
+    const feitos = lista.filter((it) => c.itens && c.itens[k(it)]).length;
+    const faltas = lista.filter((it) => c.emFalta && c.emFalta[k(it)]).length;
+    el.textContent = `${feitos + faltas}/${lista.length} produtos tratados${faltas ? ` · ${faltas} em falta` : ''}`;
+  }
+  // "Falta": quantas unidades conseguiu pôr (0 = não havia). Fica reportado ao admin e a caixa pode fechar na mesma.
+  function abrirFalta(idx) {
+    const [pi, localId, ii] = idx.split('|');
+    const pl = dia.planos[Number(pi)];
+    const p = pl && pl.paragens.find((x) => x.localId === localId);
+    const it = p && p.itens[Number(ii)];
+    if (!it) return;
+    const chave = it.maquina + '|' + it.produto;
+    const c = pl.caixas[localId] || {};
+    const atual = c.emFalta && c.emFalta[chave];
+    const url = `caixa?plano=${encodeURIComponent(pl.id)}&local=${encodeURIComponent(localId)}`;
+    pedirNumero(`Em falta: ${it.produto}`, `Eram ${it.aLevar}. Quantas conseguiste pôr na cesta? (0 = não havia nenhum)`, atual ? atual.pus : 0, it.aLevar, 'Reportar falta', async (pus) => {
+      const r = await enviar(url, 'PUT', { item: chave, falta: pus });
+      pl.caixas = r.caixas; renderTudo();
+    }, atual ? { texto: 'Afinal havia tudo (tirar a falta)', acao: async () => { const r = await enviar(url, 'PUT', { item: chave, feito: true }); pl.caixas = r.caixas; renderTudo(); } } : null);
   }
 
   // ---------- tarefas ----------
@@ -529,7 +574,8 @@
       try { await enviar(`caixa?plano=${encodeURIComponent(plano)}&local=${encodeURIComponent(local)}`, 'PUT', { pronta: v === '1' }); await carregarDia(); }
       catch (err) { mostrarErro(err); b.disabled = false; }
     });
-    el.querySelectorAll('tr[data-item]').forEach((tr) => tr.onclick = () => marcarItem(tr));
+    el.querySelectorAll('tr[data-item]').forEach((tr) => tr.onclick = (e) => { if (!e.target.closest('[data-falta]')) marcarItem(tr); });
+    el.querySelectorAll('[data-falta]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); abrirFalta(b.dataset.falta); });
     el.querySelectorAll('[data-conta]').forEach((d) => { const [plId, loc] = d.dataset.conta.split('|'); const pl = dia.planos.find((x) => x.id === plId); const p = pl && pl.paragens.find((x) => x.localId === loc); if (p) atualizarContagemCaixa(pl, p); });
     el.querySelectorAll('[data-faltas]').forEach((inp) => inp.addEventListener('change', async () => {
       const [plano, local] = inp.dataset.faltas.split('|');
