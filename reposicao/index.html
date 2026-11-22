@@ -67,6 +67,10 @@
   .fotos { display:flex; gap:6px; margin-top:8px; }
   .fotos img { width:72px; height:72px; object-fit:cover; border-radius:6px; border:1px solid var(--line); }
   .caixa-pronta { border-color:var(--positive); }
+  tr.chk { cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  tr.chk td.cx { width:34px; font-size:22px; line-height:1; text-align:center; padding:8px 2px; }
+  tr.chk.on td:not(.cx) { color:var(--muted); text-decoration:line-through; }
+  tr.chk.on td.levar { color:var(--positive); }
   .caixa-pronta .cabeca { color:var(--positive); }
   textarea, input.campo { width:100%; border:1px solid var(--line); border-radius:6px; padding:10px; font-family:inherit; font-size:15px; }
   nav.baixo { position:fixed; left:0; right:0; bottom:0; background:var(--panel); border-top:1px solid var(--line); display:flex; padding-bottom:env(safe-area-inset-bottom); z-index:30; }
@@ -255,14 +259,19 @@
         <div class="botoes"><button class="btn" id="resFechar">OK</button></div></div>`;
     } else {
       const ts = dia ? ticketsDoLocal(v.localId) : [];
-      const os = dia ? ordensDoLocal(v.localId) : [];
       const ultima = (r.juntou || (v.maquinas || [])[0] || '');
+      // tarefas pendentes deste local: primeiro as da máquina lida, depois as das outras máquinas do local
+      const todas = (r.ordens || (dia ? ordensDoLocal(v.localId).map((o) => ({ ...o, devida: true })) : []))
+        .sort((a, b) => ((b.maquina === ultima) - (a.maquina === ultima)));
+      const os = todas.filter((o) => o.devida), prox = todas.filter((o) => !o.devida);
       el.innerHTML = `<div class="cartao resultado entrada"><div class="sub">${r.juntou ? 'Máquina ' + esc(r.juntou) + ' juntada à visita' : r.repetido ? 'Visita em curso' : 'Chegada registada às ' + hhmm(v.inicio)}</div>
         <div class="grande">${esc(v.localNome)}</div>
         ${r.anterior ? `<div class="sub">A visita anterior (${esc(r.anterior.localNome)}) foi fechada automaticamente.</div>` : ''}
         <div class="sub" style="margin-top:4px;">À saída, lê outra vez o mesmo QR ou carrega em <b>Terminar visita</b>.</div>
         ${ts.length ? `<div class="maqtit">Tickets abertos (${ts.length})</div>${ts.map(htmlTicket).join('')}` : ''}
-        ${os.length ? `<div class="maqtit">Tarefas neste local (${os.length})</div>${os.map(htmlOrdem).join('')}` : ''}
+        <div class="maqtit">Tarefas para fazer agora${ultima ? ' · máquina ' + esc(ultima) + ' e local' : ''} (${os.length})</div>
+        ${os.length ? os.map((o) => htmlOrdem(o)).join('') : '<div class="sub" style="padding:6px 0;">Nenhuma tarefa pendente nesta máquina. 👌</div>'}
+        ${prox.length ? `<details><summary>Próximas tarefas deste local (${prox.length})</summary>${prox.map((o) => htmlOrdem(o, true)).join('')}</details>` : ''}
         <div class="botoes">
           <button class="btn escuro" id="resSair">Terminar visita</button>
           ${ultima ? `<a class="btn" href="/assistencia/?m=${encodeURIComponent(ultima)}&equipa=1">Reportar avaria</a>` : ''}
@@ -289,11 +298,17 @@
     for (const it of itens) (g[it.maquina || '—'] = g[it.maquina || '—'] || []).push(it);
     return Object.entries(g);
   }
-  function htmlItens(p) {
+  // chk = { pi, marcados } → na preparação das caixas cada produto tem um ✅ para marcar quando vai para a cesta
+  function htmlItens(p, chk) {
     let h = '';
     for (const [m, lista] of itensPorMaquina(p.itens)) {
-      h += `<div class="maqtit">Máquina ${esc(m)}</div><table><thead><tr><th>Produto</th><th>Canais</th><th class="n">Levar</th></tr></thead><tbody>${
-        lista.map((it) => `<tr><td>${esc(it.produto)}${it.nota ? `<div class="sub" style="font-size:11.5px;">${esc(it.nota)}</div>` : ''}</td><td>${esc(it.canais.join(', ') || '—')}</td><td class="levar">${it.aLevar}</td></tr>`).join('')}</tbody></table>`;
+      h += `<div class="maqtit">Máquina ${esc(m)}</div><table><thead><tr>${chk ? '<th></th>' : ''}<th>Produto</th><th>Canais</th><th class="n">Levar</th></tr></thead><tbody>${
+        lista.map((it) => {
+          const linha = `<td>${esc(it.produto)}${it.nota ? `<div class="sub" style="font-size:11.5px;">${esc(it.nota)}</div>` : ''}</td><td>${esc(it.canais.join(', ') || '—')}</td><td class="levar">${it.aLevar}</td>`;
+          if (!chk || !(it.aLevar > 0)) return `<tr>${chk ? '<td></td>' : ''}${linha}</tr>`;
+          const on = !!chk.marcados[it.maquina + '|' + it.produto];
+          return `<tr class="chk ${on ? 'on' : ''}" data-item="${chk.pi}|${esc(p.localId)}|${p.itens.indexOf(it)}"><td class="cx">${on ? '✅' : '⬜'}</td>${linha}</tr>`;
+        }).join('')}</tbody></table>`;
     }
     for (const f of p.retirar || []) h += `<div class="sub" style="color:var(--negative);margin-top:6px;">Retirar (fora de validade): ${esc(f.produto)} · ${f.qtd} un. · máquina ${esc(f.maquina)} canal ${esc(f.canal)}</div>`;
     for (const t of p.trocas || []) {
@@ -329,7 +344,7 @@
           <div class="sub">${p.chegada ? 'Chegada prevista ' + esc(p.chegada) + ' · ' : ''}${unidades} unidades${p.maquinas.length ? ' · ' + esc(p.maquinas.join(', ')) : ''}</div>
           <div class="etiquetas">${e.badge}${caixa.pronta ? '<span class="badge ok">📦 caixa pronta</span>' : '<span class="badge">📦 caixa por preparar</span>'}${caixa.faltas ? `<span class="badge mau">faltou: ${esc(caixa.faltas)}</span>` : ''}${nT ? `<span class="badge mau">🔧 ${nT} ticket${nT > 1 ? 's' : ''}</span>` : ''}${nO ? `<span class="badge azul">✅ ${nO} tarefa${nO > 1 ? 's' : ''}</span>` : ''}${p.trocas && p.trocas.length ? '<span class="badge curso">troca de layout</span>' : ''}</div>
           <details data-k="r-${esc(p.localId)}"><summary>O que levar e repor</summary>${htmlItens(p)}</details>
-          ${nT || nO ? `<details data-k="t-${esc(p.localId)}"><summary>Tickets e tarefas deste local</summary>${ticketsDoLocal(p.localId).map(htmlTicket).join('')}${ordensDoLocal(p.localId).map(htmlOrdem).join('')}</details>` : ''}
+          ${nT || nO ? `<details data-k="t-${esc(p.localId)}"><summary>Tickets e tarefas deste local</summary>${ticketsDoLocal(p.localId).map(htmlTicket).join('')}${ordensDoLocal(p.localId).map((o) => htmlOrdem(o)).join('')}</details>` : ''}
           <div class="botoes">
             <a class="btn" href="${linkNavegar(p)}" target="_blank" rel="noopener">Navegar</a>
             ${dataSel === dia.hoje && !e.cls ? `<button class="btn" data-chegar="${esc(p.localId)}" title="Se não conseguires ler o QR">Cheguei (sem QR)</button>` : ''}
@@ -352,7 +367,7 @@
   function renderCaixas() {
     const el = $('v-caixas');
     if (!dia.planos.length) { el.innerHTML = `<div class="cartao vazio">Ainda não há plano para ${dataSel === dia.hoje ? 'hoje' : esc(dataBonita(dataSel))}.${dataSel === dia.hoje ? '<br><br><button class="btn" data-amanha="1">Ver amanhã</button>' : ''}</div>`; ligarAcoes(el); return; }
-    el.innerHTML = dia.planos.map((pl) => {
+    el.innerHTML = dia.planos.map((pl, pi) => {
       const prontas = pl.paragens.filter((p) => pl.caixas[p.localId] && pl.caixas[p.localId].pronta).length;
       const pct = Math.round((prontas / pl.paragens.length) * 100);
       return `<div class="cartao"><h2>Caixas para ${esc(dataBonita(pl.data))}</h2>
@@ -368,7 +383,8 @@
         return `<div class="cartao ${c.pronta ? 'caixa-pronta' : ''}">
           <div class="cabeca" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;"><h2 style="margin:0;">${p.n}. ${esc(p.nome)}</h2><span class="badge ${c.pronta ? 'ok' : ''}">${c.pronta ? '✓ pronta' : unidades + ' un.'}</span></div>
           ${c.pronta ? `<div class="sub">Preparada por ${esc(c.por || '')} às ${hhmm(c.em)}</div>` : ''}
-          <details data-k="c-${esc(pl.id)}-${esc(p.localId)}" ${c.pronta ? '' : 'open'}><summary>Conteúdo da caixa</summary>${htmlItens(p)}</details>
+          <div class="sub" style="margin-top:2px;" data-conta="${esc(pl.id)}|${esc(p.localId)}"></div>
+          <details data-k="c-${esc(pl.id)}-${esc(p.localId)}" ${c.pronta ? '' : 'open'}><summary>Conteúdo da caixa — toca em cada produto quando o puseres na cesta</summary>${htmlItens(p, { pi, marcados: c.itens || {} })}</details>
           <div style="margin-top:10px;"><input class="campo" placeholder="Faltou alguma coisa? (ex.: só havia 4 Bolas de Carne)" value="${esc(c.faltas || '')}" data-faltas="${esc(pl.id)}|${esc(p.localId)}" /></div>
           <div class="botoes"><button class="btn grande ${c.pronta ? '' : 'verde'}" data-pronta="${esc(pl.id)}|${esc(p.localId)}|${c.pronta ? '0' : '1'}">${c.pronta ? 'Desmarcar' : '📦 Caixa pronta'}</button></div>
         </div>`;
@@ -376,23 +392,60 @@
     }).join('');
     ligarAcoes(el);
   }
+  async function marcarItem(tr) {
+    const [pi, localId, ii] = tr.dataset.item.split('|');
+    const pl = dia.planos[Number(pi)];
+    const p = pl && pl.paragens.find((x) => x.localId === localId);
+    const it = p && p.itens[Number(ii)];
+    if (!it) return;
+    const chave = it.maquina + '|' + it.produto;
+    const c = pl.caixas[localId] = pl.caixas[localId] || {};
+    c.itens = c.itens || {};
+    const feito = !c.itens[chave];
+    // muda logo no ecrã; o servidor confirma a seguir
+    if (feito) c.itens[chave] = 1; else delete c.itens[chave];
+    tr.classList.toggle('on', feito); tr.querySelector('.cx').textContent = feito ? '✅' : '⬜';
+    atualizarContagemCaixa(pl, p);
+    try {
+      const r = await enviar(`caixa?plano=${encodeURIComponent(pl.id)}&local=${encodeURIComponent(localId)}`, 'PUT', { item: chave, feito });
+      const antes = !!c.pronta;
+      pl.caixas = r.caixas;
+      if (antes !== !!(r.caixas[localId] || {}).pronta) renderTudo();
+    } catch (err) { mostrarErro(err); carregarDia(); }
+  }
+  function atualizarContagemCaixa(pl, p) {
+    const el = document.querySelector(`[data-conta="${CSS.escape(pl.id + '|' + p.localId)}"]`);
+    if (!el) return;
+    const c = pl.caixas[p.localId] || {};
+    const lista = p.itens.filter((it) => it.aLevar > 0);
+    const feitos = lista.filter((it) => c.itens && c.itens[it.maquina + '|' + it.produto]).length;
+    el.textContent = `${feitos}/${lista.length} produtos na cesta`;
+  }
 
   // ---------- tarefas ----------
-  function htmlOrdem(o) {
+  function descFrequencia(o) {
+    const n = o.intervalo || 1;
+    if (o.recorrencia === 'semanas') return n === 1 ? 'todas as semanas' : `a cada ${n} semanas`;
+    if (o.recorrencia === 'meses') return n === 1 ? 'todos os meses' : `a cada ${n} meses`;
+    if (o.recorrencia === 'visitas') return `a cada ${n} visita${n > 1 ? 's' : ''} · vai em ${Math.min(o.visitasDesde || 0, n)}/${n}`;
+    return '';
+  }
+  function htmlOrdem(o, proxima) {
     const atrasada = o.data && o.data < dia.hoje;
     const cor = o.urgencia === 'Urgente' ? 'mau' : o.urgencia === 'Alta' ? 'curso' : '';
     return `<div class="item"><div class="tit">${esc(o.titulo)}</div>
-      <div class="etiquetas"><span class="badge azul">${esc(o.tipo)}</span>${o.urgencia !== 'Média' ? `<span class="badge ${cor}">${esc(o.urgencia)}</span>` : ''}${o.maquina ? `<span class="badge">máquina ${esc(o.maquina)}</span>` : o.localId ? `<span class="badge">${esc(nomeLocal(o.localId))}</span>` : ''}${o.data ? `<span class="badge ${atrasada ? 'mau' : ''}">${atrasada ? 'atrasada · era ' : 'até '}${diaCurto(o.data + 'T12:00:00Z')}</span>` : ''}${o.recorrencia && o.recorrencia !== 'nenhuma' ? `<span class="badge">repete ${esc(o.recorrencia)}</span>` : ''}</div>
+      <div class="etiquetas"><span class="badge azul">${esc(o.tipo)}</span>${o.urgencia !== 'Média' ? `<span class="badge ${cor}">${esc(o.urgencia)}</span>` : ''}${o.maquina ? `<span class="badge">máquina ${esc(o.maquina)}</span>` : o.localId ? `<span class="badge">${esc(nomeLocal(o.localId))}</span>` : ''}${o.data && o.recorrencia !== 'visitas' ? `<span class="badge ${atrasada ? 'mau' : ''}">${atrasada ? 'atrasada · era ' : proxima ? 'próxima ' : 'até '}${diaCurto(o.data + 'T12:00:00Z')}</span>` : ''}${descFrequencia(o) ? `<span class="badge">🔁 ${esc(descFrequencia(o))}</span>` : ''}</div>
       ${o.maquina && o.localId ? `<div class="sub" style="margin-top:4px;">${esc(nomeLocal(o.localId))}</div>` : ''}
       ${o.descricao ? `<div class="desc">${esc(o.descricao)}</div>` : ''}
       ${o.ultimaVez ? `<div class="sub" style="margin-top:4px;">Última vez: ${diaCurto(o.ultimaVez)} por ${esc(o.ultimaPor || '')}</div>` : ''}
-      <div class="botoes"><button class="btn verde" data-feito="${esc(o.id)}" data-tit="${esc(o.titulo)}">Feito</button></div></div>`;
+      <div class="botoes"><button class="btn ${proxima ? '' : 'verde'}" data-feito="${esc(o.id)}" data-tit="${esc(o.titulo)}">${proxima ? 'Já fiz (antes do tempo)' : 'Feito'}</button></div></div>`;
   }
   function renderTarefas() {
     const el = $('v-tarefas');
     const os = dia.ordens;
     el.innerHTML = `<div class="cartao"><h2>Tarefas e ordens</h2><div class="sub">Pendentes até ${dataSel === dia.hoje ? 'hoje' : esc(dataBonita(dataSel))}, incluindo atrasadas e sem data.</div>
-      ${os.length ? os.map(htmlOrdem).join('') : '<div class="vazio">Nada pendente. 👌</div>'}</div>
+      ${os.length ? os.map((o) => htmlOrdem(o)).join('') : '<div class="vazio">Nada pendente. 👌</div>'}</div>
+      ${(dia.proximas || []).length ? `<div class="cartao"><details data-k="proximas"><summary>Próximas (${dia.proximas.length}) — ainda não estão para fazer</summary>${dia.proximas.map((o) => htmlOrdem(o, true)).join('')}</details></div>` : ''}
       ${dia.feitasHoje.length ? `<div class="cartao"><h2>Feitas ${dataSel === dia.hoje ? 'hoje' : 'neste dia'}</h2>${dia.feitasHoje.map((o) => `<div class="item"><div class="tit">✓ ${esc(o.titulo)}</div><div class="sub">${esc(o.por || '')} às ${hhmm(o.em)}${o.maquina ? ' · máquina ' + esc(o.maquina) : ''}</div></div>`).join('')}</div>` : ''}`;
     ligarAcoes(el);
   }
@@ -446,6 +499,8 @@
     el.querySelectorAll('[data-amanha]').forEach((b) => b.onclick = () => { dataSel = somarDias(hojeStr(), 1); marcarChips(); carregarDia(); });
     el.querySelectorAll('[data-feito]').forEach((b) => b.onclick = () => pedirNota('Marcar como feito', b.dataset.tit, 'Feito', async (nota) => {
       await enviar('ordem?id=' + encodeURIComponent(b.dataset.feito), 'PUT', { nota });
+      const item = b.closest('.item');
+      if (item && item.closest('#resultadoQr')) item.innerHTML = `<div class="tit">✓ ${esc(b.dataset.tit)}</div><div class="sub">feito agora${nota ? ' — ' + esc(nota) : ''}</div>`;
       await carregarDia();
     }));
     el.querySelectorAll('[data-tk]').forEach((b) => b.onclick = () => {
@@ -462,6 +517,8 @@
       try { await enviar(`caixa?plano=${encodeURIComponent(plano)}&local=${encodeURIComponent(local)}`, 'PUT', { pronta: v === '1' }); await carregarDia(); }
       catch (err) { mostrarErro(err); b.disabled = false; }
     });
+    el.querySelectorAll('tr[data-item]').forEach((tr) => tr.onclick = () => marcarItem(tr));
+    el.querySelectorAll('[data-conta]').forEach((d) => { const [plId, loc] = d.dataset.conta.split('|'); const pl = dia.planos.find((x) => x.id === plId); const p = pl && pl.paragens.find((x) => x.localId === loc); if (p) atualizarContagemCaixa(pl, p); });
     el.querySelectorAll('[data-faltas]').forEach((inp) => inp.addEventListener('change', async () => {
       const [plano, local] = inp.dataset.faltas.split('|');
       try { await enviar(`caixa?plano=${encodeURIComponent(plano)}&local=${encodeURIComponent(local)}`, 'PUT', { faltas: inp.value }); inp.style.borderColor = 'var(--positive)'; }
