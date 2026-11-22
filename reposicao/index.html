@@ -228,8 +228,8 @@
     const v = dia && dia.aberta;
     const el = $('faixaVisita');
     if (!v) { el.innerHTML = ''; return; }
-    el.innerHTML = `<div class="faixa"><div><div style="font-size:12px;">Em visita desde ${hhmm(v.inicio)} · ${fmtMin(minutosDesde(v.inicio))}</div><b>${esc(v.localNome)}</b></div>
-      <button class="btn escuro" id="btnSair">Terminar visita</button></div>`;
+    el.innerHTML = `<div class="faixa"><div><div style="font-size:12px;">${v.localId === 'armazem' ? 'No armazém' : 'Em visita'} desde ${hhmm(v.inicio)} · ${fmtMin(minutosDesde(v.inicio))}</div><b>${esc(v.localNome)}</b></div>
+      <button class="btn escuro" id="btnSair">${v.localId === 'armazem' ? 'Terminar' : 'Terminar visita'}</button></div>`;
     $('btnSair').onclick = terminarVisita;
   }
   async function terminarVisita() {
@@ -251,6 +251,18 @@
     const el = $('resultadoQr');
     if (!r || !r.visita) { el.innerHTML = ''; return; }
     const v = r.visita;
+    if (v.localId === 'armazem') {
+      // armazém: só a entrada/saída (o tempo a preparar as caixas)
+      el.innerHTML = r.acao === 'saida'
+        ? `<div class="cartao resultado saida"><div class="sub">Saída do armazém às ${hhmm(v.fim)}</div><div class="grande">Caixas · ${fmtMin(v.duracaoMin)}</div><div class="sub">Entrada às ${hhmm(v.inicio)}.</div><div class="botoes"><button class="btn" id="resFechar">OK</button></div></div>`
+        : `<div class="cartao resultado entrada"><div class="sub">${r.repetido ? 'Já estás no armazém' : 'Entrada no armazém às ' + hhmm(v.inicio)}</div><div class="grande">Preparação de caixas</div>
+           <div class="sub">Quando acabares, lê outra vez o QR do armazém (ou carrega em <b>Terminar</b>).</div>
+           <div class="botoes"><button class="btn escuro" id="resSair">Terminar</button><button class="btn" id="resFechar">Fechar</button></div></div>`;
+      const s = $('resSair'); if (s) s.onclick = terminarVisita;
+      const f = $('resFechar'); if (f) f.onclick = () => { el.innerHTML = ''; };
+      window.scrollTo(0, 0);
+      return;
+    }
     const maq = v.maquinas && v.maquinas.length ? ' · ' + v.maquinas.join(', ') : '';
     if (r.acao === 'saida') {
       el.innerHTML = `<div class="cartao resultado saida"><div class="sub">Saída registada às ${hhmm(v.fim)}</div>
@@ -538,11 +550,16 @@
     mudarVista(eu.perfil === 'preparador' ? 'caixas' : 'rota');
     const q = new URLSearchParams(location.search);
     const qr = (q.get('qr') || '').toUpperCase();
-    if (/^\d{3}(-S)?$/.test(qr)) {
+    if (/^(\d{3}(-S)?|ARMAZEM)$/.test(qr)) {
       history.replaceState(null, '', '/reposicao/');
-      dataSel = hojeStr(); marcarChips();
+      if (qr !== 'ARMAZEM') dataSel = hojeStr(); // no armazém fica o dia das caixas (amanhã a partir das 13h)
+      marcarChips();
       await carregarDia();
-      try { mostrarResultado(await enviar('visita', 'POST', { maquina: qr })); await carregarDia(); }
+      try {
+        const r = await enviar('visita', 'POST', { maquina: qr });
+        if (qr === 'ARMAZEM') mudarVista('caixas');
+        mostrarResultado(r); await carregarDia();
+      }
       catch (err) { mostrarErro(err); }
     } else await carregarDia();
     setInterval(() => { const a = document.activeElement; if (!document.hidden && !$('folha').classList.contains('on') && !(a && /INPUT|TEXTAREA/.test(a.tagName))) carregarDia(); }, 60000);
