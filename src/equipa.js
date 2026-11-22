@@ -20,7 +20,10 @@ const MAX_FALHAS = 10;
 export const PERFIS = ["repositor", "preparador", "ambos"];
 const ORDEM_TIPOS = ["Ordem", "Tarefa", "Limpeza", "Manutenção"];
 const URGENCIAS = ["Baixa", "Média", "Alta", "Urgente"];
-const RECORRENCIAS = { nenhuma: 0, semanal: 7, quinzenal: 14, mensal: 30 };
+// frequência das tarefas: uma vez (ad-hoc), a cada N semanas, a cada N meses, ou após N visitas ao local da máquina
+const RECORRENCIAS = ["nenhuma", "semanas", "meses", "visitas"];
+const RECORRENCIAS_ANTIGAS = { semanal: ["semanas", 1], quinzenal: ["semanas", 2], mensal: ["meses", 1] };
+const LOG_MAX = 400;
 const VISITA_MAX_MS = 3 * 60 * 60 * 1000; // visita aberta há mais de 3h = esqueceu-se de sair (não conta para as médias)
 const VISITA_TTL_S = 60 * 60 * 24 * 400;
 const USER_VALIDO = /^[a-z0-9._-]{3,40}$/;
@@ -63,6 +66,24 @@ function somarDias(data, n) {
   const d = new Date(data + "T12:00:00Z");
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
+}
+function somarMeses(data, n) {
+  const [a, m, d] = data.split("-").map(Number);
+  const alvo = new Date(Date.UTC(a, m - 1 + n, 1, 12));
+  const ultimoDia = new Date(Date.UTC(alvo.getUTCFullYear(), alvo.getUTCMonth() + 1, 0, 12)).getUTCDate();
+  alvo.setUTCDate(Math.min(d, ultimoDia));
+  return alvo.toISOString().slice(0, 10);
+}
+
+// ===== Registo de atividade do dia (o admin vê "ao vivo") =====
+async function registarLog(env, entrada) {
+  try {
+    const data = dataLisboa();
+    const chave = `eq:log:${data}`;
+    const lista = (await lerJSON(env, chave)) || [];
+    lista.push({ em: new Date().toISOString(), ...entrada });
+    await env.HISTORY_KV.put(chave, JSON.stringify(lista.slice(-LOG_MAX)), { expirationTtl: 60 * 60 * 24 * 120 });
+  } catch {}
 }
 
 // ===== Locais e máquinas (admin/rotas_moradas.json: os mesmos locais da rota sugerida) =====
@@ -159,7 +180,9 @@ async function registarVisita(request, env, s, p) {
   const aberta = await visitaAberta(env, s.utilizador);
   if (p.acao === "sair") {
     if (!aberta) return { acao: "nada" };
-    return { acao: "saida", visita: await fecharVisita(env, aberta, "botao", agora.toISOString()) };
+    const v = await fecharVisita(env, aberta, "botao", agora.toISOString());
+    await registarLog(env, { quem: s.nome, utilizador: s.utilizador, tipo: "saida", localId: v.localId, texto: `saiu de ${v.localNome} (${v.duracaoMin} min)` });
+    return { acao: "saida", visita: v };
   }
   const maquina = String(p.maquina || "").toUpperCase();
   let local = null;
@@ -172,14 +195,19 @@ async function registarVisita(request, env, s, p) {
     if (novaMaquina) {
       aberta.maquinas.push(maquina);
       await env.HISTORY_KV.put(`eq:visita:${aberta.id}`, JSON.stringify(aberta), { expirationTtl: VISITA_TTL_S });
-      return { acao: "entrada", visita: aberta, local, juntou: maquina };
+      return { acao: "entrada", visita: aberta, local, juntou: maquina, ordens: await ordensDoLocal(env, s, local.id) };
     }
     // a mesma leitura repetida no primeiro minuto (página recarregada) não fecha a visita
-    if (agora - new Date(aberta.inicio) < 60000 || !maquina && p.localId) return { acao: "entrada", visita: aberta, local, repetido: true };
-    return { acao: "saida", visita: await fecharVisita(env, aberta, "qr", agora.toISOString()), local };
+    if (agora - new Date(aberta.inicio) < 60000 || !maquina && p.localId) return { acao: "entrada", visita: aberta, local, repetido: true, ordens: await ordensDoLocal(env, s, local.id) };
+    const v = await fecharVisita(env, aberta, "qr", agora.toISOString());
+    await registarLog(env, { quem: s.nome, utilizador: s.utilizador, tipo: "saida", localId: v.localId, texto: `saiu de ${v.localNome} (${v.duracaoMin} min)` });
+    return { acao: "saida", visita: v, local };
   }
   let anterior = null;
-  if (aberta) anterior = await fecharVisita(env, aberta, "auto-seguinte", agora.toISOString());
+  if (aberta) {
+    anterior = await fecharVisita(env, aberta, "auto-seguinte", agora.toISOString());
+    await registarLog(env, { quem: s.nome, utilizador: s.utilizador, tipo: "saida", localId: anterior.localId, texto: `visita a ${anterior.localNome} fechada ao ler o QR seguinte` });
+  }
   const data = dataLisboa(agora);
   const v = {
     id: `${data}:${agora.getTime()}-${aleatorio(3)}`,
@@ -191,7 +219,9 @@ async function registarVisita(request, env, s, p) {
   };
   await env.HISTORY_KV.put(`eq:visita:${v.id}`, JSON.stringify(v), { expirationTtl: VISITA_TTL_S });
   await env.HISTORY_KV.put(`eq:aberta:${s.utilizador}`, v.id, { expirationTtl: VISITA_TTL_S });
-  return { acao: "entrada", visita: v, local, anterior };
+  await contarVisitaNasOrdens(env, local.id);
+  await registarLog(env, { quem: s.nome, utilizador: s.utilizador, tipo: "entrada", localId: local.id, texto: `chegou a ${local.nome}${maquina ? " (QR " + maquina + ")" : " (sem QR)"}` });
+  return { acao: "entrada", visita: v, local, anterior, ordens: await ordensDoLocal(env, s, local.id) };
 }
 
 // ===== Ordens / tarefas =====
@@ -206,20 +236,61 @@ function ordemValida(p, locais) {
     tipo: ORDEM_TIPOS.includes(p.tipo) ? p.tipo : "Tarefa",
     maquina, localId,
     data: DATA_RE.test(p.data || "") ? p.data : "",
-    recorrencia: p.recorrencia in RECORRENCIAS ? p.recorrencia : "nenhuma",
+    ...frequencia(p),
     atribuidaA: USER_VALIDO.test(normUser(p.atribuidaA)) ? normUser(p.atribuidaA) : "",
     urgencia: URGENCIAS.includes(p.urgencia) ? p.urgencia : "Média",
   };
 }
+// { recorrencia, intervalo } — aceita também os valores antigos (semanal, quinzenal, mensal)
+function frequencia(p) {
+  if (RECORRENCIAS_ANTIGAS[p.recorrencia]) { const [r, n] = RECORRENCIAS_ANTIGAS[p.recorrencia]; return { recorrencia: r, intervalo: n }; }
+  const recorrencia = RECORRENCIAS.includes(p.recorrencia) ? p.recorrencia : "nenhuma";
+  const intervalo = recorrencia === "nenhuma" ? 0 : Math.min(recorrencia === "semanas" ? 52 : recorrencia === "meses" ? 24 : 100, Math.max(1, Math.round(Number(p.intervalo) || 1)));
+  return { recorrencia, intervalo };
+}
+// tarefas antigas guardadas com "semanal"/"quinzenal"/"mensal" passam a ler-se no formato novo
+function normalizarOrdem(o) {
+  if (o && RECORRENCIAS_ANTIGAS[o.recorrencia]) Object.assign(o, frequencia(o));
+  if (o && !o.intervalo && o.recorrencia && o.recorrencia !== "nenhuma") o.intervalo = 1;
+  return o;
+}
+// está para fazer neste dia? (por data, ou por nº de visitas ao local)
+function ordemDevida(o, data) {
+  if (o.estado === "Feita") return false;
+  if (o.recorrencia === "visitas") return (o.visitasDesde || 0) >= (o.intervalo || 1);
+  return !o.data || o.data <= data;
+}
+async function listarOrdens(env) {
+  return (await listarPrefixo(env, "eq:ordem:")).map(normalizarOrdem);
+}
+// cada visita nova a um local soma 1 às tarefas "após N visitas" desse local
+async function contarVisitaNasOrdens(env, localId) {
+  for (const o of await listarOrdens(env)) {
+    if (o.recorrencia !== "visitas" || o.estado === "Feita" || o.localId !== localId) continue;
+    o.visitasDesde = (o.visitasDesde || 0) + 1;
+    await env.HISTORY_KV.put(`eq:ordem:${o.id}`, JSON.stringify(o));
+  }
+}
+// tarefas pendentes de um local (para o ecrã que abre ao ler o QR): as que estão para fazer e as próximas
+async function ordensDoLocal(env, s, localId) {
+  const hoje = dataLisboa();
+  return (await listarOrdens(env))
+    .filter((o) => o.estado !== "Feita" && o.localId === localId && ordemParaMim(o, s))
+    .map((o) => ({ ...o, devida: ordemDevida(o, hoje) }))
+    .sort((a, b) => (b.devida - a.devida) || (URGENCIAS.indexOf(b.urgencia) - URGENCIAS.indexOf(a.urgencia)));
+}
 async function concluirOrdem(env, o, quem, nota) {
+  normalizarOrdem(o);
   const agora = new Date().toISOString();
-  o.historico = [{ em: agora, por: quem, nota: txt(nota, 500), data: o.data }, ...(o.historico || [])].slice(0, 30);
+  o.historico = [{ em: agora, por: quem, nota: txt(nota, 500), data: o.data, visitas: o.visitasDesde }, ...(o.historico || [])].slice(0, 30);
   o.ultimaVez = agora;
   o.ultimaPor = quem;
-  const dias = RECORRENCIAS[o.recorrencia] || 0;
-  if (dias) {
-    // repete: volta a ficar pendente, para daqui a N dias contados a partir de hoje
-    o.data = somarDias(dataLisboa(), dias);
+  if (o.recorrencia === "semanas" || o.recorrencia === "meses" || o.recorrencia === "visitas") {
+    // repete: volta a ficar pendente, contado a partir de hoje (ou da próxima visita)
+    const hoje = dataLisboa();
+    if (o.recorrencia === "semanas") o.data = somarDias(hoje, 7 * (o.intervalo || 1));
+    if (o.recorrencia === "meses") o.data = somarMeses(hoje, o.intervalo || 1);
+    if (o.recorrencia === "visitas") o.visitasDesde = 0;
     o.estado = "Pendente";
   } else {
     o.estado = "Feita";
@@ -264,12 +335,16 @@ async function handleApiEquipa(request, env, s, caminho) {
       planosDoDia(env, data),
       listarPrefixo(env, `eq:visita:${data}:`),
       visitaAberta(env, s.utilizador),
-      listarPrefixo(env, "eq:ordem:"),
+      listarOrdens(env),
       listarTickets(env),
     ]);
-    const pendentes = ordens
-      .filter((o) => o.estado !== "Feita" && ordemParaMim(o, s) && (!o.data || o.data <= data))
+    const minhas = ordens.filter((o) => o.estado !== "Feita" && ordemParaMim(o, s));
+    const pendentes = minhas
+      .filter((o) => ordemDevida(o, data))
       .sort((a, b) => (URGENCIAS.indexOf(b.urgencia) - URGENCIAS.indexOf(a.urgencia)) || String(a.data || "9").localeCompare(String(b.data || "9")));
+    const proximas = minhas
+      .filter((o) => !ordemDevida(o, data))
+      .sort((a, b) => String(a.data || "9").localeCompare(String(b.data || "9")));
     const feitasHoje = ordens.filter((o) => ordemParaMim(o, s) && o.ultimaVez && dataLisboa(new Date(o.ultimaVez)) === data);
     return json({
       data, hoje: dataLisboa(), eu: { utilizador: s.utilizador, nome: s.nome, perfil: s.perfil },
@@ -277,6 +352,7 @@ async function handleApiEquipa(request, env, s, caminho) {
       visitas: visitasDia.sort((a, b) => a.inicio.localeCompare(b.inicio)),
       aberta,
       ordens: pendentes,
+      proximas,
       feitasHoje: feitasHoje.map((o) => ({ id: o.id, titulo: o.titulo, maquina: o.maquina, por: o.ultimaPor, em: o.ultimaVez })),
       tickets: tickets.filter((t) => t.estado !== "Resolvido").map((t) => ticketResumido(t, locais)),
       locais: locais.porId,
@@ -288,7 +364,7 @@ async function handleApiEquipa(request, env, s, caminho) {
     const dias = Array.from({ length: 7 }, (_, i) => somarDias(inicio, i));
     const fim = dias[6];
     const [ordens, ...porDia] = await Promise.all([
-      listarPrefixo(env, "eq:ordem:"),
+      listarOrdens(env),
       ...dias.map((d) => Promise.all([planosDoDia(env, d), listarPrefixo(env, `eq:visita:${d}:`)])),
     ]);
     const hoje = dataLisboa();
@@ -297,10 +373,11 @@ async function handleApiEquipa(request, env, s, caminho) {
       // ordens com data neste dia (as que se repetem aparecem também nas próximas ocorrências da semana)
       const doDia = [];
       for (const o of ordens) {
-        if (!ordemParaMim(o, s) || o.estado === "Feita" || !o.data) continue;
-        const passo = RECORRENCIAS[o.recorrencia] || 0;
+        if (!ordemParaMim(o, s) || o.estado === "Feita" || !o.data || o.recorrencia === "visitas") continue;
+        const n = o.intervalo || 1;
         let alvo = o.data;
-        if (alvo < d && passo) { while (alvo < d) alvo = somarDias(alvo, passo); }
+        if (o.recorrencia === "semanas") { while (alvo < d) alvo = somarDias(alvo, 7 * n); }
+        if (o.recorrencia === "meses") { let k = 1; const base = o.data; while (alvo < d && k < 100) alvo = somarMeses(base, n * k++); }
         if (alvo === d || (o.data < hoje && d === hoje)) doDia.push({ id: o.id, titulo: o.titulo, tipo: o.tipo, maquina: o.maquina, urgencia: o.urgencia, atrasada: o.data < hoje, prevista: alvo !== o.data });
       }
       return {
@@ -326,7 +403,9 @@ async function handleApiEquipa(request, env, s, caminho) {
     const o = await lerJSON(env, `eq:ordem:${id}`);
     if (!o || !ordemParaMim(o, s)) return json({ error: "Tarefa não encontrada" }, 404);
     const p = (await corpo()) || {};
-    return json({ ok: true, ordem: await concluirOrdem(env, o, s.nome, p.nota) });
+    const feita = await concluirOrdem(env, o, s.nome, p.nota);
+    await registarLog(env, { quem: s.nome, utilizador: s.utilizador, tipo: "tarefa", localId: o.localId, texto: `fez "${o.titulo}"${o.maquina ? " na máquina " + o.maquina : ""}${p.nota ? " — " + txt(p.nota, 200) : ""}` });
+    return json({ ok: true, ordem: feita });
   }
 
   if (caminho === "ticket" && metodo === "PUT") {
@@ -336,6 +415,7 @@ async function handleApiEquipa(request, env, s, caminho) {
     if (p.estado && !["Em curso", "Resolvido"].includes(p.estado)) return json({ error: "Estado inválido" }, 400);
     const t = await atualizarTicketPorEquipa(env, id, p, s.nome);
     if (!t) return json({ error: "Ticket não encontrado" }, 404);
+    await registarLog(env, { quem: s.nome, utilizador: s.utilizador, tipo: "ticket", texto: `ticket #${t.numero}${p.estado ? " → " + p.estado : ": nota"}${p.nota ? " — " + txt(p.nota, 200) : ""}` });
     return json({ ok: true, ticket: ticketResumido(t, locais) });
   }
 
@@ -357,8 +437,24 @@ async function handleApiEquipa(request, env, s, caminho) {
     const p = (await corpo()) || {};
     const caixas = (await lerJSON(env, `eq:caixas:${plano}`)) || {};
     const atual = caixas[localId] || {};
+    const paragem = pl.paragens.find((x) => x.localId === localId);
+    const antes = !!atual.pronta;
     if (typeof p.pronta === "boolean") { atual.pronta = p.pronta; atual.por = s.nome; atual.em = new Date().toISOString(); }
-    if (typeof p.faltas === "string") atual.faltas = txt(p.faltas, 500);
+    if (typeof p.faltas === "string") {
+      atual.faltas = txt(p.faltas, 500);
+      if (atual.faltas) await registarLog(env, { quem: s.nome, utilizador: s.utilizador, tipo: "caixa", localId, texto: `caixa ${paragem ? paragem.nome : localId}: faltou ${atual.faltas}` });
+    }
+    // ✅ produto a produto: quando estão todos marcados, a caixa fica pronta sozinha
+    if (typeof p.item === "string" && typeof p.feito === "boolean" && paragem) {
+      const chave = txt(p.item, 200);
+      atual.itens = atual.itens || {};
+      if (p.feito) atual.itens[chave] = 1; else delete atual.itens[chave];
+      const chaves = paragem.itens.filter((it) => it.aLevar > 0).map((it) => `${it.maquina}|${it.produto}`);
+      const todos = chaves.length > 0 && chaves.every((k) => atual.itens[k]);
+      if (todos && !atual.pronta) { atual.pronta = true; atual.por = s.nome; atual.em = new Date().toISOString(); }
+      if (!todos && atual.pronta && !p.feito) atual.pronta = false;
+    }
+    if (antes !== !!atual.pronta) await registarLog(env, { quem: s.nome, utilizador: s.utilizador, tipo: "caixa", localId, texto: `${atual.pronta ? "caixa pronta" : "desmarcou a caixa"}: ${paragem ? paragem.nome : localId} (${pl.data === dataLisboa() ? "hoje" : pl.data.split("-").reverse().slice(0, 2).join("/")})` });
     caixas[localId] = atual;
     await env.HISTORY_KV.put(`eq:caixas:${plano}`, JSON.stringify(caixas), { expirationTtl: VISITA_TTL_S });
     return json({ ok: true, caixas });
@@ -451,9 +547,9 @@ export async function handleEquipaAdmin(request, env) {
 
   if (recurso === "ordens") {
     if (metodo === "GET") {
-      const ordens = await listarPrefixo(env, "eq:ordem:");
+      const ordens = await listarOrdens(env);
       ordens.sort((a, b) => String(b.criadaEm).localeCompare(String(a.criadaEm)));
-      return json({ ordens, tipos: ORDEM_TIPOS, urgencias: URGENCIAS, recorrencias: Object.keys(RECORRENCIAS) });
+      return json({ ordens, tipos: ORDEM_TIPOS, urgencias: URGENCIAS, recorrencias: RECORRENCIAS });
     }
     if (metodo === "POST") {
       const b = (await corpo()) || {};
@@ -463,6 +559,7 @@ export async function handleEquipaAdmin(request, env) {
       for (const item of lista) {
         const v = ordemValida(item, locais);
         if (v.erro) return json({ error: v.erro }, 400);
+        if (v.recorrencia === "visitas" && !v.localId) return json({ error: "\"Após N visitas\" precisa de uma máquina." }, 400);
         const o = { id: crypto.randomUUID(), ...v, estado: "Pendente", criadaEm: new Date().toISOString(), historico: [] };
         await env.HISTORY_KV.put(`eq:ordem:${o.id}`, JSON.stringify(o));
         criadas.push(o);
@@ -476,7 +573,7 @@ export async function handleEquipaAdmin(request, env) {
       if (!o) return json({ error: "Tarefa não encontrada" }, 404);
       const b = (await corpo()) || {};
       if (b.concluir) return json({ ok: true, ordem: await concluirOrdem(env, o, "Admin", b.nota) });
-      if (b.reabrir) { o.estado = "Pendente"; o.feitaEm = null; o.feitaPor = null; }
+      if (b.reabrir) { o.estado = "Pendente"; o.feitaEm = null; o.feitaPor = null; normalizarOrdem(o); }
       else {
         const v = ordemValida({ ...o, ...b }, locais);
         if (v.erro) return json({ error: v.erro }, 400);
@@ -559,6 +656,50 @@ export async function handleEquipaAdmin(request, env) {
       await env.HISTORY_KV.delete(`eq:caixas:${id}`);
       return json({ ok: true });
     }
+  }
+
+  // visão ao vivo: onde está cada pessoa, progresso dos planos de hoje e amanhã, e o registo do que foi feito hoje
+  if (recurso === "aovivo" && metodo === "GET") {
+    const hoje = dataLisboa();
+    const amanha = somarDias(hoje, 1);
+    const [planosHoje, planosAmanha, visitasHoje, log, ordens] = await Promise.all([
+      planosDoDia(env, hoje), planosDoDia(env, amanha),
+      listarPrefixo(env, `eq:visita:${hoje}:`), lerJSON(env, `eq:log:${hoje}`), listarOrdens(env),
+    ]);
+    const pessoas = [];
+    for (const k of (await env.HISTORY_KV.list({ prefix: "eq:user:" })).keys) {
+      const u = await lerJSON(env, k.name);
+      if (!u || u.ativo === false) continue;
+      const utilizador = k.name.slice(8);
+      const minhas = visitasHoje.filter((v) => v.utilizador === utilizador).sort((a, b) => a.inicio.localeCompare(b.inicio));
+      const aberta = await visitaAberta(env, utilizador);
+      pessoas.push({
+        utilizador, nome: u.nome, perfil: u.perfil, ultimoAcesso: u.ultimoAcesso || null,
+        aberta, ultima: minhas.filter((v) => v.fim).pop() || null,
+        visitas: minhas.length,
+        minutos: minhas.filter((v) => v.fim && (v.fecho === "qr" || v.fecho === "botao")).reduce((s, v) => s + v.duracaoMin, 0),
+      });
+    }
+    const resumoPlano = (pl, visitas) => {
+      const feitas = new Set(visitas.filter((v) => v.fim).map((v) => v.localId));
+      const agora = new Set(visitas.filter((v) => !v.fim && !v.fecho).map((v) => v.localId));
+      return {
+        id: pl.id, data: pl.data, responsavelNome: pl.responsavelNome, saida: pl.saida,
+        paragens: pl.paragens.map((x) => {
+          const c = pl.caixas[x.localId] || {};
+          const itens = x.itens.filter((it) => it.aLevar > 0);
+          return { localId: x.localId, nome: x.nome, chegada: x.chegada, pronta: !!c.pronta, faltas: c.faltas || "", itensFeitos: itens.filter((it) => c.itens && c.itens[`${it.maquina}|${it.produto}`]).length, itens: itens.length, visitada: feitas.has(x.localId), emCurso: agora.has(x.localId) };
+        }),
+      };
+    };
+    const pendentesHoje = ordens.filter((o) => ordemDevida(o, hoje)).length;
+    return json({
+      hoje, amanha, agora: new Date().toISOString(), pessoas,
+      planosHoje: planosHoje.map((pl) => resumoPlano(pl, visitasHoje)),
+      planosAmanha: planosAmanha.map((pl) => resumoPlano(pl, [])),
+      log: (log || []).slice().reverse(),
+      tarefasPendentes: pendentesHoje,
+    });
   }
 
   if (recurso === "visitas") {

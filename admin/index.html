@@ -1477,6 +1477,15 @@
   <div id="view-equipa" class="view">
     <div class="panel full">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px;">
+        <h2 style="margin:0;">Ao vivo <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--positive);margin-left:4px;vertical-align:middle;"></span></h2>
+        <span id="eqVivoHora" style="font-size:12px;color:var(--muted);"></span>
+      </div>
+      <div style="font-size:13px;color:var(--muted);margin:0 0 12px;">Onde está cada pessoa, como vão as caixas e a rota, e tudo o que foi feito hoje. Atualiza sozinho a cada 30 segundos.</div>
+      <div id="eqVivoWrap"><div class="state small">a carregar…</div></div>
+    </div>
+
+    <div class="panel full">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px;">
         <h2 style="margin:0;">Pessoas da equipa</h2>
         <a href="/reposicao/" target="_blank" style="font-size:13px;color:var(--accent-deep);">Abrir mpvending.pt/reposicao ↗</a>
       </div>
@@ -1514,7 +1523,7 @@
     <div class="panel full">
       <h2>Tarefas e ordens para a equipa</h2>
       <div style="font-size:13px;color:var(--muted);margin:-4px 0 12px;line-height:1.5;">
-        Aparecem no separador <b>Tarefas</b> de /reposicao (e na visita, quando o repositor lê o QR dessa máquina). As que se repetem voltam a ficar pendentes N dias depois de feitas — ex.: limpeza semanal em todas as máquinas de snacks.
+        Aparecem no separador <b>Tarefas</b> de /reposicao (e na visita, quando o repositor lê o QR dessa máquina). Frequência: uma vez (ad-hoc), a cada X semanas ou meses (conta a partir do dia em que é feita) ou após X visitas à máquina (cada chegada ao local conta uma) — ex.: limpar o moedeiro a cada 4 visitas em todas as máquinas de snacks.
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
         <div style="flex:2 1 240px;"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Tarefa / ordem</label>
@@ -1527,8 +1536,11 @@
           <select id="eqOPara" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;"><option value="">Toda a equipa</option></select></div>
         <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Até ao dia</label>
           <input type="date" id="eqOData" style="border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-family:inherit;font-size:13px;" /></div>
-        <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Repetir</label>
-          <select id="eqORepetir" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;"><option value="nenhuma">Não</option><option value="semanal">Semanal</option><option value="quinzenal">Quinzenal</option><option value="mensal">Mensal</option></select></div>
+        <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Frequência</label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <select id="eqORepetir" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;"><option value="nenhuma">Uma vez (ad-hoc)</option><option value="semanas">A cada X semanas</option><option value="meses">A cada X meses</option><option value="visitas">Após X visitas à máquina</option></select>
+            <span id="eqOIntervaloWrap" style="display:none;font-size:13px;color:var(--muted);">X = <input type="number" id="eqOIntervalo" min="1" max="100" value="1" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;width:64px;" /></span>
+          </div></div>
         <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Urgência</label>
           <select id="eqOUrgencia" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;"><option>Baixa</option><option selected>Média</option><option>Alta</option><option>Urgente</option></select></div>
       </div>
@@ -7564,6 +7576,14 @@
   const eqMin = (m) => m == null ? '—' : m < 60 ? Math.round(m) + ' min' : Math.floor(m / 60) + 'h' + String(Math.round(m % 60)).padStart(2, '0');
   const eqBtn = 'background:none;border:1px solid var(--line);border-radius:4px;padding:4px 8px;font-size:12px;cursor:pointer;font-family:inherit;';
 
+  function eqDescFrequencia(o) {
+    const n = o.intervalo || 1;
+    if (o.recorrencia === 'semanas' || o.recorrencia === 'semanal') return n === 1 ? 'todas as semanas' : `a cada ${n} semanas`;
+    if (o.recorrencia === 'quinzenal') return 'a cada 2 semanas';
+    if (o.recorrencia === 'meses' || o.recorrencia === 'mensal') return n === 1 ? 'todos os meses' : `a cada ${n} meses`;
+    if (o.recorrencia === 'visitas') return `a cada ${n} visita${n > 1 ? 's' : ''} (vai em ${Math.min(o.visitasDesde || 0, n)}/${n})`;
+    return 'uma vez';
+  }
   async function eqApi(caminho, metodo, corpo) {
     const r = await fetch('/api/equipa/' + caminho, { method: metodo || 'GET', cache: 'no-store', headers: corpo ? { 'Content-Type': 'application/json' } : undefined, body: corpo ? JSON.stringify(corpo) : undefined });
     const d = await r.json().catch(() => ({}));
@@ -7652,10 +7672,12 @@
       atribuidaA: document.getElementById('eqOPara').value,
       data: document.getElementById('eqOData').value,
       recorrencia: document.getElementById('eqORepetir').value,
+      intervalo: Number(document.getElementById('eqOIntervalo').value) || 1,
       urgencia: document.getElementById('eqOUrgencia').value,
       descricao: document.getElementById('eqODescricao').value.trim(),
     };
-    if (corpo.recorrencia !== 'nenhuma' && !corpo.data) corpo.data = eqHoje();
+    if ((corpo.recorrencia === 'semanas' || corpo.recorrencia === 'meses') && !corpo.data) corpo.data = eqHoje();
+    if (corpo.recorrencia === 'visitas' && !corpo.maquina && !maquinas) { msg.style.color = 'var(--negative)'; msg.textContent = '"Após X visitas" precisa de uma máquina (ou de "Todas as…").'; return; }
     msg.style.color = 'var(--muted)'; msg.textContent = 'a criar…';
     try {
       const r = await eqApi('ordens', 'POST', corpo);
@@ -7678,15 +7700,15 @@
     const lista = eqOrdens.filter(o => filtro === 'todas' || (filtro === 'feitas' ? o.estado === 'Feita' : o.estado !== 'Feita'))
       .sort((a, b) => (filtro === 'feitas' ? String(b.feitaEm).localeCompare(String(a.feitaEm)) : (String(a.data || '9').localeCompare(String(b.data || '9')) || URG.indexOf(a.urgencia) - URG.indexOf(b.urgencia))));
     if (!lista.length) { wrap.innerHTML = '<div class="state small">Nada para mostrar.</div>'; return; }
-    wrap.innerHTML = `<table><thead><tr><th>Tarefa</th><th>Máquina</th><th>Para</th><th>Data</th><th>Repete</th><th>Estado</th><th></th></tr></thead><tbody>${lista.map(o => {
-      const atrasada = o.estado !== 'Feita' && o.data && o.data < hoje;
+    wrap.innerHTML = `<table><thead><tr><th>Tarefa</th><th>Máquina</th><th>Para</th><th>Data</th><th>Frequência</th><th>Estado</th><th></th></tr></thead><tbody>${lista.map(o => {
+      const atrasada = o.estado !== 'Feita' && o.recorrencia !== 'visitas' && o.data && o.data < hoje;
       const urgCor = o.urgencia === 'Urgente' ? 'var(--negative)' : o.urgencia === 'Alta' ? 'var(--accent-deep)' : 'var(--muted)';
       return `<tr>
         <td data-label="Tarefa"><b>${escapeHtml(o.titulo)}</b> <span style="font-size:11px;color:var(--muted);">${escapeHtml(o.tipo)}</span> <span style="font-size:11px;color:${urgCor};font-weight:600;">${escapeHtml(o.urgencia)}</span>${o.descricao ? `<div style="font-size:12px;color:var(--muted);white-space:pre-wrap;">${escapeHtml(o.descricao)}</div>` : ''}</td>
         <td data-label="Máquina">${o.maquina ? escapeHtml(machineLabel(o.maquina)) : '—'}</td>
         <td data-label="Para">${o.atribuidaA ? escapeHtml(nomeDe(o.atribuidaA)) : 'Toda a equipa'}</td>
-        <td data-label="Data" style="${atrasada ? 'color:var(--negative);font-weight:600;' : ''}">${o.data ? eqDia(o.data) + (atrasada ? ' (atrasada)' : '') : '—'}</td>
-        <td data-label="Repete">${o.recorrencia && o.recorrencia !== 'nenhuma' ? escapeHtml(o.recorrencia) : '—'}</td>
+        <td data-label="Data" style="${atrasada ? 'color:var(--negative);font-weight:600;' : ''}">${o.recorrencia === 'visitas' ? (o.estado !== 'Feita' && (o.visitasDesde || 0) >= (o.intervalo || 1) ? '<b style="color:var(--accent-deep);">para fazer na próxima visita</b>' : '—') : o.data ? eqDia(o.data) + (atrasada ? ' (atrasada)' : '') : '—'}</td>
+        <td data-label="Frequência">${escapeHtml(eqDescFrequencia(o))}</td>
         <td data-label="Estado">${o.estado === 'Feita' ? `<span style="color:var(--positive);font-weight:600;">Feita</span> <span style="font-size:12px;color:var(--muted);">${escapeHtml(o.feitaPor || '')} · ${o.feitaEm ? demoDataHora(o.feitaEm) : ''}</span>${o.nota ? `<div style="font-size:12px;">${escapeHtml(o.nota)}</div>` : ''}` : 'Pendente'}${o.ultimaVez && o.estado !== 'Feita' ? `<div style="font-size:12px;color:var(--muted);">última vez ${demoDataHora(o.ultimaVez)} · ${escapeHtml(o.ultimaPor || '')}${o.historico && o.historico[0] && o.historico[0].nota ? ' — ' + escapeHtml(o.historico[0].nota) : ''}</div>` : ''}</td>
         <td data-label="" style="white-space:nowrap;">
           ${o.estado === 'Feita' ? `<button type="button" class="eq-o-reabrir" data-id="${o.id}" style="${eqBtn}">Reabrir</button>` : `<button type="button" class="eq-o-feita" data-id="${o.id}" style="${eqBtn}">Marcar feita</button>`}
@@ -7774,7 +7796,46 @@
     } catch (err) { wrap.innerHTML = `<div class="state small error">Erro: ${escapeHtml(err.message)}</div>`; }
   }
 
+
+  // ----- ao vivo -----
+  let eqVivoTimer = null;
+  const EQ_LOG_IC = { entrada: '📍', saida: '🚐', tarefa: '✅', ticket: '🔧', caixa: '📦' };
+  async function eqCarregarVivo() {
+    const wrap = document.getElementById('eqVivoWrap');
+    if (!wrap || !document.getElementById('view-equipa').classList.contains('active')) return;
+    try {
+      const d = await eqApi('aovivo');
+      document.getElementById('eqVivoHora').textContent = 'atualizado às ' + eqHora(d.agora);
+      const pessoa = (p) => {
+        const min = p.aberta ? Math.round((Date.now() - new Date(p.aberta.inicio)) / 60000) : 0;
+        const estado = p.aberta
+          ? `<div style="color:var(--accent-deep);font-weight:600;">📍 em ${escapeHtml(p.aberta.localNome)} desde ${eqHora(p.aberta.inicio)} (${eqMin(min)})</div>`
+          : p.ultima ? `<div>🚐 saiu de ${escapeHtml(p.ultima.localNome)} às ${eqHora(p.ultima.fim)}</div>` : '<div style="color:var(--muted);">sem visitas hoje</div>';
+        return `<div style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;flex:1 1 240px;background:#fff;">
+          <div style="font-weight:700;">${escapeHtml(p.nome)} <span style="font-weight:400;font-size:11.5px;color:var(--muted);">${escapeHtml(EQ_PERFIL[p.perfil] || p.perfil)}</span></div>
+          <div style="font-size:13px;margin-top:4px;">${estado}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">${p.visitas} visita${p.visitas === 1 ? '' : 's'} hoje · ${eqMin(p.minutos)} nos locais</div></div>`;
+      };
+      const plano = (pl, titulo, comVisitas) => {
+        const prontas = pl.paragens.filter(x => x.pronta).length, vis = pl.paragens.filter(x => x.visitada).length;
+        return `<div style="margin-top:12px;"><div style="font-weight:600;font-size:13.5px;">${titulo}${pl.responsavelNome ? ' · ' + escapeHtml(pl.responsavelNome) : ''} — 📦 ${prontas}/${pl.paragens.length} caixas${comVisitas ? ` · ✓ ${vis}/${pl.paragens.length} visitados` : ''}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">${pl.paragens.map(x => {
+            const cor = x.emCurso ? '#FFE8CC' : x.visitada ? '#D3F9D8' : x.pronta ? '#E7F0FF' : '#F1F0EC';
+            return `<div style="background:${cor};border-radius:6px;padding:6px 9px;font-size:12.5px;">${x.emCurso ? '📍 ' : x.visitada ? '✓ ' : ''}<b>${escapeHtml(x.nome)}</b>${x.chegada ? ' · ' + escapeHtml(x.chegada) : ''}<br><span style="color:var(--muted);">${x.pronta ? '📦 pronta' : `cesta ${x.itensFeitos}/${x.itens}`}${x.faltas ? ' · <span style="color:var(--negative);">faltou ' + escapeHtml(x.faltas) + '</span>' : ''}</span></div>`;
+          }).join('')}</div></div>`;
+      };
+      wrap.innerHTML = `
+        <div style="display:flex;flex-wrap:wrap;gap:10px;">${d.pessoas.length ? d.pessoas.map(pessoa).join('') : '<div class="state small">Ainda não há pessoas com acesso.</div>'}</div>
+        ${d.planosHoje.map(pl => plano(pl, 'Rota de hoje', true)).join('') || '<div style="margin-top:12px;font-size:13px;color:var(--muted);">Sem plano enviado para hoje.</div>'}
+        ${d.planosAmanha.map(pl => plano(pl, 'Caixas para amanhã', false)).join('')}
+        <div style="margin-top:14px;font-weight:600;font-size:13.5px;">Hoje (${d.log.length}) · ${d.tarefasPendentes} tarefa${d.tarefasPendentes === 1 ? '' : 's'} por fazer</div>
+        <div style="max-height:320px;overflow-y:auto;margin-top:6px;border-top:1px solid var(--line);">${d.log.length ? d.log.map(e => `<div style="display:flex;gap:10px;padding:7px 2px;border-bottom:1px solid var(--line);font-size:13px;">
+          <span style="font-family:'IBM Plex Mono',monospace;color:var(--muted);flex:0 0 42px;">${eqHora(e.em)}</span><span>${EQ_LOG_IC[e.tipo] || '•'}</span><span><b>${escapeHtml(e.quem || '')}</b> ${escapeHtml(e.texto || '')}</span></div>`).join('') : '<div class="state small">Ainda nada hoje.</div>'}</div>`;
+    } catch (err) { wrap.innerHTML = `<div class="state small error">Erro: ${escapeHtml(err.message)}</div>`; }
+  }
   async function loadEquipaView() {
+    eqCarregarVivo();
+    if (!eqVivoTimer) eqVivoTimer = setInterval(() => { if (!document.hidden) eqCarregarVivo(); }, 30000);
     try { await eqCarregarUsers(); eqRenderUsers(); } catch (err) { document.getElementById('eqUsersWrap').innerHTML = `<div class="state small error">Erro: ${escapeHtml(err.message)}</div>`; }
     eqCarregarOrdens(); eqCarregarPlanos(); eqCarregarTempos();
     if (eqEventosLigados) return;
@@ -7789,6 +7850,8 @@
     document.getElementById('eqCopiar').onclick = async () => { const t = document.getElementById('eqMensagem'); t.select(); try { await navigator.clipboard.writeText(t.value); } catch { document.execCommand('copy'); } };
     eqMontarSelectMaquinas();
     document.getElementById('eqOCriarBtn').onclick = eqCriarOrdem;
+    const rep = document.getElementById('eqORepetir');
+    rep.onchange = () => { document.getElementById('eqOIntervaloWrap').style.display = rep.value === 'nenhuma' ? 'none' : ''; };
     document.getElementById('eqOFiltro').onchange = eqRenderOrdens;
     document.getElementById('eqTemposPeriodo').onchange = eqCarregarTempos;
   }
