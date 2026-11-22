@@ -1534,7 +1534,7 @@
     <div class="panel full">
       <h2>Tarefas e ordens para a equipa</h2>
       <div style="font-size:13px;color:var(--muted);margin:-4px 0 12px;line-height:1.5;">
-        Aparecem no separador <b>Tarefas</b> de /reposicao (e na visita, quando o repositor lê o QR dessa máquina). Frequência: uma vez (ad-hoc), a cada X semanas ou meses (conta a partir do dia em que é feita) ou após X visitas à máquina (cada chegada ao local conta uma) — ex.: limpar o moedeiro a cada 4 visitas em todas as máquinas de snacks.
+        Aparecem no separador <b>Tarefas</b> de /reposicao (e na visita, quando o repositor lê o QR dessa máquina). Com "Toda a equipa", as tarefas de uma máquina só aparecem a quem faz reposição; para dar uma tarefa a quem prepara as caixas, escolha a pessoa em "Para". Frequência: uma vez (ad-hoc), a cada X semanas ou meses (conta a partir do dia em que é feita) ou após X visitas à máquina (cada chegada ao local conta uma) — ex.: limpar o moedeiro a cada 4 visitas em todas as máquinas de snacks.
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
         <div style="flex:2 1 240px;"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Tarefa / ordem</label>
@@ -7633,7 +7633,7 @@
       try { await eqApi('utilizadores?utilizador=' + encodeURIComponent(b.dataset.user), 'DELETE'); await eqCarregarUsers(); eqRenderUsers(); } catch (err) { alert(err.message); }
     });
     wrap.querySelectorAll('.eq-novapass').forEach(b => b.onclick = async () => {
-      if (!confirm(`Criar uma password nova para ${b.dataset.nome}? A antiga deixa de funcionar nos próximos logins.`)) return;
+      if (!confirm(`Criar uma password nova para ${b.dataset.nome}? A antiga deixa de funcionar e a sessão aberta no telemóvel termina (terá de entrar com a nova).`)) return;
       const password = demoGerarPassword();
       try { await eqApi('utilizadores', 'PATCH', { utilizador: b.dataset.user, password }); eqMostrarMensagem(b.dataset.nome, b.dataset.user, password); } catch (err) { alert(err.message); }
     });
