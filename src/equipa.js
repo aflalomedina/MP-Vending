@@ -449,15 +449,34 @@ async function handleApiEquipa(request, env, s, caminho) {
       atual.faltas = txt(p.faltas, 500);
       if (atual.faltas) await registarLog(env, { quem: s.nome, utilizador: s.utilizador, tipo: "caixa", localId, texto: `caixa ${paragem ? paragem.nome : localId}: faltou ${atual.faltas}` });
     }
-    // ✅ produto a produto: quando estão todos marcados, a caixa fica pronta sozinha
-    if (typeof p.item === "string" && typeof p.feito === "boolean" && paragem) {
+    // ✅ produto a produto (ou ⚠️ em falta, com quantas unidades foram): com todos tratados, a caixa fica pronta sozinha
+    const temFalta = p.falta === null || Number.isFinite(Number(p.falta)) && p.falta !== "" && p.falta !== undefined;
+    if (typeof p.item === "string" && paragem && (typeof p.feito === "boolean" || temFalta)) {
       const chave = txt(p.item, 200);
+      const it = paragem.itens.find((x) => `${x.maquina}|${x.produto}` === chave);
+      if (!it) return json({ error: "Produto não está nesta caixa" }, 400);
       atual.itens = atual.itens || {};
-      if (p.feito) atual.itens[chave] = 1; else delete atual.itens[chave];
-      const chaves = paragem.itens.filter((it) => it.aLevar > 0).map((it) => `${it.maquina}|${it.produto}`);
-      const todos = chaves.length > 0 && chaves.every((k) => atual.itens[k]);
+      atual.emFalta = atual.emFalta || {};
+      let desmarcou = false;
+      if (typeof p.feito === "boolean") {
+        if (p.feito) { atual.itens[chave] = 1; delete atual.emFalta[chave]; } else { delete atual.itens[chave]; desmarcou = true; }
+      }
+      if (temFalta) {
+        if (p.falta === null) { delete atual.emFalta[chave]; desmarcou = true; }
+        else {
+          const pus = Math.max(0, Math.min(it.aLevar, Math.round(Number(p.falta))));
+          if (pus >= it.aLevar) { delete atual.emFalta[chave]; atual.itens[chave] = 1; }
+          else {
+            atual.emFalta[chave] = { pus, precisava: it.aLevar, por: s.nome, em: new Date().toISOString() };
+            delete atual.itens[chave];
+            await registarLog(env, { quem: s.nome, utilizador: s.utilizador, tipo: "falta", localId, texto: `em falta: ${it.produto} — pôs ${pus} de ${it.aLevar} (${paragem.nome})` });
+          }
+        }
+      }
+      const chaves = paragem.itens.filter((x) => x.aLevar > 0).map((x) => `${x.maquina}|${x.produto}`);
+      const todos = chaves.length > 0 && chaves.every((k) => atual.itens[k] || atual.emFalta[k]);
       if (todos && !atual.pronta) { atual.pronta = true; atual.por = s.nome; atual.em = new Date().toISOString(); }
-      if (!todos && atual.pronta && !p.feito) atual.pronta = false;
+      if (!todos && atual.pronta && desmarcou) atual.pronta = false;
     }
     if (antes !== !!atual.pronta) await registarLog(env, { quem: s.nome, utilizador: s.utilizador, tipo: "caixa", localId, texto: `${atual.pronta ? "caixa pronta" : "desmarcou a caixa"}: ${paragem ? paragem.nome : localId} (${pl.data === dataLisboa() ? "hoje" : pl.data.split("-").reverse().slice(0, 2).join("/")})` });
     caixas[localId] = atual;
@@ -603,7 +622,7 @@ export async function handleEquipaAdmin(request, env) {
         const visitadas = new Set(visitasPorDia[i].filter((v) => v.fim).map((v) => v.localId));
         return {
           id: pl.id, data: pl.data, responsavel: pl.responsavel, responsavelNome: pl.responsavelNome, criadoEm: pl.criadoEm, saida: pl.saida,
-          paragens: pl.paragens.map((x) => ({ localId: x.localId, nome: x.nome, pronta: !!(pl.caixas[x.localId] && pl.caixas[x.localId].pronta), faltas: (pl.caixas[x.localId] || {}).faltas || "", visitada: visitadas.has(x.localId) })),
+          paragens: pl.paragens.map((x) => ({ localId: x.localId, nome: x.nome, pronta: !!(pl.caixas[x.localId] && pl.caixas[x.localId].pronta), faltas: (pl.caixas[x.localId] || {}).faltas || "", emFalta: Object.keys((pl.caixas[x.localId] || {}).emFalta || {}).length, visitada: visitadas.has(x.localId) })),
         };
       }));
       return json({ planos });
@@ -693,7 +712,7 @@ export async function handleEquipaAdmin(request, env) {
         paragens: pl.paragens.map((x) => {
           const c = pl.caixas[x.localId] || {};
           const itens = x.itens.filter((it) => it.aLevar > 0);
-          return { localId: x.localId, nome: x.nome, chegada: x.chegada, pronta: !!c.pronta, faltas: c.faltas || "", itensFeitos: itens.filter((it) => c.itens && c.itens[`${it.maquina}|${it.produto}`]).length, itens: itens.length, visitada: feitas.has(x.localId), emCurso: agora.has(x.localId) };
+          return { localId: x.localId, nome: x.nome, chegada: x.chegada, pronta: !!c.pronta, faltas: c.faltas || "", emFalta: Object.keys(c.emFalta || {}).length, itensFeitos: itens.filter((it) => (c.itens && c.itens[`${it.maquina}|${it.produto}`]) || (c.emFalta && c.emFalta[`${it.maquina}|${it.produto}`])).length, itens: itens.length, visitada: feitas.has(x.localId), emCurso: agora.has(x.localId) };
         }),
       };
     };
@@ -705,6 +724,25 @@ export async function handleEquipaAdmin(request, env) {
       log: (log || []).slice().reverse(),
       tarefasPendentes: pendentesHoje,
     });
+  }
+
+  // produtos em falta reportados por quem faz as caixas (para corrigir o stock do armazém)
+  if (recurso === "faltas" && metodo === "GET") {
+    const dias = Math.min(120, Math.max(1, Number(url.searchParams.get("dias")) || 30));
+    const hoje = dataLisboa();
+    const datas = Array.from({ length: dias + 1 }, (_, i) => somarDias(hoje, 1 - i)); // inclui amanhã (caixas feitas à tarde)
+    const porDia = await Promise.all(datas.map((d) => planosDoDia(env, d)));
+    const faltas = [];
+    for (const lista of porDia) for (const pl of lista) for (const x of pl.paragens) {
+      const c = pl.caixas[x.localId] || {};
+      for (const [chave, f] of Object.entries(c.emFalta || {})) {
+        const [maquina, ...resto] = chave.split("|");
+        faltas.push({ data: pl.data, planoId: pl.id, localId: x.localId, local: x.nome, maquina, produto: resto.join("|"), pus: f.pus, precisava: f.precisava, falta: f.precisava - f.pus, por: f.por, em: f.em });
+      }
+      if (c.faltas) faltas.push({ data: pl.data, planoId: pl.id, localId: x.localId, local: x.nome, maquina: "", produto: "", nota: c.faltas, por: c.por || "", em: c.em || null });
+    }
+    faltas.sort((a, b) => String(b.em || b.data).localeCompare(String(a.em || a.data)));
+    return json({ faltas });
   }
 
   if (recurso === "visitas") {
