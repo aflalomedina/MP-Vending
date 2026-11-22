@@ -15,21 +15,21 @@ const enc = new TextEncoder();
 const toHex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 const fromHex = (hex) => new Uint8Array(hex.match(/.{2}/g).map((h) => parseInt(h, 16)));
 
-async function hashPassword(password, saltHex) {
+export async function hashPassword(password, saltHex) {
   const salt = saltHex ? fromHex(saltHex) : crypto.getRandomValues(new Uint8Array(16));
   const key = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
   const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: PBKDF2_ITER, hash: "SHA-256" }, key, 256);
   return { hash: toHex(bits), salt: toHex(salt) };
 }
 
-function igualSeguro(a, b) {
+export function igualSeguro(a, b) {
   if (a.length !== b.length) return false;
   let r = 0;
   for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return r === 0;
 }
 
-function lerCookie(request, nome) {
+export function lerCookie(request, nome) {
   const c = request.headers.get("Cookie") || "";
   const m = c.match(new RegExp("(?:^|;\\s*)" + nome + "=([^;]+)"));
   return m ? m[1] : null;
@@ -47,7 +47,7 @@ function redirect(location, extra = {}) {
 }
 
 // serve um ficheiro estático da pasta demo/ sem passar pelo controlo de acesso
-async function servirAsset(request, env, caminho) {
+export async function servirAsset(request, env, caminho) {
   const url = new URL(request.url);
   let res = await env.ASSETS.fetch(new Request(url.origin + caminho, { headers: request.headers }));
   if (res.status >= 300 && res.status < 400 && res.headers.get("Location")) {

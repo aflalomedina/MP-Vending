@@ -577,6 +577,7 @@
   <button class="tab-btn" data-view="resultados">Resultados</button>
   <button class="tab-btn" data-view="smartcake">Smartcake</button>
   <button class="tab-btn" data-view="tarefas">Tarefas Pendentes</button>
+  <button class="tab-btn" data-view="equipa">Equipa</button>
   <button class="tab-btn" data-view="demo">Acessos Demo</button>
 </div>
 
@@ -838,6 +839,20 @@
         <button type="button" id="gerarPdfFinalBtn" style="margin-top:12px;background:var(--ink);color:#fff;border:none;border-radius:4px;padding:10px 18px;font-size:13px;cursor:pointer;">
           Gerar PDF com os locais selecionados
         </button>
+        <div id="enviarEquipaWrap" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px;">
+          <div style="font-weight:600;margin-bottom:4px;">Enviar para a equipa</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
+            Os locais selecionados (o que levar em cada caixa, a rota e as trocas de layout) aparecem em <a href="/reposicao/" target="_blank" style="color:var(--accent-deep);">mpvending.pt/reposicao</a>: o preparador marca as caixas prontas e o repositor segue a rota e regista os tempos com o QR das máquinas.
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:end;">
+            <label style="font-size:12px;color:var(--muted);">Dia<br><input type="date" id="eqPlanoData" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;" /></label>
+            <label style="font-size:12px;color:var(--muted);">Repositor<br><select id="eqPlanoResp" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;"><option value="">Qualquer repositor</option></select></label>
+            <label style="font-size:12px;color:var(--muted);flex:1 1 220px;">Nota para a equipa (opcional)<br><input type="text" id="eqPlanoNota" maxlength="500" placeholder="ex: levar chave nova da Divmac" style="width:100%;border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;" /></label>
+            <label style="font-size:12px;display:flex;gap:5px;align-items:center;"><input type="checkbox" id="eqPlanoSubstituir" checked /> Substituir o plano já enviado para esse dia</label>
+            <button type="button" id="eqPlanoEnviarBtn" style="background:var(--accent);color:var(--ink);border:none;border-radius:4px;padding:10px 16px;font-size:13px;cursor:pointer;font-weight:600;">Enviar para /reposicao</button>
+          </div>
+          <div id="eqPlanoMsg" style="font-size:12.5px;margin-top:8px;"></div>
+        </div>
       </div>
     </div>
 
@@ -1456,6 +1471,93 @@
         <a href="/demo/" target="_blank" style="font-size:13px;color:var(--accent-deep);">Abrir a demo ↗</a>
       </div>
       <div class="table-wrap cards-mobile" id="demoListaWrap"><div class="state small">a carregar…</div></div>
+    </div>
+  </div>
+
+  <div id="view-equipa" class="view">
+    <div class="panel full">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px;">
+        <h2 style="margin:0;">Pessoas da equipa</h2>
+        <a href="/reposicao/" target="_blank" style="font-size:13px;color:var(--accent-deep);">Abrir mpvending.pt/reposicao ↗</a>
+      </div>
+      <div style="font-size:13px;color:var(--muted);margin:0 0 14px;line-height:1.5;">
+        Cada pessoa entra em <b>mpvending.pt/reposicao</b> com o seu utilizador, uma vez, no Chrome do telemóvel (a sessão fica guardada 90 dias).
+        Depois, ao ler o QR de uma máquina com a câmara, abre o registo de chegada/saída em vez do formulário de avaria dos clientes.
+        <b>Repositor</b>: rota, tickets, tarefas e tempos. <b>Prepara caixas</b>: caixas do dia seguinte e carga do armazém 7.
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
+        <div style="flex:1 1 170px;"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Nome</label>
+          <input type="text" id="eqNome" maxlength="60" placeholder="ex: Tomás" style="width:100%;border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;" /></div>
+        <div style="flex:1 1 140px;"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Utilizador</label>
+          <input type="text" id="eqUser" maxlength="40" autocapitalize="none" spellcheck="false" placeholder="ex: tomas" style="width:100%;border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;" /></div>
+        <div style="flex:1 1 170px;"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Password</label>
+          <div style="display:flex;gap:6px;"><input type="text" id="eqPass" maxlength="60" autocapitalize="none" spellcheck="false" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;" />
+          <button type="button" id="eqGerarPass" style="background:none;border:1px solid var(--line);border-radius:4px;padding:6px 10px;font-size:12.5px;cursor:pointer;font-family:inherit;">Gerar</button></div></div>
+        <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Função</label>
+          <select id="eqPerfil" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;">
+            <option value="repositor">Repositor</option><option value="preparador">Prepara caixas</option><option value="ambos">Repositor + caixas</option>
+          </select></div>
+        <button type="button" id="eqCriarBtn" style="background:var(--ink);color:#fff;border:none;border-radius:4px;padding:8px 16px;font-size:13px;cursor:pointer;">Criar acesso</button>
+      </div>
+      <div id="eqMsg" style="font-size:13px;margin-top:10px;"></div>
+      <div id="eqCriado" style="display:none;margin-top:14px;background:#FFF5E6;border:1px solid #F3DDB8;border-radius:6px;padding:12px 14px;">
+        <div style="font-size:12.5px;color:#7A4A06;margin-bottom:8px;"><strong>Copie já esta mensagem</strong> — por segurança, a password não volta a ser mostrada.</div>
+        <textarea id="eqMensagem" rows="7" readonly style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;background:#fff;resize:vertical;"></textarea>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+          <button type="button" id="eqCopiar" style="background:var(--ink);color:#fff;border:none;border-radius:4px;padding:8px 14px;font-size:13px;cursor:pointer;">Copiar mensagem</button>
+          <a id="eqWhatsapp" target="_blank" rel="noopener" style="border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:4px;padding:8px 14px;font-size:13px;text-decoration:none;">Enviar por WhatsApp</a>
+        </div>
+      </div>
+      <div class="table-wrap cards-mobile" id="eqUsersWrap" style="margin-top:14px;"><div class="state small">a carregar…</div></div>
+    </div>
+
+    <div class="panel full">
+      <h2>Tarefas e ordens para a equipa</h2>
+      <div style="font-size:13px;color:var(--muted);margin:-4px 0 12px;line-height:1.5;">
+        Aparecem no separador <b>Tarefas</b> de /reposicao (e na visita, quando o repositor lê o QR dessa máquina). As que se repetem voltam a ficar pendentes N dias depois de feitas — ex.: limpeza semanal em todas as máquinas de snacks.
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
+        <div style="flex:2 1 240px;"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Tarefa / ordem</label>
+          <input type="text" id="eqOTitulo" maxlength="160" placeholder="ex: Limpar vidro, espirais e tabuleiro" style="width:100%;border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;" /></div>
+        <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Tipo</label>
+          <select id="eqOTipo" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;"><option>Ordem</option><option>Tarefa</option><option>Limpeza</option><option>Manutenção</option></select></div>
+        <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Máquina</label>
+          <select id="eqOMaquina" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;max-width:220px;"></select></div>
+        <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Para</label>
+          <select id="eqOPara" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;"><option value="">Toda a equipa</option></select></div>
+        <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Até ao dia</label>
+          <input type="date" id="eqOData" style="border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-family:inherit;font-size:13px;" /></div>
+        <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Repetir</label>
+          <select id="eqORepetir" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;"><option value="nenhuma">Não</option><option value="semanal">Semanal</option><option value="quinzenal">Quinzenal</option><option value="mensal">Mensal</option></select></div>
+        <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Urgência</label>
+          <select id="eqOUrgencia" style="border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;"><option>Baixa</option><option selected>Média</option><option>Alta</option><option>Urgente</option></select></div>
+      </div>
+      <textarea id="eqODescricao" rows="2" maxlength="2000" placeholder="Detalhes (opcional)" style="width:100%;margin-top:10px;border:1px solid var(--line);border-radius:4px;padding:7px 8px;font-family:inherit;font-size:13px;"></textarea>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px;">
+        <button type="button" id="eqOCriarBtn" style="background:var(--ink);color:#fff;border:none;border-radius:4px;padding:8px 16px;font-size:13px;cursor:pointer;">Criar</button>
+        <span id="eqOMsg" style="font-size:13px;"></span>
+        <span style="flex:1;"></span>
+        <label style="font-size:13px;color:var(--muted);">Mostrar:
+          <select id="eqOFiltro" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;"><option value="pendentes">Pendentes</option><option value="feitas">Feitas</option><option value="todas">Todas</option></select></label>
+      </div>
+      <div class="table-wrap cards-mobile" id="eqOrdensWrap" style="margin-top:12px;"><div class="state small">a carregar…</div></div>
+    </div>
+
+    <div class="panel full">
+      <h2>Planos enviados</h2>
+      <div style="font-size:13px;color:var(--muted);margin:-4px 0 12px;">Enviados a partir de <b>Reposição e Layouts → Enviar para a equipa</b>. 📦 = caixa pronta · ✓ = local visitado (QR).</div>
+      <div class="table-wrap cards-mobile" id="eqPlanosWrap"><div class="state small">a carregar…</div></div>
+    </div>
+
+    <div class="panel full">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px;">
+        <h2 style="margin:0;">Tempo em cada local</h2>
+        <select id="eqTemposPeriodo" style="border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-family:inherit;font-size:13px;">
+          <option value="7">Últimos 7 dias</option><option value="30" selected>Últimos 30 dias</option><option value="90">Últimos 90 dias</option><option value="180">Últimos 180 dias</option>
+        </select>
+      </div>
+      <div style="font-size:13px;color:var(--muted);margin:0 0 12px;line-height:1.5;">Da leitura do QR à chegada até à leitura (ou "Terminar visita") à saída. Visitas fechadas automaticamente (leu o QR do local seguinte) ou sem saída (mais de 3h abertas) aparecem na lista mas não entram nas médias.</div>
+      <div id="eqTemposWrap"><div class="state small">a carregar…</div></div>
     </div>
   </div>
 
@@ -3262,6 +3364,7 @@
     document.getElementById('smartcakeGridTabela').addEventListener('input', agendarRota);
     ['rotaSaida', 'rotaServico', 'rotaServicoCafe', 'rotaVoltar'].forEach(id => document.getElementById(id).addEventListener('change', agendarRota));
     montarCafesRota();
+    eqPrepararEnvio();
   }
 
   // ===== Rota sugerida para a reposição =====
@@ -3766,28 +3869,32 @@
     return res;
   }
 
+  // locais marcados na lista, com o stock do armazém 7 repartido só por eles (usado no PDF e no plano enviado à equipa)
+  function locaisSelecionadosComStock() {
+    const marcados = Array.from(document.querySelectorAll('.checklist-local:checked')).map(el => Number(el.value));
+    const locaisOrdenados = marcados.map(i => ultimoCalculoReposicao.locaisOrdenados[i]);
+    // O stock do armazém 7 reparte-se só pelos locais selecionados (antes ia também para locais desmarcados,
+    // e os selecionados ficavam com 0 "sem stock no armazém 7" apesar de haver stock).
+    const arm7 = ultimoCalculoReposicao.armazem7 || {};
+    const porProd = new Map();
+    for (const { lista } of locaisOrdenados) for (const it of lista) {
+      if (!porProd.has(it.produto)) porProd.set(it.produto, []);
+      porProd.get(it.produto).push(it);
+    }
+    for (const [produto, lista] of porProd.entries()) {
+      lista.sort((a, b) => (b.score - a.score) || (a.pct - b.pct));
+      let disp = Math.floor(arm7[produto] || 0);
+      for (const it of lista) { const dar = Math.max(0, Math.min(it.precisava, disp)); disp -= dar; it.aLevar = dar; }
+    }
+    return locaisOrdenados;
+  }
+
   function construirEGerarPDF() {
     const msg = document.getElementById('gerarPdfMsg');
     if (!ultimoCalculoReposicao) return;
     const { semStockTotal } = ultimoCalculoReposicao;
 
-    const marcados = Array.from(document.querySelectorAll('.checklist-local:checked')).map(el => Number(el.value));
-    const locaisOrdenados = marcados.map(i => ultimoCalculoReposicao.locaisOrdenados[i]);
-    // O stock do armazém 7 reparte-se só pelos locais selecionados (antes ia também para locais desmarcados,
-    // e os selecionados ficavam com 0 "sem stock no armazém 7" apesar de haver stock).
-    {
-      const arm7 = ultimoCalculoReposicao.armazem7 || {};
-      const porProd = new Map();
-      for (const { lista } of locaisOrdenados) for (const it of lista) {
-        if (!porProd.has(it.produto)) porProd.set(it.produto, []);
-        porProd.get(it.produto).push(it);
-      }
-      for (const [produto, lista] of porProd.entries()) {
-        lista.sort((a, b) => (b.score - a.score) || (a.pct - b.pct));
-        let disp = Math.floor(arm7[produto] || 0);
-        for (const it of lista) { const dar = Math.max(0, Math.min(it.precisava, disp)); disp -= dar; it.aLevar = dar; }
-      }
-    }
+    const locaisOrdenados = locaisSelecionadosComStock();
 
     const smartcakeDivisao = lerGridSmartcake();
     if (!locaisOrdenados.length && !smartcakeDivisao.length) {
@@ -7046,6 +7153,7 @@
       if (btn.dataset.view === 'smartcake') loadSmartcakeView();
       if (btn.dataset.view === 'tarefas') loadTarefasView();
       if (btn.dataset.view === 'demo') loadDemoView();
+      if (btn.dataset.view === 'equipa') loadEquipaView();
       if (btn.dataset.view === 'tickets') loadTicketsView();
     });
   });
@@ -7442,6 +7550,337 @@
   document.addEventListener('visibilitychange', () => { if (!document.hidden) tkVerificarNovos(); });
   // o link dos emails (mpvending.pt/admin/#tickets) abre logo este separador
   if (location.hash === '#tickets') setTimeout(() => document.querySelector('.tab-btn[data-view="tickets"]').click(), 0);
+
+  // ===== Equipa (mpvending.pt/reposicao): pessoas, tarefas/ordens, planos enviados e tempos nos locais =====
+  const EQ_PERFIL = { repositor: 'Repositor', preparador: 'Prepara caixas', ambos: 'Repositor + caixas' };
+  const EQ_FECHO = { qr: 'QR', botao: 'botão', 'auto-seguinte': 'fechada ao ler o local seguinte', 'sem-saida': 'sem saída registada' };
+  let eqUsers = [];
+  let eqOrdens = [];
+  let eqEventosLigados = false;
+  const eqHoje = () => { const d = agoraPT(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const eqSomarDias = (d, n) => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+  const eqDia = (d) => d ? d.split('-').reverse().slice(0, 2).join('/') : '';
+  const eqHora = (iso) => iso ? new Date(iso).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Lisbon' }) : '—';
+  const eqMin = (m) => m == null ? '—' : m < 60 ? Math.round(m) + ' min' : Math.floor(m / 60) + 'h' + String(Math.round(m % 60)).padStart(2, '0');
+  const eqBtn = 'background:none;border:1px solid var(--line);border-radius:4px;padding:4px 8px;font-size:12px;cursor:pointer;font-family:inherit;';
+
+  async function eqApi(caminho, metodo, corpo) {
+    const r = await fetch('/api/equipa/' + caminho, { method: metodo || 'GET', cache: 'no-store', headers: corpo ? { 'Content-Type': 'application/json' } : undefined, body: corpo ? JSON.stringify(corpo) : undefined });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    return d;
+  }
+
+  async function eqCarregarUsers() {
+    const d = await eqApi('utilizadores');
+    eqUsers = d.utilizadores || [];
+    // selects que dependem das pessoas (tarefas e envio do plano)
+    const para = document.getElementById('eqOPara');
+    if (para) { const v = para.value; para.innerHTML = '<option value="">Toda a equipa</option>' + eqUsers.filter(u => u.ativo).map(u => `<option value="${escapeHtml(u.utilizador)}">${escapeHtml(u.nome)}</option>`).join(''); para.value = v; }
+    const resp = document.getElementById('eqPlanoResp');
+    if (resp) { const v = resp.value; resp.innerHTML = '<option value="">Qualquer repositor</option>' + eqUsers.filter(u => u.ativo && u.perfil !== 'preparador').map(u => `<option value="${escapeHtml(u.utilizador)}">${escapeHtml(u.nome)}</option>`).join(''); resp.value = v; }
+    return eqUsers;
+  }
+
+  function eqRenderUsers() {
+    const wrap = document.getElementById('eqUsersWrap');
+    if (!eqUsers.length) { wrap.innerHTML = '<div class="state small">Ainda não há ninguém. Cria o acesso do Tomás e do Vasco acima.</div>'; return; }
+    wrap.innerHTML = `<table><thead><tr><th>Nome</th><th>Utilizador</th><th>Função</th><th>Último acesso</th><th></th></tr></thead><tbody>${eqUsers.map(u => `<tr style="${u.ativo ? '' : 'opacity:.55;'}">
+      <td data-label="Nome"><b>${escapeHtml(u.nome)}</b>${u.ativo ? '' : ' <span style="font-size:11px;color:var(--negative);">desativado</span>'}</td>
+      <td data-label="Utilizador" style="font-family:'IBM Plex Mono',monospace;">${escapeHtml(u.utilizador)}</td>
+      <td data-label="Função"><select class="eq-perfil" data-user="${escapeHtml(u.utilizador)}" style="border:1px solid var(--line);border-radius:4px;padding:4px 6px;font-family:inherit;font-size:12.5px;">${Object.entries(EQ_PERFIL).map(([k, v]) => `<option value="${k}" ${u.perfil === k ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
+      <td data-label="Último acesso">${u.ultimoAcesso ? demoDataHora(u.ultimoAcesso) : '<span style="color:var(--muted);">nunca entrou</span>'}</td>
+      <td data-label="" style="white-space:nowrap;">
+        <button type="button" class="eq-novapass" data-user="${escapeHtml(u.utilizador)}" data-nome="${escapeHtml(u.nome)}" style="${eqBtn}">Nova password</button>
+        <button type="button" class="eq-ativo" data-user="${escapeHtml(u.utilizador)}" data-ativo="${u.ativo ? '0' : '1'}" style="${eqBtn}">${u.ativo ? 'Desativar' : 'Ativar'}</button>
+        <button type="button" class="eq-apagar" data-user="${escapeHtml(u.utilizador)}" style="${eqBtn}color:var(--negative);">Apagar</button>
+      </td></tr>`).join('')}</tbody></table>`;
+    wrap.querySelectorAll('.eq-perfil').forEach(sel => sel.onchange = async () => { try { await eqApi('utilizadores', 'PATCH', { utilizador: sel.dataset.user, perfil: sel.value }); await eqCarregarUsers(); eqRenderUsers(); } catch (err) { alert(err.message); } });
+    wrap.querySelectorAll('.eq-ativo').forEach(b => b.onclick = async () => { try { await eqApi('utilizadores', 'PATCH', { utilizador: b.dataset.user, ativo: b.dataset.ativo === '1' }); await eqCarregarUsers(); eqRenderUsers(); } catch (err) { alert(err.message); } });
+    wrap.querySelectorAll('.eq-apagar').forEach(b => b.onclick = async () => {
+      if (!confirm(`Apagar o acesso "${b.dataset.user}"? As visitas e tarefas já registadas ficam.`)) return;
+      try { await eqApi('utilizadores?utilizador=' + encodeURIComponent(b.dataset.user), 'DELETE'); await eqCarregarUsers(); eqRenderUsers(); } catch (err) { alert(err.message); }
+    });
+    wrap.querySelectorAll('.eq-novapass').forEach(b => b.onclick = async () => {
+      if (!confirm(`Criar uma password nova para ${b.dataset.nome}? A antiga deixa de funcionar nos próximos logins.`)) return;
+      const password = demoGerarPassword();
+      try { await eqApi('utilizadores', 'PATCH', { utilizador: b.dataset.user, password }); eqMostrarMensagem(b.dataset.nome, b.dataset.user, password); } catch (err) { alert(err.message); }
+    });
+  }
+
+  function eqMostrarMensagem(nome, utilizador, password) {
+    const texto = `Olá ${nome.split(' ')[0]}! O teu acesso à página da reposição da MP Vending:\n\n${location.origin}/reposicao\nUtilizador: ${utilizador}\nPassword: ${password}\n\nAbre no Chrome do telemóvel e entra uma vez: a sessão fica guardada. Depois, em cada máquina, lê o QR da etiqueta com a câmara à chegada e outra vez à saída.`;
+    document.getElementById('eqMensagem').value = texto;
+    document.getElementById('eqWhatsapp').href = 'https://wa.me/?text=' + encodeURIComponent(texto);
+    document.getElementById('eqCriado').style.display = 'block';
+  }
+
+  async function eqCriarUser() {
+    const msg = document.getElementById('eqMsg');
+    const nome = document.getElementById('eqNome').value.trim();
+    const utilizador = document.getElementById('eqUser').value.trim().toLowerCase();
+    const password = document.getElementById('eqPass').value.trim();
+    const perfil = document.getElementById('eqPerfil').value;
+    msg.style.color = 'var(--muted)'; msg.textContent = 'a criar…';
+    try {
+      await eqApi('utilizadores', 'POST', { nome, utilizador, password, perfil });
+      msg.style.color = 'var(--positive)'; msg.textContent = `Acesso criado para ${nome || utilizador}.`;
+      eqMostrarMensagem(nome || utilizador, utilizador, password);
+      document.getElementById('eqNome').value = ''; document.getElementById('eqUser').value = ''; delete document.getElementById('eqUser').dataset.mexido;
+      document.getElementById('eqPass').value = demoGerarPassword();
+      await eqCarregarUsers(); eqRenderUsers();
+    } catch (err) { msg.style.color = 'var(--negative)'; msg.textContent = 'Erro: ' + err.message; }
+  }
+
+  // ----- tarefas e ordens -----
+  function eqMontarSelectMaquinas() {
+    const sel = document.getElementById('eqOMaquina');
+    const maqs = Object.keys(MACHINES).filter(m => !MAQUINAS_EXCLUIDAS.has(m)).sort();
+    sel.innerHTML = '<option value="">— nenhuma em especial —</option><option value="*snacks">Todas as de snacks (uma tarefa cada)</option><option value="*cafe">Todas as de café (uma tarefa cada)</option><option value="*todas">Todas as máquinas (uma tarefa cada)</option>' +
+      maqs.map(m => `<option value="${m}">${escapeHtml(machineLabel(m))}</option>`).join('');
+  }
+  async function eqCriarOrdem() {
+    const msg = document.getElementById('eqOMsg');
+    const maqSel = document.getElementById('eqOMaquina').value;
+    const todas = Object.keys(MACHINES).filter(m => !MAQUINAS_EXCLUIDAS.has(m)).sort();
+    const maquinas = maqSel === '*snacks' ? todas.filter(isSnackMachine) : maqSel === '*cafe' ? todas.filter(m => !isSnackMachine(m)) : maqSel === '*todas' ? todas : null;
+    const corpo = {
+      titulo: document.getElementById('eqOTitulo').value.trim(),
+      tipo: document.getElementById('eqOTipo').value,
+      maquina: maquinas ? '' : maqSel,
+      maquinas: maquinas || undefined,
+      atribuidaA: document.getElementById('eqOPara').value,
+      data: document.getElementById('eqOData').value,
+      recorrencia: document.getElementById('eqORepetir').value,
+      urgencia: document.getElementById('eqOUrgencia').value,
+      descricao: document.getElementById('eqODescricao').value.trim(),
+    };
+    if (corpo.recorrencia !== 'nenhuma' && !corpo.data) corpo.data = eqHoje();
+    msg.style.color = 'var(--muted)'; msg.textContent = 'a criar…';
+    try {
+      const r = await eqApi('ordens', 'POST', corpo);
+      msg.style.color = 'var(--positive)'; msg.textContent = r.criadas > 1 ? `${r.criadas} tarefas criadas (uma por máquina).` : 'Criada.';
+      document.getElementById('eqOTitulo').value = ''; document.getElementById('eqODescricao').value = '';
+      await eqCarregarOrdens();
+    } catch (err) { msg.style.color = 'var(--negative)'; msg.textContent = 'Erro: ' + err.message; }
+  }
+  async function eqCarregarOrdens() {
+    const wrap = document.getElementById('eqOrdensWrap');
+    try { eqOrdens = (await eqApi('ordens')).ordens || []; eqRenderOrdens(); }
+    catch (err) { wrap.innerHTML = `<div class="state small error">Erro: ${escapeHtml(err.message)}</div>`; }
+  }
+  function eqRenderOrdens() {
+    const wrap = document.getElementById('eqOrdensWrap');
+    const filtro = document.getElementById('eqOFiltro').value;
+    const hoje = eqHoje();
+    const nomeDe = (u) => (eqUsers.find(x => x.utilizador === u) || {}).nome || u;
+    const URG = ['Urgente', 'Alta', 'Média', 'Baixa'];
+    const lista = eqOrdens.filter(o => filtro === 'todas' || (filtro === 'feitas' ? o.estado === 'Feita' : o.estado !== 'Feita'))
+      .sort((a, b) => (filtro === 'feitas' ? String(b.feitaEm).localeCompare(String(a.feitaEm)) : (String(a.data || '9').localeCompare(String(b.data || '9')) || URG.indexOf(a.urgencia) - URG.indexOf(b.urgencia))));
+    if (!lista.length) { wrap.innerHTML = '<div class="state small">Nada para mostrar.</div>'; return; }
+    wrap.innerHTML = `<table><thead><tr><th>Tarefa</th><th>Máquina</th><th>Para</th><th>Data</th><th>Repete</th><th>Estado</th><th></th></tr></thead><tbody>${lista.map(o => {
+      const atrasada = o.estado !== 'Feita' && o.data && o.data < hoje;
+      const urgCor = o.urgencia === 'Urgente' ? 'var(--negative)' : o.urgencia === 'Alta' ? 'var(--accent-deep)' : 'var(--muted)';
+      return `<tr>
+        <td data-label="Tarefa"><b>${escapeHtml(o.titulo)}</b> <span style="font-size:11px;color:var(--muted);">${escapeHtml(o.tipo)}</span> <span style="font-size:11px;color:${urgCor};font-weight:600;">${escapeHtml(o.urgencia)}</span>${o.descricao ? `<div style="font-size:12px;color:var(--muted);white-space:pre-wrap;">${escapeHtml(o.descricao)}</div>` : ''}</td>
+        <td data-label="Máquina">${o.maquina ? escapeHtml(machineLabel(o.maquina)) : '—'}</td>
+        <td data-label="Para">${o.atribuidaA ? escapeHtml(nomeDe(o.atribuidaA)) : 'Toda a equipa'}</td>
+        <td data-label="Data" style="${atrasada ? 'color:var(--negative);font-weight:600;' : ''}">${o.data ? eqDia(o.data) + (atrasada ? ' (atrasada)' : '') : '—'}</td>
+        <td data-label="Repete">${o.recorrencia && o.recorrencia !== 'nenhuma' ? escapeHtml(o.recorrencia) : '—'}</td>
+        <td data-label="Estado">${o.estado === 'Feita' ? `<span style="color:var(--positive);font-weight:600;">Feita</span> <span style="font-size:12px;color:var(--muted);">${escapeHtml(o.feitaPor || '')} · ${o.feitaEm ? demoDataHora(o.feitaEm) : ''}</span>${o.nota ? `<div style="font-size:12px;">${escapeHtml(o.nota)}</div>` : ''}` : 'Pendente'}${o.ultimaVez && o.estado !== 'Feita' ? `<div style="font-size:12px;color:var(--muted);">última vez ${demoDataHora(o.ultimaVez)} · ${escapeHtml(o.ultimaPor || '')}${o.historico && o.historico[0] && o.historico[0].nota ? ' — ' + escapeHtml(o.historico[0].nota) : ''}</div>` : ''}</td>
+        <td data-label="" style="white-space:nowrap;">
+          ${o.estado === 'Feita' ? `<button type="button" class="eq-o-reabrir" data-id="${o.id}" style="${eqBtn}">Reabrir</button>` : `<button type="button" class="eq-o-feita" data-id="${o.id}" style="${eqBtn}">Marcar feita</button>`}
+          <button type="button" class="eq-o-apagar" data-id="${o.id}" style="${eqBtn}color:var(--negative);">Apagar</button>
+        </td></tr>`;
+    }).join('')}</tbody></table>`;
+    const acao = (cls, fn) => wrap.querySelectorAll(cls).forEach(b => b.onclick = async () => { try { await fn(b.dataset.id); await eqCarregarOrdens(); } catch (err) { alert(err.message); } });
+    acao('.eq-o-feita', id => eqApi('ordens?id=' + id, 'PUT', { concluir: true }));
+    acao('.eq-o-reabrir', id => eqApi('ordens?id=' + id, 'PUT', { reabrir: true }));
+    acao('.eq-o-apagar', id => confirm('Apagar esta tarefa?') ? eqApi('ordens?id=' + id, 'DELETE') : Promise.resolve());
+  }
+
+  // ----- planos enviados -----
+  async function eqCarregarPlanos() {
+    const wrap = document.getElementById('eqPlanosWrap');
+    try {
+      const { planos } = await eqApi('planos?desde=' + eqSomarDias(eqHoje(), -7) + '&dias=21');
+      if (!planos.length) { wrap.innerHTML = '<div class="state small">Ainda não foi enviado nenhum plano nos últimos 7 dias nem para os próximos.</div>'; return; }
+      planos.sort((a, b) => b.data.localeCompare(a.data) || String(b.criadoEm).localeCompare(String(a.criadoEm)));
+      wrap.innerHTML = `<table><thead><tr><th>Dia</th><th>Repositor</th><th>Paragens</th><th class="num">Caixas</th><th class="num">Visitados</th><th></th></tr></thead><tbody>${planos.map(pl => {
+        const prontas = pl.paragens.filter(p => p.pronta).length, vis = pl.paragens.filter(p => p.visitada).length;
+        return `<tr>
+          <td data-label="Dia"><b>${eqDia(pl.data)}</b>${pl.data === eqHoje() ? ' <span style="font-size:11px;color:var(--accent-deep);font-weight:600;">hoje</span>' : ''}<div style="font-size:11px;color:var(--muted);">enviado ${demoDataHora(pl.criadoEm)}</div></td>
+          <td data-label="Repositor">${escapeHtml(pl.responsavelNome || 'Qualquer')}</td>
+          <td data-label="Paragens" style="font-size:12.5px;">${pl.paragens.map(p => `${p.visitada ? '✓' : ''}${p.pronta ? '📦' : ''} ${escapeHtml(p.nome)}${p.faltas ? ` <span style="color:var(--negative);">(faltou: ${escapeHtml(p.faltas)})</span>` : ''}`).join('<br>')}</td>
+          <td data-label="Caixas" class="num">${prontas}/${pl.paragens.length}</td>
+          <td data-label="Visitados" class="num">${vis}/${pl.paragens.length}</td>
+          <td data-label=""><button type="button" class="eq-pl-apagar" data-id="${escapeHtml(pl.id)}" style="${eqBtn}color:var(--negative);">Apagar</button></td></tr>`;
+      }).join('')}</tbody></table>`;
+      wrap.querySelectorAll('.eq-pl-apagar').forEach(b => b.onclick = async () => {
+        if (!confirm('Apagar este plano? Deixa de aparecer na página da reposição.')) return;
+        try { await eqApi('planos?id=' + encodeURIComponent(b.dataset.id), 'DELETE'); eqCarregarPlanos(); } catch (err) { alert(err.message); }
+      });
+    } catch (err) { wrap.innerHTML = `<div class="state small error">Erro: ${escapeHtml(err.message)}</div>`; }
+  }
+
+  // ----- tempos -----
+  async function eqCarregarTempos() {
+    const wrap = document.getElementById('eqTemposWrap');
+    const dias = document.getElementById('eqTemposPeriodo').value;
+    wrap.innerHTML = '<div class="state small">a carregar…</div>';
+    try {
+      const { visitas } = await eqApi('visitas?dias=' + dias);
+      if (!visitas.length) { wrap.innerHTML = '<div class="state small">Ainda não há visitas registadas neste período. Ficam registadas quando o repositor lê o QR das máquinas em /reposicao.</div>'; return; }
+      const validas = visitas.filter(v => v.fim && (v.fecho === 'qr' || v.fecho === 'botao'));
+      const agrupar = (chave, nome) => {
+        const g = new Map();
+        for (const v of visitas) {
+          const k = v[chave];
+          const e = g.get(k) || { nome: v[nome], todas: 0, mins: [], ultima: null, semSaida: 0 };
+          e.todas++; if (!e.ultima || v.inicio > e.ultima) e.ultima = v.inicio;
+          if (v.fim && (v.fecho === 'qr' || v.fecho === 'botao')) e.mins.push(v.duracaoMin); else if (v.fim || v.fecho) e.semSaida++;
+          g.set(k, e);
+        }
+        return [...g.values()].map(e => ({ ...e, media: e.mins.length ? e.mins.reduce((s, x) => s + x, 0) / e.mins.length : null, total: e.mins.reduce((s, x) => s + x, 0) }));
+      };
+      const porLocal = agrupar('localId', 'localNome').sort((a, b) => (b.media || 0) - (a.media || 0));
+      const porPessoa = agrupar('utilizador', 'nome').sort((a, b) => b.todas - a.todas);
+      const mediaGeral = validas.length ? validas.reduce((s, v) => s + v.duracaoMin, 0) / validas.length : null;
+      wrap.innerHTML = `
+        <div class="kpis" style="margin-bottom:12px;">
+          <div class="kpi"><div class="value">${visitas.length}</div><div class="label">Visitas registadas</div></div>
+          <div class="kpi"><div class="value">${eqMin(mediaGeral)}</div><div class="label">Tempo médio por local</div></div>
+          <div class="kpi"><div class="value">${eqMin(validas.reduce((s, v) => s + v.duracaoMin, 0))}</div><div class="label">Tempo total nos locais</div></div>
+          <div class="kpi"><div class="value">${visitas.filter(v => v.fecho && !(v.fim && (v.fecho === 'qr' || v.fecho === 'botao'))).length}</div><div class="label">Sem saída lida (fora das médias)</div></div>
+        </div>
+        <h3 style="font-size:13.5px;margin:4px 0 6px;">Por local</h3>
+        <div class="table-wrap cards-mobile"><table><thead><tr><th>Local</th><th class="num">Visitas</th><th class="num">Média</th><th class="num">Mín.</th><th class="num">Máx.</th><th>Última</th></tr></thead><tbody>${porLocal.map(e => `<tr>
+          <td data-label="Local">${escapeHtml(e.nome)}</td><td data-label="Visitas" class="num">${e.todas}${e.semSaida ? ` <span style="font-size:11px;color:var(--muted);">(${e.semSaida} sem saída)</span>` : ''}</td>
+          <td data-label="Média" class="num"><b>${eqMin(e.media)}</b></td><td data-label="Mín." class="num">${e.mins.length ? eqMin(Math.min(...e.mins)) : '—'}</td><td data-label="Máx." class="num">${e.mins.length ? eqMin(Math.max(...e.mins)) : '—'}</td>
+          <td data-label="Última">${demoDataHora(e.ultima)}</td></tr>`).join('')}</tbody></table></div>
+        <h3 style="font-size:13.5px;margin:16px 0 6px;">Por pessoa</h3>
+        <div class="table-wrap cards-mobile"><table><thead><tr><th>Pessoa</th><th class="num">Visitas</th><th class="num">Média por local</th><th class="num">Tempo total</th></tr></thead><tbody>${porPessoa.map(e => `<tr>
+          <td data-label="Pessoa">${escapeHtml(e.nome)}</td><td data-label="Visitas" class="num">${e.todas}</td><td data-label="Média" class="num">${eqMin(e.media)}</td><td data-label="Total" class="num">${eqMin(e.total)}</td></tr>`).join('')}</tbody></table></div>
+        <h3 style="font-size:13.5px;margin:16px 0 6px;">Últimas visitas</h3>
+        <div class="table-wrap cards-mobile" style="max-height:480px;overflow-y:auto;"><table><thead><tr><th>Dia</th><th>Pessoa</th><th>Local</th><th>Entrada</th><th>Saída</th><th class="num">Tempo</th><th></th></tr></thead><tbody>${visitas.slice(0, 100).map(v => `<tr style="${v.fim && (v.fecho === 'qr' || v.fecho === 'botao') ? '' : 'color:var(--muted);'}">
+          <td data-label="Dia">${eqDia(v.data)}</td><td data-label="Pessoa">${escapeHtml(v.nome)}</td><td data-label="Local">${escapeHtml(v.localNome)}${v.maquinas && v.maquinas.length ? ` <span style="font-size:11px;color:var(--muted);">${escapeHtml(v.maquinas.join(', '))}</span>` : ''}</td>
+          <td data-label="Entrada">${eqHora(v.inicio)}</td><td data-label="Saída">${v.fim ? eqHora(v.fim) : (v.fecho ? '—' : '<b style="color:var(--accent-deep);">em curso</b>')}${v.fecho && v.fecho !== 'qr' ? ` <span style="font-size:11px;">(${escapeHtml(EQ_FECHO[v.fecho] || v.fecho)})</span>` : ''}</td>
+          <td data-label="Tempo" class="num">${eqMin(v.duracaoMin)}</td>
+          <td data-label=""><button type="button" class="eq-v-apagar" data-id="${escapeHtml(v.id)}" title="Apagar registo errado" style="${eqBtn}color:var(--negative);">×</button></td></tr>`).join('')}</tbody></table></div>`;
+      wrap.querySelectorAll('.eq-v-apagar').forEach(b => b.onclick = async () => {
+        if (!confirm('Apagar este registo de visita?')) return;
+        try { await eqApi('visitas?id=' + encodeURIComponent(b.dataset.id), 'DELETE'); eqCarregarTempos(); } catch (err) { alert(err.message); }
+      });
+    } catch (err) { wrap.innerHTML = `<div class="state small error">Erro: ${escapeHtml(err.message)}</div>`; }
+  }
+
+  async function loadEquipaView() {
+    try { await eqCarregarUsers(); eqRenderUsers(); } catch (err) { document.getElementById('eqUsersWrap').innerHTML = `<div class="state small error">Erro: ${escapeHtml(err.message)}</div>`; }
+    eqCarregarOrdens(); eqCarregarPlanos(); eqCarregarTempos();
+    if (eqEventosLigados) return;
+    eqEventosLigados = true;
+    const pass = document.getElementById('eqPass');
+    pass.value = demoGerarPassword();
+    document.getElementById('eqGerarPass').onclick = () => { pass.value = demoGerarPassword(); };
+    const user = document.getElementById('eqUser');
+    user.addEventListener('input', () => { user.dataset.mexido = '1'; });
+    document.getElementById('eqNome').addEventListener('input', e => { if (!user.dataset.mexido) user.value = demoSlug(e.target.value).replace(/-/g, '.'); });
+    document.getElementById('eqCriarBtn').onclick = eqCriarUser;
+    document.getElementById('eqCopiar').onclick = async () => { const t = document.getElementById('eqMensagem'); t.select(); try { await navigator.clipboard.writeText(t.value); } catch { document.execCommand('copy'); } };
+    eqMontarSelectMaquinas();
+    document.getElementById('eqOCriarBtn').onclick = eqCriarOrdem;
+    document.getElementById('eqOFiltro').onchange = eqRenderOrdens;
+    document.getElementById('eqTemposPeriodo').onchange = eqCarregarTempos;
+  }
+
+  // ----- Reposição → enviar o plano para /reposicao -----
+  function eqPrepararEnvio() {
+    const data = document.getElementById('eqPlanoData');
+    if (!data.value) data.value = eqSomarDias(eqHoje(), 1);
+    eqCarregarUsers().catch(() => {});
+    document.getElementById('eqPlanoEnviarBtn').onclick = eqEnviarPlano;
+  }
+
+  function eqMontarPlano() {
+    const calc = ultimoCalculoReposicao;
+    if (!calc) throw new Error('Carrega primeiro em "Calcular necessidades".');
+    const locaisSel = locaisSelecionadosComStock();
+    const sc = lerGridSmartcake();
+    const trocas = (calc.ajusteLayout && calc.ajusteLayout.trocas) || [];
+    const frescos = (calc.ajusteLayout && calc.ajusteLayout.frescosRetirar) || [];
+    const VOLUME_RE = /\b\d+([.,]\d+)?\s*(cl|ml|litro|l)\b/i;
+    const pesado = (p) => subfamiliaLabel(p) === 'Bebidas' || VOLUME_RE.test(p);
+    const paragens = new Map();
+    const obter = (maquina) => {
+      const r = rotaPorMatricula[maquina];
+      const id = r ? r.id : 'maq-' + String(maquina).toLowerCase();
+      if (!paragens.has(id)) paragens.set(id, { localId: id, nome: r ? r.nome : pdvLabel(maquina), morada: r ? r.morada : '', lat: null, lon: null, maquinas: [], itens: [], trocas: [], retirar: [], nivel: '', score: 0 });
+      const p = paragens.get(id);
+      if (!p.maquinas.includes(maquina)) p.maquinas.push(maquina);
+      return p;
+    };
+    for (const l of locaisSel) {
+      for (const it of [...l.lista].sort((a, b) => (pesado(b.produto) ? 1 : 0) - (pesado(a.produto) ? 1 : 0))) {
+        const p = obter(it.maquina);
+        p.nivel = p.nivel || l.nivel; p.score += it.score || 0;
+        const nota = [
+          it.semVendaRecente ? 'sem vendas recentes' : '',
+          it.aLevar < it.precisava && !it.arm7 ? `sem stock no armazém 7${it.arm3 > 0 ? ` (há ${fmtInt(it.arm3)} no 3)` : ''}` : it.aLevar < it.precisava ? `só ${fmtInt(it.aLevar)} de ${fmtInt(it.precisava)} (armazém 7 não chega)` : '',
+        ].filter(Boolean).join(' · ');
+        p.itens.push({ maquina: it.maquina, produto: it.produto, aLevar: it.aLevar, precisava: it.precisava, stock: it.stock, capacidade: it.capacidade, canais: it.canais || [], nota });
+      }
+      for (const t of trocas.filter(t => pdvLabel(t.maquina) === l.local)) {
+        const feita = t.estado === 'troca_feita';
+        obter(t.maquina).trocas.push({ maquina: t.maquina, feita, canais: t.canais.filter(c => c.antes !== c.depois).map(c => ({
+          canal: c.canal, antes: c.antes || '', depois: (c.depois || '') + (c.teste ? ' (teste)' : ''),
+          acao: feita ? 'Atualizar na Luope' : !c.depois ? 'Esvaziar (fica vazio)' : c.depois === LAYOUT_SMARTCAKE ? 'Esvaziar · frescos da entrega' : 'Esvaziar e carregar',
+        })) });
+      }
+    }
+    for (const m of sc) for (const i of m.itens) obter(m.maquina).itens.push({ maquina: m.maquina, produto: i.produto, aLevar: i.qtd, precisava: i.qtd, stock: 0, capacidade: 0, canais: [], nota: 'Smartcake' });
+    for (const el of document.querySelectorAll('.rota-cafe:checked')) obter(el.value);
+    for (const f of frescos) { const r = rotaPorMatricula[f.maquina]; const id = r ? r.id : 'maq-' + f.maquina.toLowerCase(); if (paragens.has(id)) paragens.get(id).retirar.push(f); }
+    let lista = [...paragens.values()];
+    if (!lista.length) throw new Error('Seleciona pelo menos um local.');
+    const rota = ultimaRota;
+    if (rota) {
+      const porId = Object.fromEntries(rota.paragens.map(p => [p.id, p]));
+      lista.sort((a, b) => ((porId[a.localId] || {}).n || 99) - ((porId[b.localId] || {}).n || 99));
+      for (const p of lista) { const r = porId[p.localId]; if (r) { p.chegada = r.chegada; p.tempoPrevisto = r.tempo; p.lat = r.lat; p.lon = r.lon; } }
+    } else lista.sort((a, b) => b.score - a.score);
+    const tot = new Map();
+    for (const p of lista) for (const it of p.itens) { if (!(it.aLevar > 0)) continue; const e = tot.get(it.produto) || { produto: it.produto, total: 0, locais: new Set() }; e.total += it.aLevar; e.locais.add(p.localId); tot.set(it.produto, e); }
+    const faltas = new Map();
+    for (const l of locaisSel) for (const it of l.lista) {
+      if (it.aLevar >= it.precisava) continue;
+      const f = faltas.get(it.produto) || { produto: it.produto, falta: 0, arm3: it.arm3 || 0 };
+      f.falta += it.precisava - it.aLevar; faltas.set(it.produto, f);
+    }
+    return {
+      paragens: lista,
+      resumo: [...tot.values()].map(e => ({ produto: e.produto, total: e.total, locais: e.locais.size })).sort((a, b) => b.total - a.total),
+      faltas: [...faltas.values()],
+      saida: rota ? rota.saida : '', fim: rota ? rota.fim : '', km: rota ? rota.km : null, conducaoMin: rota ? rota.conducao : null, voltar: rota ? rota.voltar : false,
+      mapsLinks: rota ? rota.links : [],
+    };
+  }
+
+  async function eqEnviarPlano() {
+    const msg = document.getElementById('eqPlanoMsg');
+    const btn = document.getElementById('eqPlanoEnviarBtn');
+    try {
+      await carregarMoradasRota(); // locais da rota (mesmos ids das etiquetas QR)
+      const plano = eqMontarPlano();
+      const data = document.getElementById('eqPlanoData').value;
+      if (!data) throw new Error('Escolhe o dia.');
+      btn.disabled = true; msg.style.color = 'var(--muted)'; msg.textContent = 'a enviar…';
+      await eqApi('planos', 'POST', { ...plano, data, responsavel: document.getElementById('eqPlanoResp').value, nota: document.getElementById('eqPlanoNota').value.trim(), substituir: document.getElementById('eqPlanoSubstituir').checked });
+      const unidades = plano.resumo.reduce((s, r) => s + r.total, 0);
+      msg.style.color = 'var(--positive)';
+      msg.innerHTML = `Enviado: ${plano.paragens.length} paragens, ${fmtInt(unidades)} unidades, para ${escapeHtml(eqDia(data))}${ultimaRota ? ' (pela ordem da rota)' : ' (sem rota calculada: pela urgência)'}. Já aparece em <a href="/reposicao/" target="_blank" style="color:var(--accent-deep);">/reposicao</a>.`;
+    } catch (err) { msg.style.color = 'var(--negative)'; msg.textContent = 'Erro: ' + err.message; }
+    finally { btn.disabled = false; }
+  }
 
   init();
 </script>
