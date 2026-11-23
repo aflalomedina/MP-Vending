@@ -61,8 +61,8 @@
       "id": "bosque",
       "nome": "Bosque - Adopthouse",
       "maquinas": [
-        "006",
-        "006-S"
+        "010",
+        "014"
       ],
       "morada": "Travessa de Manuel José da Silva Correia 110, 4425-177 Águas Santas, Portugal",
       "lat": null,
@@ -72,8 +72,8 @@
       "id": "house-factory",
       "nome": "House Factory",
       "maquinas": [
-        "007",
-        "007-S"
+        "015",
+        "016"
       ],
       "morada": "R. Coronel Almeida Valente 379, 4200-030 Porto, Portugal",
       "lat": null,
@@ -105,8 +105,8 @@
       "id": "blue-sky",
       "nome": "Blue Sky Gondomar",
       "maquinas": [
-        "010",
-        "014"
+        "006",
+        "006-S"
       ],
       "morada": "Av. Dr. Mário Soares 75, 4420 Gondomar, Portugal",
       "lat": null,
@@ -137,8 +137,8 @@
       "id": "nogueira",
       "nome": "Nogueira - Perafita",
       "maquinas": [
-        "015",
-        "016"
+        "007",
+        "007-S"
       ],
       "morada": "R. Silva Aroso 630, 4455-559 Matosinhos, Portugal",
       "lat": null,
