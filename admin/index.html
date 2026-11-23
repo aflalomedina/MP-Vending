@@ -512,6 +512,13 @@
   .tk-card.Novo { border-left-color: var(--negative); }
   .tk-card.Em-curso { border-left-color: var(--accent); }
   .tk-card.Resolvido { border-left-color: var(--positive); opacity: .8; }
+  .tk-card.Pendente { border-left-color: var(--accent); }
+  .tk-card.Emitida { border-left-color: var(--positive); opacity: .8; }
+  .tk-card.Recusada { border-left-color: var(--muted); opacity: .7; }
+  .ft-dados { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; }
+  .ft-dados dt { color: var(--muted); font-size: 12px; }
+  .ft-dados dd { margin: 0; word-break: break-word; }
+  .ft-copiar { border: 1px solid var(--line); background: #fff; border-radius: 4px; padding: 1px 6px; font-size: 11px; cursor: pointer; font-family: inherit; margin-left: 4px; }
   .tk-card.recente { box-shadow: 0 0 0 2px #F8B4B0; }
   .tk-topo { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
   .tk-num { font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
@@ -568,6 +575,7 @@
 <div class="tabs">
   <button class="tab-btn active" data-view="diarias">Vendas Diárias</button>
   <button class="tab-btn" data-view="tickets">Tickets <span class="tab-contador" id="ticketsContador"></span></button>
+  <button class="tab-btn" data-view="faturas">Faturas <span class="tab-contador" id="faturasContador"></span></button>
   <button class="tab-btn" data-view="maquinas">Máquinas</button>
   <button class="tab-btn" data-view="stocks">Stocks</button>
   <button class="tab-btn" data-view="reposicao">Reposição e Layouts</button>
@@ -1419,6 +1427,27 @@
       Os tickets que chegam pela etiqueta QR (<span style="font-family:'IBM Plex Mono',monospace;color:var(--ink);">mpvending.pt/assistencia/?m=007-S</span>) ficam logo alocados à máquina; os escritos à mão aparecem em <b>Por alocar</b> até escolherem a máquina no cartão.
       Este painel verifica novos tickets a cada minuto; cada ticket novo também chega por email.
       <span id="tkNotifWrap"> <button type="button" id="tkNotifBtn" style="background:none;border:1px solid var(--line);border-radius:4px;padding:4px 9px;font-size:12px;cursor:pointer;font-family:inherit;">Ativar notificações neste computador</button></span>
+    </div>
+  </div>
+
+  <div id="view-faturas" class="view">
+    <div class="panel full">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+        <h2 style="margin:0;">Pedidos de fatura</h2>
+        <div class="tk-filtros">
+          <button type="button" class="tk-filtro ft-filtro active" data-f="Pendente">Pendentes</button>
+          <button type="button" class="tk-filtro ft-filtro" data-f="Emitida">Emitidas</button>
+          <button type="button" class="tk-filtro ft-filtro" data-f="Recusada">Recusadas</button>
+          <button type="button" class="tk-filtro ft-filtro" data-f="todos">Todos</button>
+          <input type="text" id="ftPesquisa" placeholder="procurar nome, NIF, máquina…" style="border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-family:inherit;font-size:13px;min-width:180px;" />
+        </div>
+      </div>
+      <div id="ftLista"><div class="state small">a carregar…</div></div>
+    </div>
+    <div class="panel full" style="font-size:13px;color:var(--muted);line-height:1.6;">
+      Os clientes pedem a fatura na mesma etiqueta QR das avarias (<span style="font-family:'IBM Plex Mono',monospace;color:var(--ink);">mpvending.pt/assistencia/?m=007-S</span> › Pedir fatura), com nome, NIF, produtos e dia/hora da compra (o email é opcional).
+      O NIF é verificado (dígito de controlo) antes de o pedido ser aceite. Cada pedido novo também chega por email.
+      Depois de emitir a fatura, mude o estado para <b>Emitida</b> e escreva o número da fatura. A equipa da reposição não tem acesso a estes pedidos.
     </div>
   </div>
 
@@ -7194,6 +7223,7 @@
       if (btn.dataset.view === 'demo') loadDemoView();
       if (btn.dataset.view === 'equipa') loadEquipaView();
       if (btn.dataset.view === 'tickets') loadTicketsView();
+      if (btn.dataset.view === 'faturas') loadFaturasView();
     });
   });
 
@@ -7590,6 +7620,112 @@
   document.addEventListener('visibilitychange', () => { if (!document.hidden) tkVerificarNovos(); });
   // o link dos emails (mpvending.pt/admin/#tickets) abre logo este separador
   if (location.hash === '#tickets') setTimeout(() => document.querySelector('.tab-btn[data-view="tickets"]').click(), 0);
+
+
+  // ===== Pedidos de fatura (clientes pedem pelo QR da máquina) =====
+  let ftLista = [];
+  let ftFiltro = 'Pendente';
+  let ftEventos = false;
+  let ftUltimoId = null;
+  async function carregarFaturas() {
+    const res = await fetch('/api/faturas', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    ftLista = (await res.json()).faturas || [];
+  }
+  const ftCompra = (v) => v ? `${v.slice(8, 10)}/${v.slice(5, 7)}/${v.slice(0, 4)} às ${v.slice(11, 16)}` : '—';
+  function ftNif(n) { return String(n || '').replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3'); }
+  function renderFaturas() {
+    const q = (document.getElementById('ftPesquisa').value || '').trim().toLowerCase();
+    let lista = ftLista.filter(f => ftFiltro === 'todos' || f.estado === ftFiltro);
+    if (q) lista = lista.filter(f => [f.nome, f.nif, f.produtos, f.maquina, f.maquinaId ? tkNomeMaquina(f.maquinaId) : '', f.email, f.numeroFatura, f.notas, '#' + f.numero].join(' ').toLowerCase().includes(q));
+    lista.sort((a, b) => String(b.criadoEm).localeCompare(String(a.criadoEm)));
+    const wrap = document.getElementById('ftLista');
+    if (!lista.length) { wrap.innerHTML = `<div class="state small">${ftLista.length ? 'Nenhum pedido neste filtro.' : 'Ainda não chegou nenhum pedido de fatura.'}</div>`; return; }
+    wrap.innerHTML = `<div class="tk-lista">${lista.map(f => {
+      const assunto = encodeURIComponent(`Fatura MP Vending — compra de ${ftCompra(f.compradoEm)}`);
+      const badge = f.estado === 'Pendente' ? '<span class="badge P">Pendente</span>' : f.estado === 'Emitida' ? '<span class="badge" style="background:#DDF5E3;color:#1E7B34;">Emitida</span>' : '<span class="badge">Recusada</span>';
+      return `<div class="tk-card ${f.estado}" data-id="${escapeHtml(f.id)}">
+        <div class="tk-topo"><span><span class="tk-num">#${f.numero || '—'}</span> ${badge}</span><span class="tk-quando">pedido ${tkDataHora(f.criadoEm)} · ${tkHaQuanto(f.criadoEm)}</span></div>
+        <div class="tk-tipo">${escapeHtml(f.nome)}</div>
+        <dl class="ft-dados">
+          <dt>NIF</dt><dd style="font-family:'IBM Plex Mono',monospace;">${escapeHtml(ftNif(f.nif))} <button type="button" class="ft-copiar" data-copiar="${escapeHtml(f.nif)}">copiar</button></dd>
+          <dt>Compra</dt><dd>${escapeHtml(ftCompra(f.compradoEm))}</dd>
+          <dt>Máquina</dt><dd>${f.maquinaId ? escapeHtml(tkNomeMaquina(f.maquinaId)) : escapeHtml(f.maquina)}</dd>
+          <dt>Produtos</dt><dd>${escapeHtml(f.produtos)}</dd>
+          ${f.valor ? `<dt>Valor pago</dt><dd>${escapeHtml(f.valor)}</dd>` : ''}
+          <dt>Email</dt><dd>${f.email ? `<a href="mailto:${escapeHtml(f.email)}?subject=${assunto}" style="color:var(--accent-deep);">${escapeHtml(f.email)}</a>` : '<span style="color:var(--muted);">não indicou</span>'}</dd>
+        </dl>
+        <div class="tk-acoes">
+          <select class="ft-estado" aria-label="Estado">${['Pendente', 'Emitida', 'Recusada'].map(e => `<option${e === f.estado ? ' selected' : ''}>${e}</option>`).join('')}</select>
+          <input class="ft-numfat" maxlength="60" placeholder="nº da fatura (ex: FS 2026/123)" value="${escapeHtml(f.numeroFatura || '')}" />
+          <input class="ft-notas" maxlength="2000" placeholder="nota interna" value="${escapeHtml(f.notas || '')}" />
+          <button type="button" class="ft-copiar-tudo" style="background:none;border:1px solid var(--line);border-radius:4px;padding:5px 9px;font-size:12px;cursor:pointer;font-family:inherit;">Copiar dados</button>
+          ${f.emitidaEm ? `<span style="font-size:11.5px;color:var(--muted);">emitida ${tkDataHora(f.emitidaEm)}</span>` : ''}
+          <button type="button" class="tk-apagar ft-apagar">Apagar</button>
+        </div>
+      </div>`;
+    }).join('')}</div>`;
+  }
+  async function ftGuardar(id, alteracoes) {
+    const res = await fetch(`/api/faturas?id=${encodeURIComponent(id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(alteracoes) });
+    if (!res.ok) throw new Error('Não foi possível guardar');
+    const { fatura } = await res.json();
+    ftLista = ftLista.map(f => f.id === id ? fatura : f);
+    ftVerificarNovos();
+  }
+  async function loadFaturasView() {
+    try { await carregarFaturas(); renderFaturas(); }
+    catch (err) { document.getElementById('ftLista').innerHTML = `<div class="state small error">Erro: ${escapeHtml(err.message)}</div>`; }
+    if (ftEventos) return;
+    ftEventos = true;
+    document.querySelectorAll('.ft-filtro').forEach(b => b.addEventListener('click', () => {
+      document.querySelectorAll('.ft-filtro').forEach(x => x.classList.toggle('active', x === b));
+      ftFiltro = b.dataset.f; renderFaturas();
+    }));
+    document.getElementById('ftPesquisa').addEventListener('input', renderFaturas);
+    const lista = document.getElementById('ftLista');
+    lista.addEventListener('change', async (e) => {
+      const card = e.target.closest('.tk-card'); if (!card) return;
+      const id = card.dataset.id;
+      try {
+        if (e.target.classList.contains('ft-estado')) {
+          const alt = { estado: e.target.value };
+          const num = card.querySelector('.ft-numfat').value.trim();
+          if (e.target.value === 'Emitida' && !num) { const n = prompt('Número da fatura (opcional):', ''); if (n) alt.numeroFatura = n; }
+          await ftGuardar(id, alt); renderFaturas();
+        }
+        if (e.target.classList.contains('ft-numfat')) await ftGuardar(id, { numeroFatura: e.target.value });
+        if (e.target.classList.contains('ft-notas')) await ftGuardar(id, { notas: e.target.value });
+      } catch (err) { alert(err.message); }
+    });
+    lista.addEventListener('click', async (e) => {
+      const card = e.target.closest('.tk-card'); if (!card) return;
+      const f = ftLista.find(x => x.id === card.dataset.id); if (!f) return;
+      const copiar = async (t, b) => { try { await navigator.clipboard.writeText(t); const o = b.textContent; b.textContent = 'copiado ✓'; setTimeout(() => { b.textContent = o; }, 1200); } catch { prompt('Copie:', t); } };
+      if (e.target.dataset.copiar) copiar(e.target.dataset.copiar, e.target);
+      if (e.target.classList.contains('ft-copiar-tudo')) copiar(`Nome: ${f.nome}\nNIF: ${f.nif}\nProdutos: ${f.produtos}\nCompra: ${ftCompra(f.compradoEm)}\nMáquina: ${f.maquinaId ? tkNomeMaquina(f.maquinaId) : f.maquina}${f.valor ? '\nValor pago: ' + f.valor : ''}${f.email ? '\nEmail: ' + f.email : ''}`, e.target);
+      if (e.target.classList.contains('ft-apagar')) {
+        if (!confirm(`Apagar o pedido de fatura #${f.numero} (${f.nome})?`)) return;
+        await fetch(`/api/faturas?id=${encodeURIComponent(f.id)}`, { method: 'DELETE' });
+        ftLista = ftLista.filter(x => x.id !== f.id); renderFaturas(); ftVerificarNovos();
+      }
+    });
+  }
+  async function ftVerificarNovos() {
+    try {
+      const res = await fetch('/api/faturas?resumo=1', { cache: 'no-store' });
+      if (!res.ok) return;
+      const r = await res.json();
+      const c = document.getElementById('faturasContador');
+      c.textContent = r.pendentes > 99 ? '99+' : String(r.pendentes || 0);
+      c.classList.toggle('on', (r.pendentes || 0) > 0);
+      if (ftUltimoId && r.ultimoId && r.ultimoId !== ftUltimoId && document.body.dataset.view === 'faturas') { await carregarFaturas(); renderFaturas(); }
+      ftUltimoId = r.ultimoId;
+    } catch {}
+  }
+  ftVerificarNovos();
+  setInterval(() => { if (!document.hidden) ftVerificarNovos(); }, 60000);
+  if (location.hash === '#faturas') setTimeout(() => document.querySelector('.tab-btn[data-view="faturas"]').click(), 0);
 
   // ===== Equipa (mpvending.pt/reposicao): pessoas, tarefas/ordens, planos enviados e tempos nos locais =====
   const EQ_PERFIL = { repositor: 'Repositor', preparador: 'Prepara caixas', ambos: 'Repositor + caixas' };

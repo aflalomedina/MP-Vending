@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Assistência técnica | MP Vending Solutions</title>
-<meta name="description" content="Clientes MP Vending: reporte aqui problemas numa máquina — moedas, produto encravado, falta de stock — ou sugira produtos novos. Chega de imediato à equipa técnica.">
+<title>Avarias e faturas | MP Vending Solutions</title>
+<meta name="description" content="Clientes MP Vending: reporte um problema numa máquina (moedas, produto encravado, falta de stock) ou peça a fatura de uma compra com NIF.">
 <link rel="canonical" href="https://mpvending.pt/assistencia/">
 <meta name="theme-color" content="#0B1220">
 <link rel="icon" href="/logo.png">
@@ -99,6 +99,16 @@
   .btn-sec{display:inline-block; margin-top:22px; border:1px solid var(--line-dark); padding:13px 18px; border-radius:6px; font-weight:700; font-size:14px; cursor:pointer; background:none; color:var(--white); font-family:'Inter';}
   .btn-sec:hover{border-color:var(--blue);}
 
+  .escolha{display:grid; grid-template-columns:1fr 1fr; gap:14px; padding-bottom:40px;}
+  @media (max-width:620px){ .escolha{grid-template-columns:1fr;} }
+  .opcao{display:flex; flex-direction:column; gap:8px; text-align:left; padding:24px 22px; border:1px solid var(--line-dark); border-radius:8px; background:rgba(255,255,255,0.03); color:var(--white); cursor:pointer; font-family:'Inter'; transition:border-color .15s, background .15s;}
+  .opcao:hover, .opcao:focus-visible{border-color:var(--blue); background:rgba(74,127,229,.10); outline:none;}
+  .opcao i{font-style:normal; font-size:30px;}
+  .opcao b{font-family:'Archivo Black'; font-weight:400; text-transform:uppercase; font-size:21px; line-height:1.1;}
+  .opcao span{color:var(--gray-dark); font-size:14px; line-height:1.5;}
+  .oculto-modo{display:none !important;}
+  .voltar-escolha{background:none; border:none; color:var(--blue); font-family:'Inter'; font-weight:700; font-size:14px; cursor:pointer; padding:0; align-self:flex-start;}
+  #campoMaquina{margin-bottom:22px;}
   .urgente{border-top:1px solid var(--line-dark); padding:28px 0 48px; color:var(--gray-dark); font-size:14px; line-height:1.7;}
   .urgente a{color:var(--white); font-weight:700; font-family:'Space Mono';}
   .urgente a:hover{color:var(--blue);}
@@ -115,12 +125,26 @@
 
 <main class="wrap">
   <header>
-    <div class="tag mono">Clientes · Assistência técnica</div>
-    <h1>Algum problema na <em>máquina?</em></h1>
-    <p class="lead">Diga-nos o que se passa e a equipa técnica recebe o pedido no momento. Não precisa de ligar — se for preciso, contactamos nós.</p>
+    <div class="tag mono" id="tagTopo">Clientes · Avarias e faturas</div>
+    <h1 id="tituloTopo">Avaria ou <em>fatura?</em></h1>
+    <p class="lead" id="leadTopo">Escolha o que precisa. Não precisa de ligar: o pedido chega-nos no momento.</p>
   </header>
 
-  <form id="ticketForm" novalidate>
+  <div class="escolha" id="escolha">
+    <button type="button" class="opcao" data-modo="avaria"><i>🔧</i><b>Reportar uma avaria</b><span>Moedas, pagamento com cartão, produto encravado, falta de stock ou sugestão de produto.</span></button>
+    <button type="button" class="opcao" data-modo="fatura"><i>🧾</i><b>Pedir fatura</b><span>Fatura com NIF de uma compra feita nesta máquina.</span></button>
+  </div>
+
+  <button type="button" class="voltar-escolha oculto-modo" id="voltarTopo" style="margin-bottom:18px;">← Voltar</button>
+
+  <div class="campo oculto-modo" id="campoMaquina">
+    <label for="maquina">Qual é a máquina? <b>*</b></label>
+    <div class="maq-qr" id="maqQr"><div>✓ <b id="maqQrCodigo"></b><small>Máquina identificada pelo código QR</small></div><button type="button" id="maqQrAlterar">Não é esta?</button></div>
+    <input id="maquina" name="maquina" maxlength="120" required placeholder="ex: Empresa X — máquina de snacks do refeitório">
+    <span class="ajuda" id="maquinaAjuda">Indique a empresa e onde está a máquina. Se tiver, acrescente o número da etiqueta (ex: 007).</span>
+  </div>
+
+  <form id="ticketForm" class="oculto-modo" novalidate>
     <div class="campo">
       <span class="rotulo">Qual é o problema? <b>*</b></span>
       <div class="tipos" id="tipos" role="radiogroup">
@@ -132,13 +156,6 @@
         <label class="tipo"><input type="radio" name="tipo" value="Sugestão de produto"><span><i>💡</i>Sugestão de produto</span></label>
         <label class="tipo"><input type="radio" name="tipo" value="Outro"><span><i>✏️</i>Outro</span></label>
       </div>
-    </div>
-
-    <div class="campo">
-      <label for="maquina">Qual é a máquina? <b>*</b></label>
-      <div class="maq-qr" id="maqQr"><div>✓ <b id="maqQrCodigo"></b><small>Máquina identificada pelo código QR</small></div><button type="button" id="maqQrAlterar">Não é esta?</button></div>
-      <input id="maquina" name="maquina" maxlength="120" required placeholder="ex: Empresa X — máquina de snacks do refeitório">
-      <span class="ajuda" id="maquinaAjuda">Indique a empresa e onde está a máquina. Se tiver, acrescente o número da etiqueta (ex: 007).</span>
     </div>
 
     <div class="campo">
@@ -187,7 +204,49 @@
     <button type="button" class="btn-sec" id="outro">Reportar outro problema</button>
   </div>
 
-  <div class="urgente">
+  <form id="faturaForm" class="oculto-modo" novalidate>
+    <div class="campo">
+      <label for="fNome">Nome ou empresa <b>*</b></label>
+      <input id="fNome" maxlength="120" autocomplete="name" required placeholder="Como deve aparecer na fatura">
+    </div>
+    <div class="linha">
+      <div class="campo">
+        <label for="fNif">NIF <b>*</b></label>
+        <input id="fNif" inputmode="numeric" autocomplete="off" maxlength="14" required placeholder="123 456 789">
+      </div>
+      <div class="campo">
+        <label for="fData">Dia e hora da compra <b>*</b></label>
+        <input id="fData" type="datetime-local" required>
+      </div>
+    </div>
+    <div class="campo">
+      <label for="fProdutos">Produtos que comprou <b>*</b></label>
+      <textarea id="fProdutos" rows="3" maxlength="600" required placeholder="ex: 1 Coca-Cola lata e 1 Kit Kat"></textarea>
+    </div>
+    <div class="linha">
+      <div class="campo">
+        <label for="fValor">Valor pago (opcional)</label>
+        <input id="fValor" inputmode="decimal" maxlength="20" placeholder="ex: 2,40 €">
+      </div>
+      <div class="campo">
+        <label for="fEmail">Email para receber a fatura</label>
+        <input id="fEmail" type="email" inputmode="email" autocomplete="email" maxlength="120" placeholder="nome@exemplo.pt">
+      </div>
+    </div>
+    <span class="ajuda">A data e a hora já estão preenchidas com o momento atual: se a compra foi noutra altura, corrija. Com a hora certa encontramos a venda na máquina.</span>
+    <div class="hp" aria-hidden="true"><label>Website<input type="text" id="fWebsite" tabindex="-1" autocomplete="off"></label></div>
+    <p class="erro" id="fErro" role="alert"></p>
+    <button type="submit" id="fEnviar">Pedir fatura →</button>
+  </form>
+
+  <div class="sucesso" id="sucessoFatura" role="status">
+    <div class="icone">✓</div>
+    <h2>Pedido de fatura recebido</h2>
+    <p id="sucessoFaturaTexto"></p>
+    <button type="button" class="btn-sec" id="outraFatura">Pedir outra fatura</button>
+  </div>
+
+  <div class="urgente" id="urgente">
     Urgente, ou a máquina está a perder água? Ligue-nos:
     <a href="tel:916073188">916 073 188</a> · <a href="tel:914079820">914 079 820</a>
   </div>
@@ -408,7 +467,9 @@
   });
 
   function concluir(numero) {
-    form.style.display = 'none';
+    form.classList.add('oculto-modo');
+    document.getElementById('campoMaquina').classList.add('oculto-modo');
+    document.getElementById('voltarTopo').classList.add('oculto-modo');
     document.getElementById('sucessoTexto').innerHTML = (numero ? 'O seu pedido tem o número <span class="num">#' + numero + '</span>. ' : '') +
       'A equipa técnica já foi avisada e trata do assunto o mais depressa possível. Se precisarmos de mais detalhes, ligamos para o número que deixou.';
     var s = document.getElementById('sucesso');
@@ -424,8 +485,136 @@
     fotos = []; desenharFotos();
     btn.disabled = false; btn.textContent = 'Enviar pedido →';
     document.getElementById('sucesso').style.display = 'none';
-    form.style.display = 'flex';
+    form.classList.remove('oculto-modo');
+    document.getElementById('campoMaquina').classList.remove('oculto-modo');
+    document.getElementById('voltarTopo').classList.remove('oculto-modo');
   });
+
+  // ===== escolha: avaria ou fatura (o mesmo QR serve para as duas) =====
+  var TOPO = {
+    escolha: ['Clientes · Avarias e faturas', 'Avaria ou <em>fatura?</em>', 'Escolha o que precisa. Não precisa de ligar: o pedido chega-nos no momento.'],
+    avaria: ['Clientes · Assistência técnica', 'Algum problema na <em>máquina?</em>', 'Diga-nos o que se passa e a equipa técnica recebe o pedido no momento. Não precisa de ligar — se for preciso, contactamos nós.'],
+    fatura: ['Clientes · Faturas', 'Pedir <em>fatura</em>', 'Indique os dados para a fatura e o que comprou. Enviamos a fatura assim que for emitida.'],
+  };
+  function mostrarModo(modo) {
+    if (!TOPO[modo]) modo = 'escolha';
+    document.getElementById('tagTopo').textContent = TOPO[modo][0];
+    document.getElementById('tituloTopo').innerHTML = TOPO[modo][1];
+    document.getElementById('leadTopo').textContent = TOPO[modo][2];
+    document.getElementById('escolha').classList.toggle('oculto-modo', modo !== 'escolha');
+    document.getElementById('campoMaquina').classList.toggle('oculto-modo', modo === 'escolha');
+    document.getElementById('voltarTopo').classList.toggle('oculto-modo', modo === 'escolha');
+    form.classList.toggle('oculto-modo', modo !== 'avaria');
+    document.getElementById('faturaForm').classList.toggle('oculto-modo', modo !== 'fatura');
+    document.getElementById('sucesso').style.display = 'none';
+    document.getElementById('sucessoFatura').style.display = 'none';
+    document.getElementById('urgente').classList.toggle('oculto-modo', modo === 'fatura');
+    if (modo === 'fatura') porDataFatura();
+  }
+  function modoAtual() { var h = location.hash.replace('#', ''); return TOPO[h] ? h : (params.get('tipo') ? 'avaria' : 'escolha'); }
+  document.querySelectorAll('.opcao').forEach(function (b) { b.addEventListener('click', function () { location.hash = b.getAttribute('data-modo'); }); });
+  document.querySelectorAll('.voltar-escolha').forEach(function (b) { b.addEventListener('click', function () { location.hash = 'escolha'; }); });
+  window.addEventListener('hashchange', function () { mostrarModo(modoAtual()); window.scrollTo(0, 0); });
+
+  // ===== pedido de fatura =====
+  var fForm = document.getElementById('faturaForm');
+  var fBtn = document.getElementById('fEnviar');
+  var fErro = document.getElementById('fErro');
+  var fData = document.getElementById('fData');
+  function porDataFatura() { if (!fData.value) fData.value = agoraLocal(); fData.max = agoraLocal(); }
+  function fMostrarErro(msg) { fErro.textContent = msg; fErro.style.display = msg ? 'block' : 'none'; }
+  function nifValido(n) {
+    var d = String(n || '').toUpperCase().replace(/^PT/, '').replace(/[\s.-]/g, '');
+    if (!/^[1-9]\d{8}$/.test(d)) return '';
+    var soma = 0; for (var i = 0; i < 8; i++) soma += Number(d[i]) * (9 - i);
+    var c = 11 - (soma % 11); if (c >= 10) c = 0;
+    return c === Number(d[8]) ? d : '';
+  }
+  function enviarEmailFatura(d, numero) {
+    return fetch('https://api.web3forms.com/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        access_key: WEB3FORMS_KEY,
+        subject: '🧾 ' + (numero ? 'Pedido de fatura nº ' + numero : 'Pedido de fatura') + ' — ' + d.nome + ' — ' + d.maquina,
+        from_name: 'Faturas MP Vending',
+        'Pedido': numero ? 'nº ' + numero : '(não ficou gravado no painel — tratar por aqui)',
+        'Compra': d.compradoEm.replace('T', ' às '),
+        'Máquina': d.maquina,
+        'Nome': d.nome,
+        'NIF': d.nif,
+        'Produtos': d.produtos,
+        'Valor pago': d.valor || '—',
+        'Email': d.email || '—',
+        'Painel': 'https://mpvending.pt/admin/#faturas',
+        botcheck: '',
+      }),
+    }).then(function (r) { return r.json(); }).then(function (j) { return !!(j && j.success); }).catch(function () { return false; });
+  }
+  fForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    fMostrarErro('');
+    var d = {
+      maquina: document.getElementById('maquina').value.trim(),
+      nome: document.getElementById('fNome').value.trim(),
+      nif: document.getElementById('fNif').value.trim(),
+      produtos: document.getElementById('fProdutos').value.trim(),
+      compradoEm: fData.value,
+      valor: document.getElementById('fValor').value.trim(),
+      email: document.getElementById('fEmail').value.trim(),
+      website: document.getElementById('fWebsite').value,
+    };
+    if (!d.maquina) { fMostrarErro('Indique qual é a máquina.'); document.getElementById('maquina').focus(); return; }
+    if (!d.nome) { fMostrarErro('Indique o nome ou a empresa.'); document.getElementById('fNome').focus(); return; }
+    if (!nifValido(d.nif)) { fMostrarErro('O NIF não é válido. Confirme os 9 dígitos.'); document.getElementById('fNif').focus(); return; }
+    if (!d.compradoEm) { fMostrarErro('Indique o dia e a hora da compra.'); fData.focus(); return; }
+    if (!d.produtos) { fMostrarErro('Indique os produtos que comprou.'); document.getElementById('fProdutos').focus(); return; }
+    if (d.email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email)) { fMostrarErro('O email não parece válido.'); document.getElementById('fEmail').focus(); return; }
+    fBtn.disabled = true; fBtn.textContent = 'A enviar…';
+    fetch('/api/faturas/novo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d) })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, j: j }; }); })
+      .catch(function () { return { ok: false, status: 0, j: {} }; })
+      .then(function (res) {
+        if (!res.ok && res.status >= 400 && res.status < 500) {
+          fBtn.disabled = false; fBtn.textContent = 'Pedir fatura →';
+          fMostrarErro(res.j.error || 'Verifique os dados e tente de novo.');
+          return;
+        }
+        if (d.website) return concluirFatura(0, d);
+        var numero = res.ok ? res.j.numero : 0;
+        var envio = (res.ok && res.j.emailServidor) ? Promise.resolve(true) : enviarEmailFatura(d, numero);
+        envio.then(function (emailOk) {
+          if (!res.ok && !emailOk) {
+            fBtn.disabled = false; fBtn.textContent = 'Tentar novamente →';
+            fMostrarErro('Não conseguimos enviar o pedido (sem ligação?). Tente novamente daqui a pouco.');
+            return;
+          }
+          concluirFatura(numero, d);
+        });
+      });
+  });
+  function concluirFatura(numero, d) {
+    fForm.classList.add('oculto-modo');
+    document.getElementById('campoMaquina').classList.add('oculto-modo');
+    document.getElementById('voltarTopo').classList.add('oculto-modo');
+    document.getElementById('sucessoFaturaTexto').innerHTML = (numero ? 'O seu pedido tem o número <span class="num">#' + numero + '</span>. ' : '') +
+      (d.email ? 'Enviamos a fatura para <span class="num">' + d.email.replace(/[<>&"]/g, '') + '</span> assim que for emitida.' : 'Vamos emitir a fatura com os dados indicados.');
+    document.getElementById('sucessoFatura').style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  document.getElementById('outraFatura').addEventListener('click', function () {
+    var nome = document.getElementById('fNome').value, nif = document.getElementById('fNif').value, email = document.getElementById('fEmail').value;
+    fForm.reset();
+    document.getElementById('fNome').value = nome; document.getElementById('fNif').value = nif; document.getElementById('fEmail').value = email;
+    fData.value = ''; porDataFatura();
+    fBtn.disabled = false; fBtn.textContent = 'Pedir fatura →';
+    document.getElementById('sucessoFatura').style.display = 'none';
+    fForm.classList.remove('oculto-modo');
+    document.getElementById('campoMaquina').classList.remove('oculto-modo');
+    document.getElementById('voltarTopo').classList.remove('oculto-modo');
+  });
+
+  mostrarModo(modoAtual());
 
   // contagem de visitas no painel (mesmo tracking do site)
   try {
