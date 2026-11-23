@@ -1593,12 +1593,12 @@
   const MACHINES = {
     "001": "Recepção", "002": "Central Park", "002-S": "Central Park",
     "003": "Gondomar Premium", "003-S": "Gondomar Premium", "004": "Guifões - Green Park",
-    "005": "Recepção", "006": "Bosque - Adopthouse", "006-S": "Bosque - Adopthouse",
-    "007": "House Factory (Refeitório)", "007-S": "House Factory (Refeitório)",
+    "005": "Recepção", "006": "Blue Sky Gondomar", "006-S": "Blue Sky Gondomar",
+    "007": "Nogueira - Perafita", "007-S": "Nogueira - Perafita",
     "008": "Oasis - Edinorte", "008-S": "Oasis - Edinorte",
-    "009": "D'Casa Gondomar", "009-S": "D'Casa Gondomar", "010": "Blue Sky Gondomar",
+    "009": "D'Casa Gondomar", "009-S": "D'Casa Gondomar", "010": "Bosque - Adopthouse",
     "011": "Jardins do Oriente", "012": "Águas Santas (só café)", "013": "Jardins do Oriente",
-    "014": "Blue Sky Gondomar", "015": "Nogueira - Perafita", "016": "Nogueira - Perafita",
+    "014": "Bosque - Adopthouse", "015": "House Factory (Refeitório)", "016": "House Factory (Refeitório)",
     "017": "Divmac 017 (snacks)", "018": "Divmac 018 (snacks)",
     "019": "Divmac 019 (café)", "020": "Divmac 020 (café)",
     "021": "Melt",
@@ -1613,6 +1613,22 @@
 
   function pdvLabel(matricula) {
     return MACHINES[matricula] || matricula || '—';
+  }
+
+  // Trocas de máquinas entre pontos de venda: a máquina (matrícula) mantém-se, muda o local.
+  // MACHINES tem o local ATUAL; aqui ficam os locais ANTERIORES, para dias passados (histórico) continuarem no local onde as máquinas estavam.
+  const TROCAS_LOCAL = [
+    { desde: '2026-11-23', antes: {
+      "006": "Bosque - Adopthouse", "006-S": "Bosque - Adopthouse",
+      "007": "House Factory (Refeitório)", "007-S": "House Factory (Refeitório)",
+      "010": "Blue Sky Gondomar", "014": "Blue Sky Gondomar",
+      "015": "Nogueira - Perafita", "016": "Nogueira - Perafita",
+    } },
+  ];
+  // local da máquina numa data (AAAA-MM-DD); sem data devolve o atual
+  function pdvLabelEm(matricula, data) {
+    if (data) for (const t of TROCAS_LOCAL) if (data < t.desde && t.antes[matricula]) return t.antes[matricula];
+    return pdvLabel(matricula);
   }
 
   // Matrículas de máquinas de snacks (todas as "-S" mais estas três sem sufixo)
@@ -7203,7 +7219,8 @@
           r.porCategoria = r.porCategoria || {};
           for (const [m, v] of Object.entries(r.porMaquina)) {
             if (MAQUINAS_EXCLUIDAS.has(m)) continue;
-            r.porPontoVenda[pdvLabel(m)] = (r.porPontoVenda[pdvLabel(m)] || 0) + v;
+            const pdvDia = pdvLabelEm(m, d);
+            r.porPontoVenda[pdvDia] = (r.porPontoVenda[pdvDia] || 0) + v;
             r.porCategoria[tipoMaquinaLabel(m)] = (r.porCategoria[tipoMaquinaLabel(m)] || 0) + v;
           }
         }
