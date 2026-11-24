@@ -226,7 +226,7 @@ async function registarVisita(request, env, s, p) {
   };
   await env.HISTORY_KV.put(`eq:visita:${v.id}`, JSON.stringify(v), { expirationTtl: VISITA_TTL_S });
   await env.HISTORY_KV.put(`eq:aberta:${s.utilizador}`, v.id, { expirationTtl: VISITA_TTL_S });
-  if (local !== LOCAL_ARMAZEM) await contarVisitaNasOrdens(env, local.id);
+  await contarVisitaNasOrdens(env, local.id);
   await registarLog(env, { quem: s.nome, utilizador: s.utilizador, tipo: "entrada", localId: local.id, texto: local === LOCAL_ARMAZEM ? "entrou no armazém (caixas)" : `chegou a ${local.nome}${maquina ? " (QR " + maquina + ")" : " (sem QR)"}` });
   return { acao: "entrada", visita: v, local, anterior, ordens: await ordensDoLocal(env, s, local.id) };
 }
@@ -236,7 +236,7 @@ function ordemValida(p, locais) {
   const titulo = txt(p.titulo, 160);
   if (!titulo) return { erro: "Falta o título." };
   const maquina = MAQ_RE.test(String(p.maquina || "").toUpperCase()) ? String(p.maquina).toUpperCase() : "";
-  const localId = maquina ? localDaMaquina(locais, maquina).id : (p.localId && locais.porId[p.localId] ? p.localId : "");
+  const localId = maquina ? localDaMaquina(locais, maquina).id : (p.localId === LOCAL_ARMAZEM.id ? LOCAL_ARMAZEM.id : p.localId && locais.porId[p.localId] ? p.localId : "");
   return {
     titulo,
     descricao: txt(p.descricao, 2000),
@@ -309,7 +309,8 @@ async function concluirOrdem(env, o, quem, nota) {
   return o;
 }
 // "toda a equipa": as tarefas de uma máquina/local só aparecem a quem vai às máquinas (não a quem só prepara caixas)
-const ordemParaMim = (o, s) => o.atribuidaA ? o.atribuidaA === s.utilizador : !(o.localId && s.perfil === "preparador");
+// as do armazém aparecem também a quem prepara as caixas
+const ordemParaMim = (o, s) => o.atribuidaA ? o.atribuidaA === s.utilizador : (o.localId === LOCAL_ARMAZEM.id || !(o.localId && s.perfil === "preparador"));
 
 // ===== Planos =====
 async function planosDoDia(env, data) {
@@ -587,7 +588,7 @@ export async function handleEquipaAdmin(request, env) {
       for (const item of lista) {
         const v = ordemValida(item, locais);
         if (v.erro) return json({ error: v.erro }, 400);
-        if (v.recorrencia === "visitas" && !v.localId) return json({ error: "\"Após N visitas\" precisa de uma máquina." }, 400);
+        if (v.recorrencia === "visitas" && !v.localId) return json({ error: "\"Após N visitas\" precisa de uma máquina ou do armazém." }, 400);
         const o = { id: crypto.randomUUID(), ...v, estado: "Pendente", criadaEm: new Date().toISOString(), historico: [] };
         await env.HISTORY_KV.put(`eq:ordem:${o.id}`, JSON.stringify(o));
         criadas.push(o);
