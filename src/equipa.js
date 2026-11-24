@@ -122,6 +122,8 @@ async function sessaoValida(request, env) {
   if (!s || Date.now() > s.expiraEm) return null;
   const u = await lerJSON(env, `eq:user:${s.utilizador}`);
   if (!u || u.ativo === false) return null; // apagado ou desativado no admin → perde o acesso logo
+  // password nova, desativação ou acesso recriado terminam as sessões abertas antes disso (ex.: telemóvel perdido)
+  if (u.sessoesDesde && (s.criadaEm || 0) < u.sessoesDesde) return null;
   return { token, utilizador: s.utilizador, nome: u.nome || s.utilizador, perfil: PERFIS.includes(u.perfil) ? u.perfil : "repositor" };
 }
 
@@ -146,7 +148,7 @@ async function handleLogin(request, env) {
   if (!igualSeguro(hash, u.hash)) return falhou();
   if (u.ativo === false) return redirect(`/reposicao/?erro=desativado${extra}`);
   const token = aleatorio(32);
-  await env.HISTORY_KV.put(`eq:sessao:${token}`, JSON.stringify({ utilizador, expiraEm: Date.now() + SESSAO_S * 1000 }), { expirationTtl: SESSAO_S });
+  await env.HISTORY_KV.put(`eq:sessao:${token}`, JSON.stringify({ utilizador, criadaEm: Date.now(), expiraEm: Date.now() + SESSAO_S * 1000 }), { expirationTtl: SESSAO_S });
   u.ultimoAcesso = new Date().toISOString();
   await env.HISTORY_KV.put(`eq:user:${utilizador}`, JSON.stringify(u));
   if (falhas) await env.HISTORY_KV.delete(chaveFalhas);
@@ -306,7 +308,8 @@ async function concluirOrdem(env, o, quem, nota) {
   await env.HISTORY_KV.put(`eq:ordem:${o.id}`, JSON.stringify(o));
   return o;
 }
-const ordemParaMim = (o, s) => !o.atribuidaA || o.atribuidaA === s.utilizador;
+// "toda a equipa": as tarefas de uma máquina/local só aparecem a quem vai às máquinas (não a quem só prepara caixas)
+const ordemParaMim = (o, s) => o.atribuidaA ? o.atribuidaA === s.utilizador : !(o.localId && s.perfil === "preparador");
 
 // ===== Planos =====
 async function planosDoDia(env, data) {
@@ -544,7 +547,7 @@ export async function handleEquipaAdmin(request, env) {
       if (password.length < 6) return json({ error: "A password tem de ter pelo menos 6 caracteres." }, 400);
       if (await env.HISTORY_KV.get(`eq:user:${utilizador}`)) return json({ error: "Já existe esse utilizador." }, 409);
       const { hash, salt } = await hashPassword(password);
-      const registo = { nome: txt(b.nome, 60) || utilizador, perfil: PERFIS.includes(b.perfil) ? b.perfil : "repositor", hash, salt, ativo: true, criadoEm: new Date().toISOString() };
+      const registo = { nome: txt(b.nome, 60) || utilizador, perfil: PERFIS.includes(b.perfil) ? b.perfil : "repositor", hash, salt, ativo: true, criadoEm: new Date().toISOString(), sessoesDesde: Date.now() };
       await env.HISTORY_KV.put(`eq:user:${utilizador}`, JSON.stringify(registo));
       return json({ ok: true, utilizador });
     }
@@ -555,10 +558,11 @@ export async function handleEquipaAdmin(request, env) {
       if (!u) return json({ error: "Utilizador não encontrado." }, 404);
       if (typeof b.nome === "string" && b.nome.trim()) u.nome = txt(b.nome, 60);
       if (PERFIS.includes(b.perfil)) u.perfil = b.perfil;
-      if (typeof b.ativo === "boolean") u.ativo = b.ativo;
+      if (typeof b.ativo === "boolean") { if (u.ativo !== false && !b.ativo) u.sessoesDesde = Date.now(); u.ativo = b.ativo; }
       if (typeof b.password === "string") {
         if (b.password.length < 6) return json({ error: "A password tem de ter pelo menos 6 caracteres." }, 400);
         Object.assign(u, await hashPassword(b.password));
+        u.sessoesDesde = Date.now(); // a password antiga deixa de servir em todos os telemóveis
       }
       await env.HISTORY_KV.put(`eq:user:${utilizador}`, JSON.stringify(u));
       return json({ ok: true });
