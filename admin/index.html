@@ -7471,7 +7471,7 @@
   function eqMontarSelectMaquinas() {
     const sel = document.getElementById('eqOMaquina');
     const maqs = Object.keys(MACHINES).filter(m => !MAQUINAS_EXCLUIDAS.has(m)).sort();
-    sel.innerHTML = '<option value="">— nenhuma em especial —</option><option value="*snacks">Todas as de snacks (uma tarefa cada)</option><option value="*cafe">Todas as de café (uma tarefa cada)</option><option value="*todas">Todas as máquinas (uma tarefa cada)</option>' +
+    sel.innerHTML = '<option value="">— nenhuma em especial —</option><option value="*armazem">📦 Armazém (preparação de caixas)</option><option value="*snacks">Todas as de snacks (uma tarefa cada)</option><option value="*cafe">Todas as de café (uma tarefa cada)</option><option value="*todas">Todas as máquinas (uma tarefa cada)</option>' +
       maqs.map(m => `<option value="${m}">${escapeHtml(machineLabel(m))}</option>`).join('');
   }
   async function eqCriarOrdem() {
@@ -7482,7 +7482,8 @@
     const corpo = {
       titulo: document.getElementById('eqOTitulo').value.trim(),
       tipo: document.getElementById('eqOTipo').value,
-      maquina: maquinas ? '' : maqSel,
+      maquina: maquinas || maqSel === '*armazem' ? '' : maqSel,
+      localId: maqSel === '*armazem' ? 'armazem' : undefined,
       maquinas: maquinas || undefined,
       atribuidaA: document.getElementById('eqOPara').value,
       data: document.getElementById('eqOData').value,
@@ -7492,7 +7493,7 @@
       descricao: document.getElementById('eqODescricao').value.trim(),
     };
     if ((corpo.recorrencia === 'semanas' || corpo.recorrencia === 'meses') && !corpo.data) corpo.data = eqHoje();
-    if (corpo.recorrencia === 'visitas' && !corpo.maquina && !maquinas) { msg.style.color = 'var(--negative)'; msg.textContent = '"Após X visitas" precisa de uma máquina (ou de "Todas as…").'; return; }
+    if (corpo.recorrencia === 'visitas' && !corpo.maquina && !maquinas && !corpo.localId) { msg.style.color = 'var(--negative)'; msg.textContent = '"Após X visitas" precisa de uma máquina (ou de "Todas as…").'; return; }
     msg.style.color = 'var(--muted)'; msg.textContent = 'a criar…';
     try {
       const r = await eqApi('ordens', 'POST', corpo);
@@ -7520,7 +7521,7 @@
       const urgCor = o.urgencia === 'Urgente' ? 'var(--negative)' : o.urgencia === 'Alta' ? 'var(--accent-deep)' : 'var(--muted)';
       return `<tr>
         <td data-label="Tarefa"><b>${escapeHtml(o.titulo)}</b> <span style="font-size:11px;color:var(--muted);">${escapeHtml(o.tipo)}</span> <span style="font-size:11px;color:${urgCor};font-weight:600;">${escapeHtml(o.urgencia)}</span>${o.descricao ? `<div style="font-size:12px;color:var(--muted);white-space:pre-wrap;">${escapeHtml(o.descricao)}</div>` : ''}</td>
-        <td data-label="Máquina">${o.maquina ? escapeHtml(machineLabel(o.maquina)) : '—'}</td>
+        <td data-label="Máquina">${o.maquina ? escapeHtml(machineLabel(o.maquina)) : o.localId === 'armazem' ? '📦 Armazém' : '—'}</td>
         <td data-label="Para">${o.atribuidaA ? escapeHtml(nomeDe(o.atribuidaA)) : 'Toda a equipa'}</td>
         <td data-label="Data" style="${atrasada ? 'color:var(--negative);font-weight:600;' : ''}">${o.recorrencia === 'visitas' ? (o.estado !== 'Feita' && (o.visitasDesde || 0) >= (o.intervalo || 1) ? '<b style="color:var(--accent-deep);">para fazer na próxima visita</b>' : '—') : o.data ? eqDia(o.data) + (atrasada ? ' (atrasada)' : '') : '—'}</td>
         <td data-label="Frequência">${escapeHtml(eqDescFrequencia(o))}</td>
