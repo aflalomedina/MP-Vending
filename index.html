@@ -39,7 +39,11 @@
   "url": "https://mpvending.pt/",
   "logo": "https://mpvending.pt/logo.png",
   "image": "https://mpvending.pt/logo.png",
-  "telephone": ["+351916073188", "+351914079820"],
+  "telephone": ["+351916073188", "+351914079820", "+351937533914"],
+  "contactPoint": [
+    { "@type": "ContactPoint", "contactType": "sales", "telephone": ["+351916073188", "+351914079820"], "areaServed": "PT", "availableLanguage": "Portuguese" },
+    { "@type": "ContactPoint", "contactType": "technical support", "telephone": "+351937533914", "areaServed": "PT", "availableLanguage": "Portuguese" }
+  ],
   "email": "mpvendingsolutions@gmail.com",
   "priceRange": "€€",
   "address": {
@@ -79,7 +83,7 @@
     --line-light: rgba(11,18,32,0.10);
   }
   *{box-sizing:border-box; margin:0; padding:0;}
-  html{scroll-behavior:smooth;}
+  html{scroll-behavior:smooth; background:var(--ink);}
   body{
     background:var(--white);
     color:var(--ink);
@@ -267,7 +271,7 @@
   .contact-lead{color:var(--gray-dark); max-width:480px; margin-top:22px; font-size:16px; line-height:1.6;}
   .contact-grid{display:grid; grid-template-columns:1.1fr 0.9fr; gap:60px; margin-top:56px;}
   @media (max-width:860px){ .contact-grid{grid-template-columns:1fr;} }
-  .receipt{ border:1px solid var(--line-dark); border-radius:6px; overflow:hidden; }
+  .receipt{ border:1px solid var(--line-dark); border-radius:6px; overflow:hidden; align-self:start; }
   .receipt-row{
     display:flex; justify-content:space-between; align-items:center;
     padding:20px 24px; border-bottom:1px solid var(--line-dark);
@@ -294,12 +298,17 @@
   }
   form button:hover{ background:var(--blue-dark); }
 
-  footer{background:var(--ink); color:var(--gray-dark); border-top:1px solid var(--line-dark); padding:32px 0; font-size:13px;}
-  footer .wrap{display:flex; justify-content:space-between; flex-wrap:wrap; gap:16px; align-items:center;}
+  footer{background:var(--ink); color:var(--gray-dark); border-top:1px solid var(--line-dark); padding:48px 0 28px; font-size:14px;}
+  footer .wrap{display:grid; grid-template-columns:1.4fr 1fr 1fr 1fr; gap:32px; align-items:start;}
+  footer .fcol{display:flex; flex-direction:column; gap:8px; min-width:0;}
+  footer .fbrand p{line-height:1.5; max-width:260px;}
   footer .brand{ gap:10px; }
   footer .brand img{ width:28px; height:28px; }
-  footer a{opacity:0.8;} footer a:hover{opacity:1; color:var(--blue);}
-  footer .flinks{ display:flex; gap:20px; }
+  footer .ftitle{font-family:'Space Mono'; font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:var(--white); margin-bottom:4px;}
+  footer a{color:var(--gray-dark); overflow-wrap:anywhere;} footer a:hover{color:var(--blue);}
+  footer .fbottom{display:block; margin-top:36px; padding-top:20px; border-top:1px solid var(--line-dark); font-size:13px;}
+  @media (max-width:860px){ footer .wrap{grid-template-columns:1fr 1fr;} footer .fbrand{grid-column:1 / -1;} }
+  @media (max-width:520px){ footer{padding-bottom:96px;} footer .wrap{grid-template-columns:1fr; gap:26px;} }
 
   /* Conteúdo sempre visível: a animação é apenas um extra e não pode esconder o texto. */
   .reveal{opacity:1; visibility:visible; transform:none; transition:opacity .5s ease, transform .5s ease;}
@@ -323,6 +332,7 @@
 </style>
   <!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "b810eae6e207447c83953edea034ff8a"}'></script><!-- End Cloudflare Web Analytics -->
 </head>
+<body>
   <!-- Botão flutuante WhatsApp -->
 <a href="https://wa.me/351916073188" target="_blank" rel="noopener" aria-label="Enviar mensagem no WhatsApp"
    style="position:fixed; bottom:24px; right:24px; z-index:9999; width:56px; height:56px; border-radius:50%; background:#25D366; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(0,0,0,0.25); text-decoration:none;">
@@ -372,7 +382,6 @@
   window.addEventListener('pagehide', enviarDuracao);
 })();
 </script>
-<body>
 
 <a class="faixa-assist" href="/assistencia/">🔧 <b>Já é nosso cliente?</b> Reporte aqui problemas com moedas, produtos encravados ou falta de stock <span class="seta">Pedir assistência →</span></a>
 <nav>
@@ -556,7 +565,9 @@
         <div class="receipt-row"><span>Localização</span><span>Porto, Portugal</span></div>
         <div class="receipt-row"><span>Comercial</span><a href="tel:916073188">916 073 188</a></div>
         <div class="receipt-row"><span>Comercial</span><a href="tel:914079820">914 079 820</a></div>
-<div class="receipt-row"><span>Email</span><a href="mailto:mpvendingsolutions&#64;gmail.com">mpvendingsolutions&#64;gmail&#46;com</a></div>        <div class="receipt-row"><span>Horário</span><span>Seg–Sex, 8h–18h</span></div>
+        <div class="receipt-row"><span>Assistência técnica</span><a href="tel:937533914">937 533 914</a></div>
+<div class="receipt-row"><span>Email</span><a href="mailto:mpvendingsolutions&#64;gmail.com">mpvendingsolutions&#64;gmail&#46;com</a></div>
+        <div class="receipt-row"><span>Horário</span><span>Seg–Sex, 8h–18h</span></div>
       </div>
 
       <form id="contactForm" action="https://api.web3forms.com/submit" method="POST">
@@ -597,14 +608,28 @@
 
 <footer>
   <div class="wrap">
-    <div class="brand"><img src="/logo.png" alt="MP Vending"><span class="brand-word" style="color:var(--white);">MP VENDING SOLUTIONS</span></div>
-    <div class="flinks">
-      <a href="/assistencia/">Assistência a clientes</a>
-      <a href="#contacto">Contacto</a>
+    <div class="fcol fbrand">
+      <div class="brand"><img src="/logo.png" alt="MP Vending" width="28" height="28"><span class="brand-word" style="color:var(--white);">MP VENDING SOLUTIONS</span></div>
+      <p>Vending para empresas · Porto e Norte de Portugal</p>
+    </div>
+    <div class="fcol">
+      <div class="ftitle">Comercial</div>
+      <a href="tel:916073188">916 073 188</a>
+      <a href="tel:914079820">914 079 820</a>
+      <a href="mailto:mpvendingsolutions&#64;gmail.com">mpvendingsolutions&#64;gmail&#46;com</a>
+    </div>
+    <div class="fcol">
+      <div class="ftitle">Assistência técnica</div>
+      <a href="tel:937533914">937 533 914</a>
+      <a href="/assistencia/">Reportar problema online</a>
+    </div>
+    <div class="fcol">
+      <div class="ftitle">Ligações</div>
+      <a href="#contacto">Pedir proposta</a>
       <a href="https://wa.me/351916073188" target="_blank" rel="noopener">WhatsApp</a>
     </div>
-    <div>© MP Vending Solutions · Porto</div>
   </div>
+  <div class="wrap fbottom">© MP Vending Solutions · Porto</div>
 </footer>
 
 </body>
