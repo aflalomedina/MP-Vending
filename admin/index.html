@@ -582,7 +582,6 @@
   <button class="tab-btn" data-view="produtos">Produtos</button>
   <button class="tab-btn" data-view="financeiro">Financeiro</button>
   <button class="tab-btn" data-view="site">Site</button>
-  <button class="tab-btn" data-view="resultados">Resultados</button>
   <button class="tab-btn" data-view="smartcake">Smartcake</button>
   <button class="tab-btn" data-view="tarefas">Tarefas Pendentes</button>
   <button class="tab-btn" data-view="equipa">Equipa</button>
@@ -1134,68 +1133,6 @@
     </div>
   </div>
 
-  <div id="view-resultados" class="view">
-    <div class="panel full">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
-        <h2 style="margin:0;">Resultado líquido mensal</h2>
-        <div>
-          <label for="resultadosMes" style="font-size:13px;color:var(--muted);margin-right:8px;">Mês:</label>
-          <select id="resultadosMes" style="border:1px solid var(--line);border-radius:4px;padding:5px 8px;font-family:inherit;font-size:13px;"></select>
-        </div>
-      </div>
-      <div class="kpis" style="margin-bottom:0;">
-        <div class="kpi"><div class="value" id="resReceita">—</div><div class="label">Receita</div></div>
-        <div class="kpi"><div class="value" id="resDespesas">—</div><div class="label">Despesas totais</div></div>
-        <div class="kpi"><div class="value" id="resLiquido">—</div><div class="label">Resultado líquido</div></div>
-        <div class="kpi"><div class="value" id="resMargem">—</div><div class="label">Margem líquida</div></div>
-      </div>
-    </div>
-
-    <div class="panel full">
-      <h2>Despesas por categoria</h2>
-      <canvas id="chartDespesasCategoria" height="180"></canvas>
-    </div>
-
-    <div class="panel full">
-      <h2>Adicionar despesa</h2>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
-        <div>
-          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Categoria</label>
-          <select id="despesaCategoria" style="border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-family:inherit;font-size:13px;">
-            <option value="Pessoal">Pessoal</option>
-            <option value="Sistemas">Sistemas</option>
-            <option value="Mercadoria">Mercadoria</option>
-            <option value="Armazenamento">Armazenamento</option>
-            <option value="Combustível">Combustível</option>
-            <option value="Taxas Unicre">Taxas Unicre</option>
-            <option value="Manutenção">Manutenção</option>
-            <option value="Amortização máquinas">Amortização máquinas</option>
-            <option value="Outros">Outros</option>
-          </select>
-        </div>
-        <div>
-          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Descrição</label>
-          <input type="text" id="despesaDescricao" placeholder="ex: fatura fornecedor X" style="border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-family:inherit;font-size:13px;width:220px;" />
-        </div>
-        <div>
-          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Valor (€)</label>
-          <input type="number" id="despesaValor" step="0.01" min="0" placeholder="0,00" style="border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-family:inherit;font-size:13px;width:110px;" />
-        </div>
-        <div>
-          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Data</label>
-          <input type="date" id="despesaData" style="border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-family:inherit;font-size:13px;" />
-        </div>
-        <button type="button" id="despesaAdicionarBtn" style="background:var(--ink);color:#fff;border:none;border-radius:4px;padding:8px 16px;font-size:13px;cursor:pointer;">Adicionar</button>
-      </div>
-      <div id="despesaFormMsg" style="font-size:12px;margin-top:8px;"></div>
-    </div>
-
-    <div class="panel full">
-      <h2>Despesas do mês</h2>
-      <div class="table-wrap" id="despesasTableWrap"><div class="state small">a carregar…</div></div>
-    </div>
-  </div>
-
   <div id="view-smartcake" class="view">
     <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
       Produtos frescos (validade curta, tipicamente 5 dias) — subfamília "Frescos". Gestão cuidada de stock e vendas para reduzir quebras por validade.
@@ -1563,7 +1500,7 @@
     <div class="panel full">
       <h2>Tarefas e ordens para a equipa</h2>
       <div style="font-size:13px;color:var(--muted);margin:-4px 0 12px;line-height:1.5;">
-        Aparecem no separador <b>Tarefas</b> de /reposicao (e na visita, quando o repositor lê o QR dessa máquina). Frequência: uma vez (ad-hoc), a cada X semanas ou meses (conta a partir do dia em que é feita) ou após X visitas à máquina (cada chegada ao local conta uma) — ex.: limpar o moedeiro a cada 4 visitas em todas as máquinas de snacks.
+        Aparecem no separador <b>Tarefas</b> de /reposicao (e na visita, quando o repositor lê o QR dessa máquina). Com "Toda a equipa", as tarefas de uma máquina só aparecem a quem faz reposição; para dar uma tarefa a quem prepara as caixas, escolha a pessoa em "Para". Frequência: uma vez (ad-hoc), a cada X semanas ou meses (conta a partir do dia em que é feita) ou após X visitas à máquina (cada chegada ao local conta uma) — ex.: limpar o moedeiro a cada 4 visitas em todas as máquinas de snacks.
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
         <div style="flex:2 1 240px;"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Tarefa / ordem</label>
@@ -4388,106 +4325,6 @@
     renderFinanceiro();
   }
 
-  // ===== Resultados (receita - despesas) =====
-  let todasDespesas = [];
-  let chartDespesasCategoriaInstance = null;
-
-  function mesesComDados() {
-    const meses = new Set(monthsAvailable());
-    for (const d of todasDespesas) meses.add(String(d.data).slice(0, 7));
-    return Array.from(meses).sort();
-  }
-
-  async function carregarDespesas() {
-    const res = await fetch('/api/despesas');
-    const data = res.ok ? await res.json() : { despesas: [] };
-    todasDespesas = data.despesas || [];
-  }
-
-  function renderResultadosMes() {
-    const mes = document.getElementById('resultadosMes').value;
-    if (!mes) return;
-
-    let receitaMes = 0;
-    for (const [data, resumo] of Object.entries(HISTORICO)) {
-      if (data.startsWith(mes)) receitaMes += resumo.receitaTotal || 0;
-    }
-
-    const despesasMes = todasDespesas.filter(d => String(d.data).slice(0, 7) === mes);
-    const totalDespesas = despesasMes.reduce((s, d) => s + Number(d.valor || 0), 0);
-    const liquido = receitaMes - totalDespesas;
-    const margem = receitaMes ? (liquido / receitaMes) * 100 : 0;
-
-    document.getElementById('resReceita').textContent = fmtEUR(receitaMes);
-    document.getElementById('resDespesas').textContent = fmtEUR(totalDespesas);
-    document.getElementById('resLiquido').textContent = fmtEUR(liquido);
-    document.getElementById('resLiquido').style.color = liquido >= 0 ? 'var(--positive)' : 'var(--negative)';
-    document.getElementById('resMargem').textContent = margem.toFixed(1) + '%';
-
-    // gráfico por categoria
-    const porCategoria = new Map();
-    for (const d of despesasMes) {
-      porCategoria.set(d.categoria, (porCategoria.get(d.categoria) || 0) + Number(d.valor || 0));
-    }
-    const entradas = Array.from(porCategoria.entries()).sort((a, b) => b[1] - a[1]);
-    if (chartDespesasCategoriaInstance) chartDespesasCategoriaInstance.destroy();
-    if (entradas.length) {
-      chartDespesasCategoriaInstance = new Chart(document.getElementById('chartDespesasCategoria'), {
-        type: 'bar',
-        data: {
-          labels: entradas.map(e => e[0]),
-          datasets: [{ label: 'Despesa (€)', data: entradas.map(e => e[1]), backgroundColor: '#E03131' }],
-        },
-        options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
-      });
-    }
-
-    // tabela de despesas do mês
-    const wrap = document.getElementById('despesasTableWrap');
-    if (!despesasMes.length) {
-      wrap.innerHTML = '<div class="state small">Sem despesas registadas para este mês.</div>';
-      return;
-    }
-    const linhas = [...despesasMes].sort((a, b) => (b.data || '').localeCompare(a.data || '')).map(d => `
-      <tr>
-        <td>${d.data}</td>
-        <td>${d.categoria}</td>
-        <td>${d.descricao || '—'}</td>
-        <td class="num">${fmtEUR(d.valor)}</td>
-        <td><button type="button" class="despesa-apagar" data-id="${d.id}" style="border:none;background:none;color:var(--negative);cursor:pointer;font-size:12px;">Apagar</button></td>
-      </tr>
-    `).join('');
-    wrap.innerHTML = `
-      <table>
-        <thead><tr><th>Data</th><th>Categoria</th><th>Descrição</th><th class="num">Valor</th><th></th></tr></thead>
-        <tbody>${linhas}</tbody>
-      </table>
-    `;
-    wrap.querySelectorAll('.despesa-apagar').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        btn.disabled = true;
-        btn.textContent = '...';
-        try {
-          await fetch(`/api/despesas?id=${btn.dataset.id}`, { method: 'DELETE' });
-          await carregarDespesas();
-          renderResultadosMes();
-        } catch {
-          btn.textContent = 'Erro';
-        }
-      });
-    });
-  }
-
-  function popularSelectMeses() {
-    const select = document.getElementById('resultadosMes');
-    const meses = mesesComDados();
-    if (!meses.length) return;
-    const valorAnterior = select.value;
-    select.innerHTML = meses.map(m => `<option value="${m}">${monthName(m)}</option>`).join('');
-    select.value = meses.includes(valorAnterior) ? valorAnterior : meses[meses.length - 1];
-    select.onchange = renderResultadosMes;
-  }
-
   // Produtos Smartcake para a grelha de reposição: Frescos + Sandes + alguns nomes que o catálogo classifica de outra forma
   function isSmartcakeProd(produto) {
     const sf = subfamiliaLabel(produto);
@@ -6106,55 +5943,6 @@
     ` : '<div class="state small">Ainda sem histórico suficiente capturado para produtos Frescos.</div>';
   }
 
-  let resultadosLoaded = false;
-  async function loadResultadosView() {
-    if (resultadosLoaded) return;
-    resultadosLoaded = true;
-    await carregarDespesas();
-    popularSelectMeses();
-    renderResultadosMes();
-
-    const btn = document.getElementById('despesaAdicionarBtn');
-    btn.addEventListener('click', async () => {
-      const categoria = document.getElementById('despesaCategoria').value;
-      const descricao = document.getElementById('despesaDescricao').value;
-      const valorStr = document.getElementById('despesaValor').value;
-      const data = document.getElementById('despesaData').value;
-      const msg = document.getElementById('despesaFormMsg');
-
-      const valor = parseFloat(valorStr);
-      if (!data || isNaN(valor) || valor <= 0) {
-        msg.style.color = 'var(--negative)';
-        msg.textContent = 'Preenche a data e um valor válido.';
-        return;
-      }
-
-      btn.disabled = true;
-      msg.style.color = 'var(--muted)';
-      msg.textContent = 'a guardar…';
-      try {
-        const res = await fetch('/api/despesas', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ categoria, descricao, valor, data }),
-        });
-        if (!res.ok) throw new Error('falha ao guardar');
-        document.getElementById('despesaDescricao').value = '';
-        document.getElementById('despesaValor').value = '';
-        msg.style.color = 'var(--positive)';
-        msg.textContent = 'Despesa adicionada.';
-        await carregarDespesas();
-        popularSelectMeses();
-        renderResultadosMes();
-      } catch (err) {
-        msg.style.color = 'var(--negative)';
-        msg.textContent = 'Erro ao guardar: ' + err.message;
-      } finally {
-        btn.disabled = false;
-      }
-    });
-  }
-
   let siteLoaded = false;
   function loadSiteView() {
     if (siteLoaded) return;
@@ -7217,7 +7005,6 @@
       if (btn.dataset.view === 'produtos') loadProdutosView();
       if (btn.dataset.view === 'financeiro') loadFinanceiroView();
       if (btn.dataset.view === 'site') loadSiteView();
-      if (btn.dataset.view === 'resultados') loadResultadosView();
       if (btn.dataset.view === 'smartcake') loadSmartcakeView();
       if (btn.dataset.view === 'tarefas') loadTarefasView();
       if (btn.dataset.view === 'demo') loadDemoView();
@@ -7786,7 +7573,7 @@
       try { await eqApi('utilizadores?utilizador=' + encodeURIComponent(b.dataset.user), 'DELETE'); await eqCarregarUsers(); eqRenderUsers(); } catch (err) { alert(err.message); }
     });
     wrap.querySelectorAll('.eq-novapass').forEach(b => b.onclick = async () => {
-      if (!confirm(`Criar uma password nova para ${b.dataset.nome}? A antiga deixa de funcionar nos próximos logins.`)) return;
+      if (!confirm(`Criar uma password nova para ${b.dataset.nome}? A antiga deixa de funcionar e a sessão aberta no telemóvel termina (terá de entrar com a nova).`)) return;
       const password = demoGerarPassword();
       try { await eqApi('utilizadores', 'PATCH', { utilizador: b.dataset.user, password }); eqMostrarMensagem(b.dataset.nome, b.dataset.user, password); } catch (err) { alert(err.message); }
     });
@@ -7820,7 +7607,7 @@
   function eqMontarSelectMaquinas() {
     const sel = document.getElementById('eqOMaquina');
     const maqs = Object.keys(MACHINES).filter(m => !MAQUINAS_EXCLUIDAS.has(m)).sort();
-    sel.innerHTML = '<option value="">— nenhuma em especial —</option><option value="*snacks">Todas as de snacks (uma tarefa cada)</option><option value="*cafe">Todas as de café (uma tarefa cada)</option><option value="*todas">Todas as máquinas (uma tarefa cada)</option>' +
+    sel.innerHTML = '<option value="">— nenhuma em especial —</option><option value="*armazem">📦 Armazém (preparação de caixas)</option><option value="*snacks">Todas as de snacks (uma tarefa cada)</option><option value="*cafe">Todas as de café (uma tarefa cada)</option><option value="*todas">Todas as máquinas (uma tarefa cada)</option>' +
       maqs.map(m => `<option value="${m}">${escapeHtml(machineLabel(m))}</option>`).join('');
   }
   async function eqCriarOrdem() {
@@ -7831,7 +7618,8 @@
     const corpo = {
       titulo: document.getElementById('eqOTitulo').value.trim(),
       tipo: document.getElementById('eqOTipo').value,
-      maquina: maquinas ? '' : maqSel,
+      maquina: maquinas || maqSel === '*armazem' ? '' : maqSel,
+      localId: maqSel === '*armazem' ? 'armazem' : undefined,
       maquinas: maquinas || undefined,
       atribuidaA: document.getElementById('eqOPara').value,
       data: document.getElementById('eqOData').value,
@@ -7841,7 +7629,7 @@
       descricao: document.getElementById('eqODescricao').value.trim(),
     };
     if ((corpo.recorrencia === 'semanas' || corpo.recorrencia === 'meses') && !corpo.data) corpo.data = eqHoje();
-    if (corpo.recorrencia === 'visitas' && !corpo.maquina && !maquinas) { msg.style.color = 'var(--negative)'; msg.textContent = '"Após X visitas" precisa de uma máquina (ou de "Todas as…").'; return; }
+    if (corpo.recorrencia === 'visitas' && !corpo.maquina && !maquinas && !corpo.localId) { msg.style.color = 'var(--negative)'; msg.textContent = '"Após X visitas" precisa de uma máquina (ou de "Todas as…").'; return; }
     msg.style.color = 'var(--muted)'; msg.textContent = 'a criar…';
     try {
       const r = await eqApi('ordens', 'POST', corpo);
@@ -7869,7 +7657,7 @@
       const urgCor = o.urgencia === 'Urgente' ? 'var(--negative)' : o.urgencia === 'Alta' ? 'var(--accent-deep)' : 'var(--muted)';
       return `<tr>
         <td data-label="Tarefa"><b>${escapeHtml(o.titulo)}</b> <span style="font-size:11px;color:var(--muted);">${escapeHtml(o.tipo)}</span> <span style="font-size:11px;color:${urgCor};font-weight:600;">${escapeHtml(o.urgencia)}</span>${o.descricao ? `<div style="font-size:12px;color:var(--muted);white-space:pre-wrap;">${escapeHtml(o.descricao)}</div>` : ''}</td>
-        <td data-label="Máquina">${o.maquina ? escapeHtml(machineLabel(o.maquina)) : '—'}</td>
+        <td data-label="Máquina">${o.maquina ? escapeHtml(machineLabel(o.maquina)) : o.localId === 'armazem' ? '📦 Armazém' : '—'}</td>
         <td data-label="Para">${o.atribuidaA ? escapeHtml(nomeDe(o.atribuidaA)) : 'Toda a equipa'}</td>
         <td data-label="Data" style="${atrasada ? 'color:var(--negative);font-weight:600;' : ''}">${o.recorrencia === 'visitas' ? (o.estado !== 'Feita' && (o.visitasDesde || 0) >= (o.intervalo || 1) ? '<b style="color:var(--accent-deep);">para fazer na próxima visita</b>' : '—') : o.data ? eqDia(o.data) + (atrasada ? ' (atrasada)' : '') : '—'}</td>
         <td data-label="Frequência">${escapeHtml(eqDescFrequencia(o))}</td>

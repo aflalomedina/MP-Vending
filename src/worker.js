@@ -924,6 +924,39 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
+    // Força sempre https://mpvending.pt (sem www e sem http) — evita o aviso "Não seguro" do browser
+    // e garante que a password do admin nunca viaja sem encriptação.
+    if (url.protocol === "http:" || url.hostname === "www.mpvending.pt") {
+      url.protocol = "https:";
+      if (url.hostname === "www.mpvending.pt") url.hostname = "mpvending.pt";
+      return Response.redirect(url.toString(), 301);
+    }
+
+    const res = await tratarPedido(request, env, ctx, url);
+    return comCabecalhosSeguranca(res);
+  },
+};
+
+// Cabeçalhos de segurança aplicados a todas as respostas (site, admin, API, demo, reposição)
+const CABECALHOS_SEGURANCA = {
+  "Strict-Transport-Security": "max-age=31536000", // 1 ano: o browser passa a usar sempre HTTPS
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY", // o site não pode ser embutido noutras páginas (anti-clickjacking)
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "geolocation=(self), camera=(self), microphone=()",
+};
+
+function comCabecalhosSeguranca(res) {
+  if (!res || res.status === 101) return res;
+  const nova = new Response(res.body, res);
+  for (const [k, v] of Object.entries(CABECALHOS_SEGURANCA)) {
+    if (!nova.headers.has(k)) nova.headers.set(k, v);
+  }
+  return nova;
+}
+
+async function tratarPedido(request, env, ctx, url) {
+  {
     // /api/track fica público (chamado por visitantes anónimos do site) — sem password
     if (url.pathname === "/api/track") {
       if (request.method === "OPTIONS") {
@@ -1163,5 +1196,5 @@ export default {
 
     // tudo o resto continua a servir o site normal (index.html, /admin, imagens, etc.)
     return env.ASSETS.fetch(request);
-  },
-};
+  }
+}

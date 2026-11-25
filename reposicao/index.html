@@ -240,7 +240,7 @@
     $('contTickets').textContent = nK; $('contTickets').style.display = nK ? '' : 'none';
     document.querySelectorAll('details[data-k]').forEach((d) => { if (d.dataset.k in abertos) d.open = abertos[d.dataset.k]; });
   }
-  const nomeLocal = (id) => (dia && dia.locais[id] && dia.locais[id].nome) || id;
+  const nomeLocal = (id) => id === 'armazem' ? '📦 Armazém' : (dia && dia.locais[id] && dia.locais[id].nome) || id;
   const ticketsDoLocal = (id) => dia.tickets.filter((t) => t.localId === id);
   const ordensDoLocal = (id) => dia.ordens.filter((o) => o.localId === id);
   const linkNavegar = (p) => 'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=' + encodeURIComponent(Number.isFinite(p.lat) && Number.isFinite(p.lon) && p.lat ? p.lat + ',' + p.lon : (p.morada || p.nome));
@@ -279,9 +279,11 @@
         ? `<div class="cartao resultado saida"><div class="sub">Saída do armazém às ${hhmm(v.fim)}</div><div class="grande">Caixas · ${fmtMin(v.duracaoMin)}</div><div class="sub">Entrada às ${hhmm(v.inicio)}.</div><div class="botoes"><button class="btn" id="resFechar">OK</button></div></div>`
         : `<div class="cartao resultado entrada"><div class="sub">${r.repetido ? 'Já estás no armazém' : 'Entrada no armazém às ' + hhmm(v.inicio)}</div><div class="grande">Preparação de caixas</div>
            <div class="sub">Quando acabares, lê outra vez o QR do armazém (ou carrega em <b>Terminar</b>).</div>
+           ${(() => { const os = (r.ordens || []).filter((o) => o.devida); return `<div class="maqtit">Tarefas do armazém (${os.length})</div>` + (os.length ? os.map((o) => htmlOrdem(o)).join('') : '<div class="sub" style="padding:6px 0;">Nenhuma tarefa pendente. 👌</div>'); })()}
            <div class="botoes"><button class="btn escuro" id="resSair">Terminar</button><button class="btn" id="resFechar">Fechar</button></div></div>`;
       const s = $('resSair'); if (s) s.onclick = terminarVisita;
       const f = $('resFechar'); if (f) f.onclick = () => { el.innerHTML = ''; };
+      ligarAcoes(el);
       window.scrollTo(0, 0);
       return;
     }
