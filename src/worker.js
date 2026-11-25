@@ -1,5 +1,6 @@
 import { handleDemo, handleDemoAcessos } from "./demo.js";
 import { handleTicketPublico, handleTickets } from "./tickets.js";
+import { handleFaturaPublica, handleFaturas } from "./faturas.js";
 import { handleEquipa, handleEquipaAdmin } from "./equipa.js";
 
 // ===== Autenticação simples (HTTP Basic) para /admin e /api =====
@@ -986,6 +987,15 @@ async function tratarPedido(request, env, ctx, url) {
       }
     }
 
+    // /api/faturas/novo também é público: clientes pedem fatura pelo QR da máquina (mpvending.pt/assistencia)
+    if (url.pathname === "/api/faturas/novo") {
+      try {
+        return await handleFaturaPublica(request, env, ctx);
+      } catch (err) {
+        return jsonResponse({ error: "Não foi possível registar o pedido. Tente novamente." }, 500);
+      }
+    }
+
     // /reposicao tem o seu próprio login (equipa: repositores e preparação de caixas) — ver src/equipa.js
     const equipa = await handleEquipa(request, env);
     if (equipa) return equipa;
@@ -1105,6 +1115,14 @@ async function tratarPedido(request, env, ctx, url) {
           status: 500,
           headers: { "Content-Type": "application/json" },
         });
+      }
+    }
+
+    if (url.pathname === "/api/faturas") {
+      try {
+        return await handleFaturas(request, env);
+      } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
       }
     }
 
