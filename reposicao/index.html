@@ -223,15 +223,29 @@
   $('dataOutra').addEventListener('change', (e) => { if (e.target.value) { dataSel = e.target.value; marcarChips(); carregarDia(); } });
 
   // ---------- dados ----------
+  // Atualização inteligente: a cada minuto pergunta só se houve mudanças (o "sinal", muito barato);
+  // a página completa só é recarregada quando algo mudou, ou de 30 em 30 minutos por segurança.
+  let ultimoSinal = null, ultimaCargaCompleta = 0;
+  const idsPlanos = () => ((dia && dia.planos) || []).map((pl) => pl.id).join(',');
+  async function lerSinal() {
+    try { return (await api('sinal?planos=' + encodeURIComponent(idsPlanos()))).sinal; } catch { return null; }
+  }
   async function carregarDia() {
     try {
       dia = await api('dia?data=' + dataSel);
+      ultimaCargaCompleta = Date.now();
+      ultimoSinal = await lerSinal();
       mostrarErro(null);
       renderTudo();
     } catch (err) { mostrarErro(err); }
   }
+  async function verificarMudancas() {
+    if (Date.now() - ultimaCargaCompleta > 30 * 60000) return carregarDia();
+    const sinal = await lerSinal();
+    if (sinal && sinal !== ultimoSinal) await carregarDia();
+  }
   function renderTudo() {
-    // mantém abertos/fechados os detalhes que a pessoa mexeu (a página atualiza-se sozinha a cada minuto)
+    // mantém abertos/fechados os detalhes que a pessoa mexeu (a página atualiza-se sozinha quando há mudanças)
     const abertos = {};
     document.querySelectorAll('details[data-k]').forEach((d) => { abertos[d.dataset.k] = d.open; });
     renderFaixa(); renderRota(); renderCaixas(); renderTarefas(); renderTickets();
@@ -610,9 +624,9 @@
       }
       catch (err) { mostrarErro(err); }
     } else await carregarDia();
-    setInterval(() => { const a = document.activeElement; if (!document.hidden && !$('folha').classList.contains('on') && !(a && /INPUT|TEXTAREA/.test(a.tagName))) carregarDia(); }, 60000);
+    setInterval(() => { const a = document.activeElement; if (!document.hidden && !$('folha').classList.contains('on') && !(a && /INPUT|TEXTAREA/.test(a.tagName))) verificarMudancas(); }, 60000);
     setInterval(() => { if (dia && dia.aberta) renderFaixa(); }, 30000);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) carregarDia(); });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) verificarMudancas(); });
   }
   iniciar();
 })();
