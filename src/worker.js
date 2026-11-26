@@ -1,6 +1,6 @@
 import { handleDemo, handleDemoAcessos } from "./demo.js";
 import { handleTicketPublico, handleTickets } from "./tickets.js";
-import { handleEquipa, handleEquipaAdmin } from "./equipa.js";
+import { handleEquipa, handleEquipaAdmin, marcarMudanca } from "./equipa.js";
 
 // ===== Autenticação simples (HTTP Basic) para /admin e /api =====
 function checkAuth(request, env) {
@@ -980,7 +980,9 @@ async function tratarPedido(request, env, ctx, url) {
     // /api/tickets/novo fica público: clientes reportam avarias em mpvending.pt/assistencia sem password
     if (url.pathname === "/api/tickets/novo") {
       try {
-        return await handleTicketPublico(request, env, ctx);
+        const res = await handleTicketPublico(request, env, ctx);
+        if (res.ok) ctx.waitUntil(marcarMudanca(env)); // tickets aparecem na página da reposição
+        return res;
       } catch (err) {
         return jsonResponse({ error: "Não foi possível registar o pedido. Tente novamente ou ligue-nos." }, 500);
       }
@@ -1110,7 +1112,9 @@ async function tratarPedido(request, env, ctx, url) {
 
     if (url.pathname === "/api/tickets") {
       try {
-        return await handleTickets(request, env);
+        const res = await handleTickets(request, env);
+        if (request.method !== "GET" && res.ok) ctx.waitUntil(marcarMudanca(env));
+        return res;
       } catch (err) {
         return jsonResponse({ error: err.message }, 500);
       }

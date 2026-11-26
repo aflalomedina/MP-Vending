@@ -7616,12 +7616,27 @@
   // ----- ao vivo -----
   let eqVivoTimer = null;
   const EQ_LOG_IC = { entrada: '📍', saida: '🚐', tarefa: '✅', ticket: '🔧', caixa: '📦', falta: '⚠️' };
-  async function eqCarregarVivo() {
+  // Atualização inteligente: a cada minuto só se pergunta pelo "sinal" (leituras baratas, sem listagens);
+  // os dados completos só são pedidos quando algo mudou, ou de 30 em 30 minutos por segurança.
+  let eqVivoDados = null, eqVivoSinal = null, eqVivoCarga = 0;
+  const eqVivoPlanos = () => eqVivoDados ? [...(eqVivoDados.planosHoje || []), ...(eqVivoDados.planosAmanha || [])].map(pl => pl.id).join(',') : '';
+  async function eqLerSinal() {
+    try { return (await eqApi('sinal?planos=' + encodeURIComponent(eqVivoPlanos()))).sinal; } catch { return null; }
+  }
+  async function eqVerificarVivo() {
+    if (!document.getElementById('view-equipa').classList.contains('active')) return;
+    if (!eqVivoDados || Date.now() - eqVivoCarga > 30 * 60000) return eqCarregarVivo();
+    const sinal = await eqLerSinal();
+    if (sinal && sinal !== eqVivoSinal) return eqCarregarVivo();
+    eqCarregarVivo(eqVivoDados); // sem mudanças: só atualiza os minutos no ecrã, sem pedir nada ao servidor
+  }
+  async function eqCarregarVivo(dadosJa) {
     const wrap = document.getElementById('eqVivoWrap');
     if (!wrap || !document.getElementById('view-equipa').classList.contains('active')) return;
     try {
-      const d = await eqApi('aovivo');
-      document.getElementById('eqVivoHora').textContent = 'atualizado às ' + eqHora(d.agora);
+      const d = dadosJa || await eqApi('aovivo');
+      if (!dadosJa) { eqVivoDados = d; eqVivoCarga = Date.now(); eqLerSinal().then(x => { eqVivoSinal = x; }); }
+      document.getElementById('eqVivoHora').textContent = 'atualizado às ' + eqHora(dadosJa ? new Date().toISOString() : d.agora);
       const pessoa = (p) => {
         const min = p.aberta ? Math.round((Date.now() - new Date(p.aberta.inicio)) / 60000) : 0;
         const estado = p.aberta
@@ -7681,7 +7696,7 @@
   }
   async function loadEquipaView() {
     eqCarregarVivo(); eqCarregarFaltas();
-    if (!eqVivoTimer) eqVivoTimer = setInterval(() => { if (!document.hidden) eqCarregarVivo(); }, 30000);
+    if (!eqVivoTimer) eqVivoTimer = setInterval(() => { if (!document.hidden) eqVerificarVivo(); }, 60000);
     try { await eqCarregarUsers(); eqRenderUsers(); } catch (err) { document.getElementById('eqUsersWrap').innerHTML = `<div class="state small error">Erro: ${escapeHtml(err.message)}</div>`; }
     eqCarregarOrdens(); eqCarregarPlanos(); eqCarregarTempos();
     if (eqEventosLigados) return;

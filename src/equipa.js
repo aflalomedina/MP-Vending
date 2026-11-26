@@ -50,6 +50,30 @@ function redirect(location, extra = {}) {
 async function lerJSON(env, chave) {
   try { const raw = await env.HISTORY_KV.get(chave); return raw ? JSON.parse(raw) : null; } catch { return null; }
 }
+// ===== Atualização inteligente (poupa as 1 000 listagens/dia do plano gratuito da Cloudflare) =====
+// "eq:versao" muda sempre que muda algo que as páginas obtêm por listagem (visitas, tarefas, planos,
+// utilizadores, tickets). As páginas perguntam a cada minuto pelo "sinal" — só leituras, nenhuma
+// listagem — e só recarregam tudo quando o sinal muda. Os ✅ das caixas e o registo do dia entram
+// no sinal por leitura direta, por isso não gastam escritas extra.
+export async function marcarMudanca(env) {
+  try { await env.HISTORY_KV.put("eq:versao", Date.now().toString(36) + Math.random().toString(36).slice(2, 6)); } catch {}
+}
+function resumoHash(texto) {
+  let h = 5381;
+  for (let i = 0; i < texto.length; i++) h = ((h << 5) + h + texto.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+async function calcularSinal(env, url) {
+  const planos = (url.searchParams.get("planos") || "").split(",").filter((x) => /^[\w-]{4,80}$/.test(x)).slice(0, 12);
+  const hoje = dataLisboa();
+  const [versao, log, ...caixas] = await Promise.all([
+    env.HISTORY_KV.get("eq:versao"),
+    env.HISTORY_KV.get(`eq:log:${hoje}`),
+    ...planos.map((id) => env.HISTORY_KV.get(`eq:caixas:${id}`)),
+  ]);
+  return json({ sinal: `${hoje}.${versao || "0"}.${resumoHash((log || "") + "|" + caixas.map((c) => c || "").join("|"))}` });
+}
+
 async function listarPrefixo(env, prefixo) {
   const out = [];
   let cursor;
@@ -508,7 +532,13 @@ export async function handleEquipa(request, env) {
   const s = await sessaoValida(request, env);
   if (p.startsWith("/reposicao/api/")) {
     if (!s) return json({ error: "sem sessão" }, 401);
-    try { return await handleApiEquipa(request, env, s, p.slice("/reposicao/api/".length)); }
+    const caminho = p.slice("/reposicao/api/".length);
+    try {
+      if (caminho === "sinal" && request.method === "GET") return await calcularSinal(env, url);
+      const res = await handleApiEquipa(request, env, s, caminho);
+      if (request.method !== "GET" && res.ok && caminho !== "caixa") await marcarMudanca(env);
+      return res;
+    }
     catch (err) { return json({ error: err.message }, 500); }
   }
   if (!s) return servirAsset(request, env, "/reposicao/entrar.html");
@@ -521,6 +551,13 @@ export async function handleEquipa(request, env) {
 export async function handleEquipaAdmin(request, env) {
   const url = new URL(request.url);
   const recurso = url.pathname.slice("/api/equipa/".length);
+  if (recurso === "sinal" && request.method === "GET") return calcularSinal(env, url);
+  const res = await handleEquipaAdminInterno(request, env, url, recurso);
+  if (request.method !== "GET" && res && res.ok) await marcarMudanca(env);
+  return res;
+}
+
+async function handleEquipaAdminInterno(request, env, url, recurso) {
   const metodo = request.method;
   const corpo = async () => { try { return await request.json(); } catch { return null; } };
   const locais = await carregarLocais(request, env);
