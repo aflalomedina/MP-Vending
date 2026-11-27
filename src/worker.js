@@ -695,8 +695,8 @@ function distLinhaReta(a, b) {
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
 }
-// Zona onde estão todos os locais (Grande Porto até Santa Maria da Feira): resultados fora desta caixa são ignorados.
-// Antes, a procura pelo código postal da Divmac devolvia um ponto a ~140 km.
+// Zona onde estão todos os locais (Grande Porto, Gaia e Santa Maria da Feira): resultados fora desta caixa são ignorados.
+// Antes, a procura pelo código postal de um dos locais devolvia um ponto a ~140 km.
 const ZONA_ROTAS = { oeste: -8.85, este: -8.30, sul: 40.80, norte: 41.40 };
 const GEO_VERSAO = 2; // localizações guardadas por versões anteriores (sem a caixa) são recalculadas
 async function geocodificar(env, p) {
