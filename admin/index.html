@@ -722,7 +722,7 @@
     <div class="panel full" id="comparaStockPanel">
       <h2>Comparar máquinas de snacks lado a lado — stock</h2>
       <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">
-        Stock atual e capacidade por produto em duas máquinas (por defeito as duas Divmac, 017 e 018), para ver o que é complementar.
+        Stock atual e capacidade por produto em duas máquinas (por defeito as máquinas de snacks 017 e 018), para ver o que é complementar.
       </div>
       <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:end;margin-bottom:10px;">
         <div><label for="comparaStockA" style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Máquina A</label>
@@ -1536,10 +1536,13 @@
     "009": "D'Casa Gondomar", "009-S": "D'Casa Gondomar", "010": "Bosque - Adopthouse",
     "011": "Jardins do Oriente", "012": "Águas Santas (só café)", "013": "Jardins do Oriente",
     "014": "Bosque - Adopthouse", "015": "House Factory (Refeitório)", "016": "House Factory (Refeitório)",
-    "017": "Divmac 017 (snacks)", "018": "Divmac 018 (snacks)",
-    "019": "Divmac 019 (café)", "020": "Divmac 020 (café)",
+    "017": "Arkay - Gaia", "018": "Guifões - Green Park",
+    "019": "Arkay - Gaia", "020": "Douromar - Gaia",
     "021": "Melt",
   };
+
+  // Máquinas sem telemetria (não aparecem nas vendas nem na lista de reposição): existem só para entrar na rota e nas tarefas da equipa
+  const MAQUINAS_OFFLINE = { "022": "Hotel Fénix" };
 
   // Máquinas ainda por instalar: só entram na lista de reposição quando a data da visita for igual ou posterior
   const MAQUINAS_DATA_INSTALACAO = { "017": "2026-10-01", "018": "2026-10-01", "019": "2026-10-01", "020": "2026-10-01" };
@@ -1549,7 +1552,7 @@
   const MAQUINAS_EXCLUIDAS = new Set(['005']);
 
   function pdvLabel(matricula) {
-    return MACHINES[matricula] || matricula || '—';
+    return MACHINES[matricula] || MAQUINAS_OFFLINE[matricula] || matricula || '—';
   }
 
   // Trocas de máquinas entre pontos de venda: a máquina (matrícula) mantém-se, muda o local.
@@ -1560,6 +1563,11 @@
       "007": "House Factory (Refeitório)", "007-S": "House Factory (Refeitório)",
       "010": "Blue Sky Gondomar", "014": "Blue Sky Gondomar",
       "015": "Nogueira - Perafita", "016": "Nogueira - Perafita",
+    } },
+    // a Divmac deixou de ser ponto de venda: 017/019 foram para Arkay (Gaia), 020 para Douromar (Gaia) e 018 para Guifões - Green Park
+    { desde: '2026-11-27', antes: {
+      "017": "Divmac 017 (snacks)", "018": "Divmac 018 (snacks)",
+      "019": "Divmac 019 (café)", "020": "Divmac 020 (café)",
     } },
   ];
   // local da máquina numa data (AAAA-MM-DD); sem data devolve o atual
@@ -1585,6 +1593,7 @@
   const NAME_TO_SUBFAMILIA = {"Coca Cola Zero Lata 33 Cl":"Snacks","Leite Uht Achocolatado Agros 200 Ml":"Snacks","Snack de Chocolate Snickers 50 G":"Snacks","MACA DESIDRAT VERDE FRUBIS 20G":"Snacks","Tortitas Milho Caçarola Crackies Chocolate 22,6":"Snacks","Tisana Pleno Chá Verde e Limão PET 33 Cl":"Bebidas","Bolacha Maria sem Açúcar Doses":"Snacks","Bolachas Crackers Tuc Originais 31 G":"Bolachas","Barras Cereais Linha Nacional Chocolate 23 G":"Snacks","Pastilhas Elásticas Chiclets Spearmint 16,5 G":"Snacks","Coca Cola Original Lata 33 Cl":"Bebidas","Ice Tea Lipton Limão Lata 33 Cl":"Snacks","Ice Tea Lipton Pêssego Lata 33 Cl":"Snacks","Guaraná Brasil Lata 33 Cl":"Bebidas","Refrigerante com Gás Seven Up Lata 33 Cl":"Snacks","Pão com Chouriço":"Frescos","Pizza":"Frescos","Croissant Simples":"Snacks","Bolachas Marinheiras Cem Porcento Chia Mini 50 G":"Bolachas","Tortitas Milho Caçarola Crackies Chocolate 22,6 G":"Snacks","REF S/G FRESKY F TROP TET 20CL":"Bebidas","REF S/G FRESKY LAR TET 20CL":"Snacks","NAPOLITANAS AMANH CACAU 45GR":"Snacks","Snack de Chocolate Twix 50 G":"Chocolates","Snack de Chocolate Mars 45 G":"Chocolates","Kit Kat 41,5 Gr":"Chocolates","Lion 42 Gr":"Chocolates","Santal Active Drink Laranja/Cenoura":"Bebidas","Croissant Aurora Simples 240gr":"Snacks","7Up 33cl - SDR":"Bebidas","Bolacha Cracker TUC Ervas Aromáticas":"Snacks","Bebida Energetica Hell Classic 25cl":"Bebidas","Sumol Laranja Lata 33cl":"Bebidas","Ice Tea Pessego Continente 20cl":"Bebidas","Batata Frita Barrosã 45g":"Snacks","BEB ENERGÉTICA BE POWER LATA 25C":"Snacks","Oreo original 6 66g":"Bolachas","Bola de Carne":"Frescos","Pepsi Cola Zero Lata 33 Cl (SDR)":"Bebidas","NAPOLITANA SCHOCO CHOC":"Snacks","ICE TEA AMANH PES TET 20CL":"Bebidas","Cerveja sem álcool super bock 00% lata":"Bebidas","Café longo especial":"Compostos","Café pingado especial":"Compostos","Garoto especial":"Compostos","Capuccino especial":"Compostos","Mocaccino especial":"Compostos","Galão XL":"Compostos","Chocolate Forte XL":"Compostos","Chocolate com Leite XL":"Compostos","Capuccino XL":"Compostos","Chá Limão XL":"Compostos","Capuccino Baunilha XL":"Compostos","Café c/ Chocolate":"Compostos","Chá Frutos Vermelhos":"Compostos","Capuccino c/ Chocolate":"Compostos","Copo":"Compostos","Água quente":"Compostos","Descafeinado Mocaccino":"Compostos","Café Caramelo":"Compostos","Descafeinado Garoto":"Compostos","Café c/Chocolate Solúvel":"Compostos","ND":"Snacks","Fatia Bolo Cenoura com Chocolate":"Snacks","Salame de Chocolate Ecobol":"Snacks","Kinder Bueno":"Chocolates","Kinder Delice":"Chocolates","Napolitana Chocolate 45 Gr - Bitee":"Snacks","Croissant Recheado com Cacau 60 Gr - Belino":"Snacks","Açucar 1 Kg":"Solúveis / Recipientes","Café em Grão 1Kg":"Solúveis / Recipientes","Bidón 20L":"Solúveis / Recipientes","Descafeinado 100gr Amanhecer":"Solúveis / Recipientes","Cocoa GO! Choco":"Solúveis / Recipientes","Café Sical":"Solúveis / Recipientes","Trik - Salty Sticks":"Snacks","Vendin - Preparado Base de Leite 750 Gr":"Solúveis / Recipientes","DaVinci - Capuccino Avelã 1 Kg":"Solúveis / Recipientes","Chá Limão":"Solúveis / Recipientes","Copos de Papel 6oz  180ml":"Solúveis / Recipientes","Copo Plástico Branco 165CC 3000un":"Solúveis / Recipientes","Paletinas madeira 90x10x1.3mm (3750un)":"Solúveis / Recipientes","Copos Plástico Marrom para Vending 160ml (3000un)":"Solúveis / Recipientes","Bolo de Laranja":"Snacks","Batatas Fritas - Super Douradas Onduladas 40gr":"Snacks","Dulcesol - Zebra":"Snacks","Frisumo Laranja Lata 0.33cl":"Snacks","Kas Limão":"Bebidas","TPA Ellectro":"ND","Cretamel - Barra de Amendoim Com Mel  40 Gr":"Snacks","Mr Brownie - Chocolate Brownies 50 Gr":"Chocolates","Fatia de Bolo iogurte":"Snacks","SUMO AMANH 100% LAR TET 20CL":"Bebidas","Agua UP 0,5L":"Bebidas","Wafer de Cacau com Recheio Avelã - My Motto":"Bolachas","Crispy Bar de Chocolate e Aveia  40 Gr - Sante":"Bolachas","Caramel GO! Capuccino em Pó":"Solúveis / Recipientes","Simat - Chá de Menta":"Solúveis / Recipientes","Bebida Energetica Hell Zero 25cl":"Bebidas","Iogurte Liquido Longa Vida Tropical":"ND","Café em Grão Caffier Robusta":"Solúveis / Recipientes","Copos de Plástico 166ml":"Solúveis / Recipientes","Limonada 500 ml - Enjoy":"Bebidas","Bolacha Fit de Cereais e Cacau 50 Gr Sante":"Bolachas","Amendoins Mel e Mostarda 70gr - Zigi":"Snacks","Depósito SDR embalagem":"ND","Coca-Coca Original Lata 33cl - SDR":"Bebidas","Fatia Bolo Ecobolos (Variados)":"Snacks","Açucar Amanhecer 1KG Sticks 4g x250":"Solúveis / Recipientes","Empada de Frango":"Sandes","Kit Kat Chunky Funky 40g":"Chocolates","Tarte de Amêndoa 80Gr":"Snacks","Barra Go On Energy 45 Gr Sante":"Chocolates","Trik - Crackers Original 110gr":"Snacks","Bebida Energetica Hell Classic 250ml (SDR)":"Bebidas","Kings - Soft Cookies com Pedaços de Chocolate Triplo 40gr":"Bolachas","Padaria da Arrifana - Folhado de Chocolate 4 Uni 70 Gr":"Snacks","Guarana Antartica lata 33cl":"Bebidas","Kinder Bueno White 39g":"Chocolates","7UP - Refrigerante com Gás Zero Mint 330ml (SDR)":"Bebidas","Bitee - Croissant Recheio Cacau 60g":"Snacks","Vidal - Mega Sweet Mix 90 Gr":"Snacks","Poker Wafer Cacao":"Bolachas","Coca Cola Original Lata Sleek (SDR)":"Bebidas","Agua Rioba 50cl (SDR)":"Bebidas","Guaraná Brasil 33cl (Sdr)":"Bebidas","Agua S. Martinho 50cl (SDR)":"Bebidas","Açucar Sidul 1kg":"ND","Tisana Pleno Chá Verde e Limão PET 33 Cl (SDR)":"Bebidas","Ristora - Chá Limão 1Kg":"Solúveis / Recipientes","Descafeinado Laqtia 250 g":"Solúveis / Recipientes","Bolo de Arroz":"Frescos","Sande Mista Mistura Cacetinho":"Sandes","Lanche Fiambre":"Frescos","Bebida Energetica Hell Zero 25cl - SDR":"Bebidas","Hell Energy Coffee Latte 250ml":"Bebidas","7Up Sleek 330ml":"Bebidas","Frisumo Laranja Lata 0.33cl (SDR)":"Bebidas","Fuze Tea Pêssego Sleek 330ml - SDR":"Bebidas","Bitee - Bolachas Húngaras 70 Gr":"Bolachas","Café Normal":"Compostos","Chá":"Compostos","Chocolate":"Compostos","Capuccino":"Compostos","Café Pingado":"Compostos","Galão":"Compostos","Leite":"Compostos","Chocolate c/ Leite":"Compostos","Moccaccino":"Compostos","Café Curto":"Compostos","Café Longo":"Compostos","Garoto":"Compostos","Chocolate Forte":"Compostos","Café Solúvel":"Compostos","Descafeinado Curto":"Compostos","Descafeinado Normal":"Compostos","Descafeinado Longo":"Compostos","Descafeinado Capuccino c/ chocolate":"Compostos","Descafeinado Pingado":"Compostos","Descafeinado Galão":"Compostos","Capuccino de Avelã":"Compostos","Capuccino de caramelo":"Compostos","Capuccino de baunilha":"Compostos","Leite c/ chocolate":"Compostos","Café Curto Solúvel":"Compostos","Café Longo Solúvel":"Compostos","Café Pingado Solúvel":"Compostos","Galão Solúvel":"Compostos","Capuccino Solúvel":"Compostos","Mocacciono Solúvel":"Compostos","Chocolate Crema":"Compostos","Leite com Café":"Compostos"};
 
   function machineLabel(matricula) {
+    if (MAQUINAS_OFFLINE[matricula]) return MAQUINAS_OFFLINE[matricula];
     const pdv = MACHINES[matricula];
     if (!pdv) return matricula || '—';
     return pdv.includes(matricula) ? pdv : `${pdv} · ${matricula}`;
@@ -3485,7 +3494,7 @@
       </tbody></table>
       <div style="font-size:11.5px;color:var(--muted);margin-top:6px;">
         Ordem com menos tempo de condução, por estrada, ${res.fonte === 'osrm' ? 'sem contar com trânsito' : '<b>estimada pela distância em linha reta</b> (o serviço de mapas não respondeu)'}; ${servico} min por paragem${servicoCafe ? ` + ${servicoCafe} min por máquina de café` : ''}.
-        Portagens não são calculadas: trajetos longos (ex.: Divmac) podem passar por autoestrada com portagem.
+        Portagens não são calculadas: trajetos longos podem passar por autoestrada com portagem.
         ${ultimaRota.semMorada.length ? `<br><span style="color:var(--negative);">Fora da rota (sem morada ou morada não encontrada): ${escapeHtml(ultimaRota.semMorada.join(', '))}.</span>` : ''}
         <br>${ultimaRota.links.map((l, i) => `<a href="${l}" target="_blank" rel="noopener">Abrir no Google Maps${ultimaRota.links.length > 1 ? ' (parte ' + (i + 1) + ')' : ''}</a>`).join(' · ')}
       </div>`;
@@ -3499,7 +3508,7 @@
     const wrap = document.getElementById('rotaCafes');
     if (!wrap || wrap.dataset.pronto) return;
     await carregarMoradasRota();
-    const cafes = Object.keys(MACHINES).filter(m => !isSnackMachine(m) && !MAQUINAS_EXCLUIDAS.has(m) && rotaPorMatricula[m]).sort();
+    const cafes = [...Object.keys(MACHINES), ...Object.keys(MAQUINAS_OFFLINE)].filter(m => !isSnackMachine(m) && !MAQUINAS_EXCLUIDAS.has(m) && rotaPorMatricula[m]).sort();
     let guardado = [];
     try { guardado = JSON.parse(localStorage.getItem('rotaCafes') || '[]'); } catch {}
     wrap.innerHTML = `<span style="color:var(--muted);margin-right:6px;">Máquinas de café a visitar:</span>` + cafes.map(m =>
@@ -6049,7 +6058,7 @@
   // O layout atual vem do export de canais da Luope (/api/layout-maquinas). O planeado fica guardado na KV (/api/layouts),
   // partilhado entre os sócios. A lista de reposição pode usar o planeado numa visita pontual (troca de layout nesse dia).
   const LAYOUT_SMARTCAKE = 'Smartcake (conforme entrega)';
-  const LAYOUT_MIN_SMARTCAKE = { '017': 5, '018': 5 }; // Divmac: mínimo de canais para frescos Smartcake
+  const LAYOUT_MIN_SMARTCAKE = { '017': 5, '018': 5 }; // mínimo de canais para frescos Smartcake (as duas máquinas de snacks que eram da Divmac)
   const LAYOUT_ORDEM_FAMILIAS = ['Bebidas', 'Frescos', 'Chocolates', 'Bolachas', 'Snacks', 'Outros'];
   const LAYOUT_COR_FAMILIA = { Bebidas: '#E3EEF9', Frescos: '#E1F3E6', Chocolates: '#F0E4D7', Bolachas: '#F8EFCF', Snacks: '#FBE7D6', Outros: '#F1F1F1' };
   const LAYOUT_SNACK_SUBFAMILIAS = new Set(['Bebidas', 'Snacks', 'Bolachas', 'Chocolates', 'Sandes', 'Frescos']);
@@ -7470,7 +7479,7 @@
   // ----- tarefas e ordens -----
   function eqMontarSelectMaquinas() {
     const sel = document.getElementById('eqOMaquina');
-    const maqs = Object.keys(MACHINES).filter(m => !MAQUINAS_EXCLUIDAS.has(m)).sort();
+    const maqs = [...Object.keys(MACHINES), ...Object.keys(MAQUINAS_OFFLINE)].filter(m => !MAQUINAS_EXCLUIDAS.has(m)).sort();
     sel.innerHTML = '<option value="">— nenhuma em especial —</option><option value="*armazem">📦 Armazém (preparação de caixas)</option><option value="*snacks">Todas as de snacks (uma tarefa cada)</option><option value="*cafe">Todas as de café (uma tarefa cada)</option><option value="*todas">Todas as máquinas (uma tarefa cada)</option>' +
       maqs.map(m => `<option value="${m}">${escapeHtml(machineLabel(m))}</option>`).join('');
   }

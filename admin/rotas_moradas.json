@@ -51,7 +51,8 @@
       "id": "guifoes",
       "nome": "Guifões - Green Park",
       "maquinas": [
-        "004"
+        "004",
+        "018"
       ],
       "morada": "Travessa Monte da Terra 67, Guifões, Matosinhos, Portugal",
       "lat": null,
@@ -145,25 +146,43 @@
       "lon": null
     },
     {
-      "id": "divmac",
-      "nome": "Divmac",
-      "maquinas": [
-        "017",
-        "018",
-        "019",
-        "020"
-      ],
-      "morada": "Rua 1º de Maio 110, 3700-541 Arrifana, Santa Maria da Feira, Portugal",
-      "lat": 40.919325,
-      "lon": -8.492408
-    },
-    {
       "id": "melt",
       "nome": "Melt Porto",
       "maquinas": [
         "021"
       ],
       "morada": "R. Conde de Avranches 413, 4200-072 Porto, Portugal",
+      "lat": null,
+      "lon": null
+    },
+    {
+      "id": "arkay-gaia",
+      "nome": "Arkay - Gaia",
+      "maquinas": [
+        "017",
+        "019"
+      ],
+      "morada": "R. Almeida Garrett 19, 4430-300 Vila Nova de Gaia, Portugal",
+      "lat": null,
+      "lon": null
+    },
+    {
+      "id": "douromar-gaia",
+      "nome": "Douromar - Gaia",
+      "maquinas": [
+        "020"
+      ],
+      "morada": "Av. Agustina Bessa Luís, 4400-044 Vila Nova de Gaia, Portugal",
+      "lat": null,
+      "lon": null
+    },
+    {
+      "id": "hotel-fenix",
+      "nome": "Hotel Fénix",
+      "maquinas": [
+        "022"
+      ],
+      "morada": "",
       "lat": null,
       "lon": null
     }
